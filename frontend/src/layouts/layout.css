@@ -57,9 +57,6 @@ html:has(.test-site-notice) { --test-site-offset: var(--control-height); }
 .sidebar > .brand { padding: 0 var(--space-2); }
 
 .sidebar-nav { display: grid; align-content: start; gap: 22px; }
-.workspace-switcher { padding-inline: var(--space-2); }
-.topbar-account { display: none; margin-left: auto; }
-.account-links { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .nav-group { display: grid; gap: 2px; }
 .nav-group h6 { margin: 0; padding: 0 12px 6px; color: var(--muted); font-size: var(--text-xs); font-weight: 700; }
 
@@ -274,7 +271,6 @@ html:has(.test-site-notice) { --test-site-offset: var(--control-height); }
   .sidebar { display: none; }
   .topbar { height: 56px; padding-inline: max(var(--space-4), env(safe-area-inset-left)) max(var(--space-4), env(safe-area-inset-right)); }
   .topbar-brand { display: block; }
-  .topbar-account { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; }
   .topbar-brand .brand-copy { display: none; }
   /* 手机：详情页用“‹ 上一级”替代标志；主题切换在“我的”页 */
   .topbar:has(.page-back) .topbar-brand { display: none; }

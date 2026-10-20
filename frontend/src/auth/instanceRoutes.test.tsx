@@ -13,12 +13,9 @@ describe('instance routes', () => {
     ['/models/gpt-5', '/models/:model'],
     ['/keys', '/keys'],
     ['/usage', '/usage'],
-    ['/supply/channels', '/supply/channels'],
-    ['/supply/channels/new', '/supply/channels/new'],
-    ['/supply/channels/abc', '/supply/channels/:id/*'],
-    ['/supply/channels/abc/config', '/supply/channels/:id/*'],
-    ['/supply/channels/abc/health', '/supply/channels/:id/*'],
-    ['/supply/revenue', '/supply/revenue'],
+    ['/channels', '/channels'],
+    ['/channels/new', '/channels/new'],
+    ['/channels/abc', '/channels/:id'],
     ['/points', '/points'],
     ['/points/trades/abc', '/points/trades/:id'],
     ['/account', '/account'],
@@ -40,13 +37,5 @@ describe('instance routes', () => {
     const initializeMatch = matchRoutes(appRoutes, '/initialize') ?? []
     const initializeGuards = initializeMatch.map((m) => (typeof m.route.element === 'object' && m.route.element !== null && 'type' in m.route.element ? String((m.route.element as { type?: { name?: string } }).type?.name) : ''))
     expect(initializeGuards).not.toContain('RequireSession')
-  })
-
-  it('板块管理和治理详情都经过管理员守卫，旧板块入口只做重定向', () => {
-    for (const path of ['/admin/forum/boards', '/admin/users', '/admin/channels/abc']) {
-      const matches = matchRoutes(appRoutes, path) ?? []
-      expect(matches.some(match => (match.route.element as { type?: { name?: string } } | undefined)?.type?.name === 'RequireAdmin')).toBe(true)
-    }
-    expect((matchRoutes(appRoutes, '/forum/boards')?.at(-1)?.route.element as { type?: { name?: string } })?.type?.name).toBe('LegacyRedirect')
   })
 })

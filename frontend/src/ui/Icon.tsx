@@ -35,7 +35,6 @@ const paths = {
     </>
   ),
   swap: <path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4m4 4H7" />,
-  'sell-order': <><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 7h6M9 11h6M9 15h3" /></>,
   // 管理后台
   gauge: (
     <>

@@ -1,17 +1,56 @@
-import { BalanceCard } from '../points/BalanceCard'
 import { useQueryOverlay } from '../ui/urlState'
 import { useAuth } from '../auth/AuthProvider'
 import { CallDetailDrawer, CallTable, summaryColumns, useCall } from '../calls'
 import type { CallSummary } from '../api/types'
-import { formatPoints } from '../money/format'
+import { amountSign, formatPoints } from '../money/format'
+import { parseNanoPoints, formatNanoPoints } from '../money/amount'
 import { usePoints } from '../points/queries'
-import { ButtonLink, Card, EmptyState, Icon, Notice, PageHeader, QueryBoundary } from '../ui'
+import { ButtonLink, Card, EmptyState, Icon, Notice, PageHeader, QueryBoundary, Sparkline } from '../ui'
 import { useHome } from './queries'
 import { StartCard } from './StartCard'
 
-function HomeBalance() {
+/** 还能透支：可用额度与信用额度取小（余额为正时可用额度包含余额）。 */
+export function overdraftRemaining(available: string, creditLimit: string) {
+  const a = parseNanoPoints(available)
+  const c = parseNanoPoints(creditLimit)
+  const value = a < c ? a : c
+  return formatNanoPoints(value < 0n ? 0n : value)
+}
+
+function BalanceCard() {
   const points = usePoints()
-  return <QueryBoundary query={points} errorFallback="余额加载失败">{summary => <BalanceCard summary={summary} variant="compact" />}</QueryBoundary>
+  return (
+    <Card className="home-balance" title="余额">
+      <QueryBoundary errorFallback="余额加载失败" query={points}>
+        {(data) => {
+          const trend = data.trend?.map((point) => Number(point.balance)) ?? []
+          return (
+          <div className="balance-body">
+            <strong className={`balance-value num ${amountSign(data.balance) < 0 ? 'amount-negative' : ''}`}>
+              {formatPoints(data.balance, { digits: 2 })}
+              <small>积分</small>
+            </strong>
+            <span className="balance-meta">
+              <span className="muted-copy">
+                还能透支 <span className="num">{formatPoints(overdraftRemaining(data.available, data.credit_limit), { digits: 2 })}</span>
+              </span>
+              {trend.length > 1 && <span className="muted-copy">30 天走势</span>}
+            </span>
+            <Sparkline height={36} label="30 天余额走势" values={trend} width={300} />
+            <div className="balance-actions">
+              <ButtonLink size="sm" to="/points?tab=buy" variant="primary">
+                买积分
+              </ButtonLink>
+              <ButtonLink size="sm" to="/points?sell=1">
+                卖积分
+              </ButtonLink>
+            </div>
+          </div>
+          )
+        }}
+      </QueryBoundary>
+    </Card>
+  )
 }
 
 function TodayCard() {
@@ -53,8 +92,8 @@ function RecentCalls() {
   return (
     <Card
       actions={
-        <ButtonLink size="sm" to="/calls" variant="quiet">
-          全部调用
+        <ButtonLink size="sm" to="/usage" variant="quiet">
+          全部用量
         </ButtonLink>
       }
       flush
@@ -83,7 +122,7 @@ function PendingTradesBanner() {
   return (
     <Notice
       action={
-        <ButtonLink icon={<Icon name="chevron-right" />} size="sm" to="/points/trades">
+        <ButtonLink icon={<Icon name="chevron-right" />} size="sm" to="/points?tab=trades">
           去处理
         </ButtonLink>
       }
@@ -103,7 +142,7 @@ export function HomePage() {
       <PendingTradesBanner />
       <StartCard />
       <div className="home-grid">
-        <HomeBalance />
+        <BalanceCard />
         <TodayCard />
       </div>
       <RecentCalls />

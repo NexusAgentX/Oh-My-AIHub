@@ -73,49 +73,6 @@ func (q *Queries) FinishTrade(ctx context.Context, arg FinishTradeParams) error 
 	return err
 }
 
-const getMarketOrder = `-- name: GetMarketOrder :one
-SELECT o.id, o.seller_id, o.total_nano, o.available_nano, o.in_trade_nano, o.sold_nano, o.closed_nano, o.unit_price_fen, o.min_per_trade_nano, o.max_per_trade_nano, o.payment_methods_ciphertext, o.payment_methods_nonce, o.payment_methods_key_id, o.status, o.created_at, o.updated_at, o.closed_at, a.display_name AS seller_name
-FROM c2c_orders o JOIN accounts a ON a.id = o.seller_id
-WHERE o.id = $1 AND o.status = 'open' AND o.available_nano > 0
-  AND o.seller_id <> $2
-`
-
-type GetMarketOrderParams struct {
-	ID       string
-	ViewerID string
-}
-
-type GetMarketOrderRow struct {
-	C2cOrder   C2cOrder
-	SellerName string
-}
-
-func (q *Queries) GetMarketOrder(ctx context.Context, arg GetMarketOrderParams) (GetMarketOrderRow, error) {
-	row := q.db.QueryRow(ctx, getMarketOrder, arg.ID, arg.ViewerID)
-	var i GetMarketOrderRow
-	err := row.Scan(
-		&i.C2cOrder.ID,
-		&i.C2cOrder.SellerID,
-		&i.C2cOrder.TotalNano,
-		&i.C2cOrder.AvailableNano,
-		&i.C2cOrder.InTradeNano,
-		&i.C2cOrder.SoldNano,
-		&i.C2cOrder.ClosedNano,
-		&i.C2cOrder.UnitPriceFen,
-		&i.C2cOrder.MinPerTradeNano,
-		&i.C2cOrder.MaxPerTradeNano,
-		&i.C2cOrder.PaymentMethodsCiphertext,
-		&i.C2cOrder.PaymentMethodsNonce,
-		&i.C2cOrder.PaymentMethodsKeyID,
-		&i.C2cOrder.Status,
-		&i.C2cOrder.CreatedAt,
-		&i.C2cOrder.UpdatedAt,
-		&i.C2cOrder.ClosedAt,
-		&i.SellerName,
-	)
-	return i, err
-}
-
 const getOrder = `-- name: GetOrder :one
 SELECT o.id, o.seller_id, o.total_nano, o.available_nano, o.in_trade_nano, o.sold_nano, o.closed_nano, o.unit_price_fen, o.min_per_trade_nano, o.max_per_trade_nano, o.payment_methods_ciphertext, o.payment_methods_nonce, o.payment_methods_key_id, o.status, o.created_at, o.updated_at, o.closed_at, a.display_name AS seller_name
 FROM c2c_orders o JOIN accounts a ON a.id = o.seller_id
@@ -594,10 +551,9 @@ WHERE (CASE $1::text
   AND (NOT $4::bool
        OR (t.buyer_id = $2 AND t.status = 'awaiting_payment')
        OR (t.seller_id = $2 AND t.status = 'paid'))
-  AND (NOT $5::bool OR t.status IN ('awaiting_payment', 'paid', 'disputed'))
-  AND (NOT $6::bool OR (t.created_at, t.id) < ($7::timestamptz, $8::uuid))
+  AND (NOT $5::bool OR (t.created_at, t.id) < ($6::timestamptz, $7::uuid))
 ORDER BY t.created_at DESC, t.id DESC
-LIMIT $9
+LIMIT $8
 `
 
 type ListUserTradesParams struct {
@@ -605,7 +561,6 @@ type ListUserTradesParams struct {
 	UserID    string
 	Status    string
 	Pending   bool
-	Active    bool
 	HasCursor bool
 	AfterTime time.Time
 	AfterID   string
@@ -627,7 +582,6 @@ func (q *Queries) ListUserTrades(ctx context.Context, arg ListUserTradesParams) 
 		arg.UserID,
 		arg.Status,
 		arg.Pending,
-		arg.Active,
 		arg.HasCursor,
 		arg.AfterTime,
 		arg.AfterID,

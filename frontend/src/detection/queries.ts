@@ -1,21 +1,17 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiSend } from '../api/client'
-import { usePageVisible } from '../api/visibility'
 import type { components } from '../api/schema.gen'
 export type Job = components['schemas']['DetectionJob']
 export type SearchSettings = components['schemas']['DetectionSearchSettings']
-export const detectionKeys = { all: ['detection'] as const, list: (cursor: string, draftID?: string) => ['detection', 'jobs', cursor, draftID] as const, job: (id: string) => ['detection', 'job', id] as const, parameters: ['detection', 'parameters'] as const }
-export function useDetectionJobs(cursor: string, enabled = true, draftID?: string) {
-  const visible = usePageVisible()
-  return useQuery({ enabled, queryKey: detectionKeys.list(cursor, draftID), queryFn: () => apiGet<'listDetectionJobs'>('/api/detection/jobs', { cursor: cursor || undefined, draft_id: draftID, limit: 100 }), placeholderData: keepPreviousData, refetchOnWindowFocus: true, refetchInterval: query => visible && query.state.data?.items.some(job => job.execution_active) ? 2000 : false })
+export const detectionKeys = { all: ['detection'] as const, list: (cursor: string) => ['detection', 'jobs', cursor] as const, job: (id: string) => ['detection', 'job', id] as const, parameters: ['detection', 'parameters'] as const }
+export function useDetectionJobs(cursor: string,enabled=true) {
+  return useQuery({ enabled,queryKey: detectionKeys.list(cursor), queryFn: () => apiGet<'listDetectionJobs'>('/api/detection/jobs', { cursor }) })
 }
 export function useDetectionJob(id: string) {
-  const visible = usePageVisible()
-  return useQuery({ queryKey: detectionKeys.job(id), queryFn: () => apiGet<'getDetectionJob'>(`/api/detection/jobs/${encodeURIComponent(id)}`), refetchOnWindowFocus: true, refetchInterval: (query) => visible && query.state.data?.job.execution_active ? 2000 : false })
+  return useQuery({ queryKey: detectionKeys.job(id), queryFn: () => apiGet<'getDetectionJob'>(`/api/detection/jobs/${encodeURIComponent(id)}`), refetchInterval: (query) => query.state.data?.job.execution_active ? 2000 : false })
 }
 export function useDetectionArtifacts(id: string, updatedAt: string, active: boolean, enabled = true) {
-  const visible = usePageVisible()
-  return useQuery({ queryKey: ['detection', 'artifacts', id, updatedAt],enabled,refetchInterval: visible && active ? 2000 : false, queryFn: () => apiGet<'listDetectionArtifacts'>(`/api/detection/jobs/${encodeURIComponent(id)}/artifacts`) })
+  return useQuery({ queryKey: ['detection', 'artifacts', id, updatedAt],enabled,refetchInterval: active ? 2000 : false, queryFn: () => apiGet<'listDetectionArtifacts'>(`/api/detection/jobs/${encodeURIComponent(id)}/artifacts`) })
 }
 export function useDetectionAction() {
   const client = useQueryClient()

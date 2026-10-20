@@ -12,10 +12,9 @@ function RequireAdmin() {
 export const adminRoutes = (
   <Route element={<RequireAdmin />}>
     <Route lazy={async () => ({ Component: (await import('./AdminFrame')).AdminFrame })} path="/admin">
-      <Route lazy={async()=>({Component:(await import("../contributions/Pages")).ContributionQueuePage})} path="contributions"><Route lazy={async()=>({Component:(await import("../contributions/Pages")).NewContributionRoute})} path="new" /></Route>
+      <Route lazy={async()=>({Component:(await import("../contributions/Pages")).ContributionQueuePage})} path="contributions"/>
  <Route lazy={async()=>({Component:(await import("../contributions/Pages")).ContributionDetailPage})} path="contributions/:draftID"/>
- <Route lazy={async () => ({ Component: (await import('../forum/BoardsPage')).BoardsPage })} path="forum/boards" />
-      <Route index lazy={async () => ({ Component: (await import('./OverviewPage')).OverviewPage })} />
+ <Route index lazy={async () => ({ Component: (await import('./OverviewPage')).OverviewPage })} />
       <Route lazy={async () => ({ Component: (await import('./CallsPage')).CallsPage })} path="calls" />
       <Route lazy={async () => ({ Component: (await import('../calls/Pages')).AdminCallInsightsPage })} path="calls/insights" />
       <Route lazy={async () => ({ Component: (await import('../calls/Pages')).CallPage })} path="calls/:id" />
@@ -26,7 +25,7 @@ export const adminRoutes = (
       <Route lazy={async()=>({Component:(await import('../group-channels/Pages')).AdminGroupChannelsPage})} path="channels" />
       <Route
         lazy={async () => ({ Component: (await import('../group-channels/Pages')).AdminGroupChannelPage })}
-        path="channels/:id/*"
+        path="channels/:id"
       />
       <Route lazy={async () => ({ Component: (await import('./DisputesPage')).DisputesPage })} path="disputes" />
       <Route

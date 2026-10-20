@@ -1,18 +1,20 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { errorMessage } from '../api/query'
 import { formatFen, formatPoints, parseYuanToFen } from '../money/format'
-import { Button, Drawer, Icon, IconButton, InlineError, QueryBoundary, TextField } from '../ui'
+import { Button, Drawer, Icon, IconButton, InlineError, SuccessMessage, TextField } from '../ui'
 import { emptySellForm, maxPaymentMethods, maxSellable, sellRequest, validateSell, type SellForm } from './c2c'
 import { newIdempotencyKey, useCreateOrder, usePoints } from './queries'
 
-function SellForm({ balance, onCreated, onBusy }: { balance: string; onCreated: (id: string) => void; onBusy: (busy: boolean) => void }) {
+function SellForm({ onDone }: { onDone: () => void }) {
+  const points = usePoints()
+  const balance = points.data?.balance ?? '0'
   const max = maxSellable(balance)
   const [form, setForm] = useState<SellForm>(emptySellForm)
   const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
   const [idempotencyKey] = useState(newIdempotencyKey)
   const create = useCreateOrder()
-  useEffect(() => onBusy(create.isPending), [create.isPending, onBusy])
   const set = (patch: Partial<SellForm>) => {
     setConfirming(false)
     setForm({ ...form, ...patch })
@@ -30,9 +32,22 @@ function SellForm({ balance, onCreated, onBusy }: { balance: string; onCreated: 
     create.mutate(
       { body: sellRequest(form), idempotencyKey },
       {
-        onSuccess: value => onCreated(value.order.id),
+        onSuccess: () => setDone(true),
         onError: (caught) => setError(errorMessage(caught, '发布失败，请重试')),
       },
+    )
+  }
+
+  if (done) {
+    return (
+      <div className="stack-form">
+        <SuccessMessage>卖单已发布</SuccessMessage>
+        <div className="form-actions">
+          <Button onClick={onDone} type="button">
+            完成
+          </Button>
+        </div>
+      </div>
     )
   }
 
@@ -110,12 +125,10 @@ function SellForm({ balance, onCreated, onBusy }: { balance: string; onCreated: 
 }
 
 /** 卖积分右侧抽屉。 */
-export function SellDrawer({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: string) => void }) {
-  const points = usePoints()
-  const [busy, setBusy] = useState(false)
+export function SellDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
-    <Drawer onClose={onClose} open={open} busy={busy} title="卖积分">
-      {open && <QueryBoundary query={points} errorFallback="余额加载失败">{data => <SellForm balance={data.balance} onCreated={onCreated} onBusy={setBusy} />}</QueryBoundary>}
+    <Drawer onClose={onClose} open={open} title="卖积分">
+      {open && <SellForm onDone={onClose} />}
     </Drawer>
   )
 }

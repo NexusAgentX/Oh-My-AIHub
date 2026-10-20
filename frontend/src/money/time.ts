@@ -26,9 +26,6 @@ const timeOnly = new Intl.DateTimeFormat('zh-CN', {
   hour12: false,
 })
 
-/** 保存状态使用的北京时间时分。 */
-export function formatClockTime(value: Date) { return timeOnly.format(value).slice(0, 5) }
-
 /** 列表时间：今天只显示时分秒，其余显示月-日 时:分。 */
 export function formatTime(value: string | null | undefined, now = new Date()) {
   if (!value) return '—'

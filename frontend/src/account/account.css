@@ -1,7 +1,62 @@
-/* 账户入口：资料、密码、设备主题与社区。 */
-.account-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); }
-.account-grid .panel { margin: 0; min-width: 0; }
-.inline-edit-trigger { min-height: 44px; padding: 0; border: 0; color: var(--link); background: transparent; cursor: pointer; font: inherit; text-align: left; }
-.inline-edit-form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.inline-edit-form .input { width: min(100%, 16rem); }
-@media (max-width: 767px) { .account-grid { grid-template-columns: minmax(0, 1fr); } .account-password { order: 1; } }
+/* 我的（移动端）与账户设置 */
+.me-page { display: grid; gap: var(--space-4); }
+.me-profile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3) var(--space-4);
+  align-items: center;
+  padding: var(--space-5);
+  border: var(--sticker-border);
+  border-radius: var(--radius-lg);
+  background: var(--canvas);
+  box-shadow: var(--shadow-md);
+}
+.me-profile h1 { font-size: var(--text-xl); }
+.avatar-lg { width: 48px; height: 48px; font-size: var(--text-lg); }
+.me-balance {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--hairline);
+  color: var(--muted);
+}
+.me-balance:hover { text-decoration: none; }
+.me-balance strong { color: var(--ink); font-family: var(--font-display); font-size: var(--text-xl); font-weight: 800; }
+.me-links { display: grid; overflow: hidden; border: var(--sticker-border); border-radius: var(--radius-lg); background: var(--canvas); box-shadow: var(--shadow-md); }
+.me-link {
+  display: flex;
+  width: 100%;
+  min-height: 52px;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--ink);
+  background: var(--canvas);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+.me-link:last-child { border-bottom: 0; }
+.me-link:hover { background: var(--hover); text-decoration: none; }
+.me-link > span { flex: 1; }
+.me-link > .icon:first-child { color: var(--muted); }
+.me-link > .icon:last-child { color: var(--muted); }
+.me-theme {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border: var(--sticker-border);
+  border-radius: var(--radius-lg);
+  color: var(--ink);
+  background: var(--canvas);
+  box-shadow: var(--shadow-md);
+}
+.me-signout { border: var(--sticker-border); border-radius: var(--radius-lg); color: var(--danger); box-shadow: var(--shadow-md); }

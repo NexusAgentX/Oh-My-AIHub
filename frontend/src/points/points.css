@@ -11,8 +11,6 @@
 
 .trades-tab,
 .bill-tab { display: grid; gap: var(--space-3); }
-.bill-tab[aria-busy="true"] .panel,
-.panel[aria-busy="true"] { opacity: 0.6; }
 .trades-tab .filter-select { justify-self: start; }
 .needs-action { color: var(--warning) !important; font-weight: 600; }
 

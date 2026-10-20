@@ -1,11 +1,6 @@
-import { SaveBar } from '../ui/SaveBar'
-import { useUnsavedGuard } from '../ui/UnsavedGuard'
-import { useKeys } from '../keys/queries'
-import { formatClockTime } from '../money/time'
-import { DomainNav } from '../layouts/DomainNav'
 import { MarketQualitySection } from './Quality'
-import { useState } from 'react'
-import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { errorMessage } from '../api/query'
 import type { components } from '../api/schema.gen'
 import { FormatTags } from '../calls'
@@ -17,7 +12,7 @@ import { SupplierIcon } from '../sharing/components'
 import { EstimateCard } from '../typical/Page'
 import { useTypicalCosts } from '../typical/queries'
 import { formatTypicalPrice } from '../typical/format'
-import { Badge, Button, ButtonLink, Card, Checkbox, Disclosure, EmptyState, InlineError, Notice, PageHeader, QueryBoundary, SearchInput, SelectField, Switch, TextField, Toolbar } from '../ui'
+import { Badge, Button, ButtonLink, Card, Checkbox, Disclosure, EmptyState, InlineError, Notice, PageHeader, QueryBoundary, SearchInput, SelectField, SuccessMessage, Switch, TextField, Toolbar } from '../ui'
 import { useMarketGroup, useMarketModel, useMarketModels, useMarketReport, useMarketSuppliers,useSetMarketRouting } from './queries'
 import './market.css'
 
@@ -85,29 +80,23 @@ export function MarketModelGrid({ groupID, supplierID }: { groupID?: string; sup
     <QueryBoundary query={query} errorFallback="模型目录加载失败">{data => <>
       <p className="muted-copy" role="status">共 {data.total} 个模型 · 能力和费用来自符合筛选的候选</p>
       {data.price_sort_fallback && <Notice tone="info">报价的计量单位不同，当前按模型 ID 排序。</Notice>}
-      {data.items.length ? <div className="model-grid">{data.items.map(model => <ModelCard key={model.id} model={model} search={search.toString()} />)}</div> : <EmptyState title="没有符合条件的模型" action={<ButtonLink to="/supply/contributions">贡献供应商分组</ButtonLink>} />}
+      {data.items.length ? <div className="model-grid">{data.items.map(model => <ModelCard key={model.id} model={model} search={search.toString()} />)}</div> : <EmptyState title="没有符合条件的模型" action={<ButtonLink to="/contributions">贡献供应商分组</ButtonLink>} />}
       <div className="form-actions"><Button variant="quiet" disabled={!params.get('cursor')} onClick={() => update('cursor', '')}>回到第一页</Button><Button variant="secondary" disabled={!data.next_cursor} onClick={() => setParams(current => { const next = new URLSearchParams(current); next.set('cursor', data.next_cursor ?? ''); return next })}>下一页</Button></div>
     </>}</QueryBoundary>
   </>
 }
-export function MarketModelsPage() { return <><PageHeader title="模型" /><DomainNav domain="市场" /><MarketModelGrid /></> }
+export function MarketModelsPage() { return <><PageHeader title="模型" /><MarketModelGrid /></> }
 
 function RoutingCard({ detail }: { detail: Detail }) {
-  const location = useLocation()
-  const [base, setBase] = useState(() => draftFromPreference(detail.routing, detail.routing_channels))
-  const [draft, setDraft] = useState(base)
-  const [savedAt, setSavedAt] = useState('')
-  const mutation = useSetMarketRouting(detail.model.id)
-  const keys = useKeys()
-  const dirty = !sameDraft(draft, base)
-  useUnsavedGuard(dirty, { busy: mutation.isPending })
-  return <Card title="我的调用方式">
-    <div className="stack-form"><p className="muted-copy">{detail.routing.source === 'account' ? '账号设置' : '平台默认'}</p>
-    <SaveBar dirtyCount={dirty ? 1 : 0} busy={mutation.isPending} savedAt={savedAt} onDiscard={() => setDraft(base)} onSave={() => mutation.mutate(toRoutingInput(draft), { onSuccess: result => { const latest = draftFromPreference(result, detail.routing_channels); setBase(latest); setDraft(latest); setSavedAt(formatClockTime(new Date())) } })} />
-    <InlineError>{mutation.isError ? errorMessage(mutation.error, '保存失败') : ''}</InlineError>
-    <RoutingEditor channels={detail.routing_channels} draft={draft} onChange={setDraft} scopeHint="该模型的全部渠道，对你所有 Key 生效；单把 Key 的覆盖优先" />
-    {(keys.data?.items ?? []).filter(key => key.routed_models.includes(detail.model.id)).map(key => <Link key={key.id} to={`/keys/${key.id}/routing/${encodeURIComponent(detail.model.id)}`} state={{ from: { to: location.pathname + location.search, label: '模型' } }}>Key「{key.name}」单独设置了此模型 →</Link>)}
-    </div>
+  const saved = draftFromPreference(detail.routing, detail.routing_channels)
+  const [draft, setDraft] = useState(saved)
+  const [message, setMessage] = useState('')
+  const mutation=useSetMarketRouting(detail.model.id)
+  useEffect(() => { setDraft(draftFromPreference(detail.routing, detail.routing_channels)) }, [detail.routing, detail.routing_channels])
+  const dirty = !sameDraft(draft, saved)
+  return <Card title="调用方式" actions={<Button size="sm" disabled={!dirty} loading={mutation.isPending} onClick={() => { setMessage(''); mutation.mutate(toRoutingInput(draft), { onSuccess: () => setMessage('已保存') }) }}>保存</Button>}>
+    <SuccessMessage>{dirty ? '' : message}</SuccessMessage><InlineError>{mutation.isError ? errorMessage(mutation.error, '保存失败') : ''}</InlineError>
+    <RoutingEditor channels={detail.routing_channels} draft={draft} onChange={setDraft} scopeHint="该模型的全部渠道，对你所有 Key 生效，单把 Key 可以另设" />
   </Card>
 }
 export function ModelRoutingCard({id}:{id:string}){
@@ -163,7 +152,7 @@ function CodexSetup({ model }: { model: string }) {
 
 export function MarketSuppliersPage() {
   const query = useMarketSuppliers(), [params, setParams] = useSearchParams()
-  return <><PageHeader title="供应商" actions={<ButtonLink to="/supply/contributions">贡献供应商</ButtonLink>} /><DomainNav domain="市场" /><Toolbar><SearchInput label="搜索供应商" value={params.get('q') ?? ''} onChange={e => setParams(p => { const n = new URLSearchParams(p); n.set('q', e.target.value); return n })} /><SelectField label="供应商分类" value={params.get('kind') ?? ''} onChange={e => setParams(p => { const n = new URLSearchParams(p); n.set('kind', e.target.value); return n })}><option value="">全部</option>{Object.entries(kinds).map(([k, label]) => <option value={k} key={k}>{label}</option>)}</SelectField></Toolbar>
+  return <><PageHeader title="供应商" actions={<ButtonLink to="/contributions">贡献供应商</ButtonLink>} /><Toolbar><SearchInput label="搜索供应商" value={params.get('q') ?? ''} onChange={e => setParams(p => { const n = new URLSearchParams(p); n.set('q', e.target.value); return n })} /><SelectField label="供应商分类" value={params.get('kind') ?? ''} onChange={e => setParams(p => { const n = new URLSearchParams(p); n.set('kind', e.target.value); return n })}><option value="">全部</option>{Object.entries(kinds).map(([k, label]) => <option value={k} key={k}>{label}</option>)}</SelectField></Toolbar>
     <QueryBoundary query={query} errorFallback="供应商加载失败">{data => {
       const rows = data.items.filter(s => (!params.get('kind') || s.kind === params.get('kind')) && `${s.name} ${s.summary}`.toLowerCase().includes((params.get('q') ?? '').toLowerCase()))
       return rows.length ? <div className="sharing-grid">{rows.map(s => <Card key={s.id}><div className="sharing-title"><SupplierIcon supplier={s} /><h2><Link to={`/suppliers/${s.id}`}>{s.name}</Link></h2><Badge>{kinds[s.kind]}</Badge></div><p>{s.summary}</p><p className="muted-copy">{s.groups.length} 个分组</p></Card>)}</div> : <EmptyState title="暂无符合条件的供应商" />
@@ -179,7 +168,7 @@ export function MarketSupplierDetailPage() {
 }
 export function MarketGroupPage() {
   const { id = '' } = useParams(), query = useMarketGroup(id)
-  return <QueryBoundary query={query} errorFallback="分组不存在或已停用">{data => <><PageHeader title={data.group.name} back={{ to: `/suppliers/${data.supplier.id}`, label: data.supplier.name }} actions={<ButtonLink to={`/supply/channels/new?group=${encodeURIComponent(id)}`} state={{ from: { to: `/groups/${id}`, label: data.group.name } }}>用此分组共享渠道</ButtonLink>} /><Card><MarkdownContent value={data.group.description} />{data.group.status_url && <a href={data.group.status_url} target="_blank" rel="noopener noreferrer">服务状态 ↗</a>}<div className="sharing-line">{data.reports.map(id => <ButtonLink key={id} to={`/reports/${id}`} variant="secondary">查看检测报告</ButtonLink>)}</div>{data.reports.length === 0 && <p className="muted-copy">暂无已批准检测报告</p>}</Card><MarketModelGrid groupID={id} /></>}</QueryBoundary>
+  return <QueryBoundary query={query} errorFallback="分组不存在或已停用">{data => <><PageHeader title={data.group.name} back={{ to: `/suppliers/${data.supplier.id}`, label: data.supplier.name }} /><Card><MarkdownContent value={data.group.description} />{data.group.status_url && <a href={data.group.status_url} target="_blank" rel="noopener noreferrer">服务状态 ↗</a>}<div className="sharing-line">{data.reports.map(id => <ButtonLink key={id} to={`/reports/${id}`} variant="secondary">查看检测报告</ButtonLink>)}</div>{data.reports.length === 0 && <p className="muted-copy">暂无已批准检测报告</p>}</Card><MarketModelGrid groupID={id} /></>}</QueryBoundary>
 }
 export function MarketReportPage() {
   const { id = '' } = useParams(), query = useMarketReport(id)

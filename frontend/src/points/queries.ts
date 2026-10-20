@@ -1,8 +1,7 @@
-import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiSend, pathSegment, request, withQuery, type QueryParams } from '../api/client'
 import type { RequestBody } from '../api/types'
-import type { C2CMyOrder, C2COrder, C2CTrade, PointsEntryPage, ResponseBody, TradeStatus } from '../api/types'
-import { usePageVisible } from '../api/visibility'
+import type { PointsEntryPage, TradeStatus } from '../api/types'
 
 export const pointsKeys = {
   all: ['points'] as const,
@@ -19,10 +18,9 @@ export const c2cKeys = {
   trade: (id: string) => ['c2c', 'trade', id] as const,
 }
 
-/** 当前账户的积分概况（余额、信用额度、可用额度、30 天走势与本月对账）。 */
+/** 当前账户的积分概况（余额、信用额度、可透支额度、30 天走势与本月对账）。 */
 export function usePoints() {
-  const visible = usePageVisible()
-  return useQuery({ queryKey: pointsKeys.summary, queryFn: () => apiGet<'getPoints'>('/api/points'), refetchOnWindowFocus: true, refetchInterval: visible ? 60_000 : false })
+  return useQuery({ queryKey: pointsKeys.summary, queryFn: () => apiGet<'getPoints'>('/api/points') })
 }
 
 /** 指定期间（如账单所选月份）的对账；与 usePoints 同一接口，按期间单独缓存。 */
@@ -35,7 +33,7 @@ export function usePointsPeriod(from?: string, to?: string) {
 }
 
 export type EntryParams = {
-  transaction_id?: string
+ transaction_id?: string
   /** 汇总方式；省略则不返回 summary */
   group?: 'day' | 'key'
   type?: string
@@ -51,7 +49,6 @@ export function usePointsEntries(params: EntryParams) {
       request<PointsEntryPage>(withQuery('/api/points/entries', { ...params, limit: 50, cursor: pageParam || undefined })),
     initialPageParam: '',
     getNextPageParam: (last: PointsEntryPage) => last.next_cursor ?? undefined,
-    placeholderData: keepPreviousData,
   })
 }
 
@@ -79,43 +76,33 @@ export async function downloadEntriesCsv(params: EntryParams) {
   URL.revokeObjectURL(url)
 }
 
-function useC2CPages<T>(key: readonly unknown[], path: string, params: QueryParams = {}) {
-  const visible = usePageVisible()
-  const query = useInfiniteQuery({
-    queryKey: [...key, params],
-    queryFn: ({ pageParam, signal }) => request<{ items: T[]; next_cursor: string | null }>(withQuery(path, { ...params, cursor: pageParam || undefined, limit: 50 }), { signal }),
-    initialPageParam: '', getNextPageParam: last => last.next_cursor || undefined,
-    placeholderData: keepPreviousData, refetchOnWindowFocus: true,
-    refetchInterval: visible && (params.pending || params.active) ? 15_000 : false,
+export function useC2COrders() {
+  return useQuery({
+    queryKey: c2cKeys.orders,
+    queryFn: () => apiGet<'listC2COrders'>('/api/c2c/orders', { limit: 100 }),
   })
-  return { ...query, pageCount: query.data?.pages.length ?? 0, data: query.data ? { items: query.data.pages.flatMap(page => page.items), next_cursor: query.data.pages.at(-1)?.next_cursor ?? null } : undefined }
 }
-export function useC2COrders() { return useC2CPages<C2COrder>(c2cKeys.orders, '/api/c2c/orders') }
 
 export function useMyC2COrders() {
-  return useC2CPages<C2CMyOrder>(c2cKeys.myOrders, '/api/c2c/my/orders')
-}
-
-export function useMyC2CTrades(params: { status?: TradeStatus; role?: 'buyer' | 'seller'; pending?: boolean; active?: boolean }) {
-  return useC2CPages<C2CTrade>(c2cKeys.myTrades(params), '/api/c2c/my/trades', params)
-}
-
-export function useC2COrder(id: string) {
   return useQuery({
-    queryKey: ['c2c', 'order', id], enabled: Boolean(id),
-    queryFn: async ({ signal }) => (await request<ResponseBody<'getC2CMarketOrder'>>(`/api/c2c/orders/${pathSegment(id)}`, { signal })).order,
-    refetchOnWindowFocus: true,
+    queryKey: c2cKeys.myOrders,
+    queryFn: () => apiGet<'listMyC2COrders'>('/api/c2c/my/orders', { limit: 100 }),
+  })
+}
+
+export function useMyC2CTrades(params: { status?: TradeStatus; role?: 'buyer' | 'seller' }) {
+  return useQuery({
+    queryKey: c2cKeys.myTrades(params),
+    queryFn: () => apiGet<'listMyC2CTrades'>('/api/c2c/my/trades', { ...params, limit: 100 }),
   })
 }
 
 export function useC2CTrade(id: string | null) {
-  const visible = usePageVisible()
   return useQuery({
     queryKey: c2cKeys.trade(id ?? ''),
     queryFn: async () => (await apiGet<'getC2CTrade'>(`/api/c2c/trades/${pathSegment(id ?? '')}`)).trade,
     enabled: Boolean(id),
-    refetchInterval: query => visible && query.state.data && !['released', 'cancelled', 'resolved_to_buyer', 'resolved_to_seller'].includes(query.state.data.status) ? 15_000 : false,
-    refetchOnWindowFocus: true,
+    refetchInterval: 15_000,
   })
 }
 

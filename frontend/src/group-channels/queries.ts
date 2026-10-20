@@ -1,9 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiSend } from '../api/client'
 import type { components } from '../api/schema.gen'
-import { usePageVisible } from '../api/visibility'
-
-export function probing(channel: GroupChannel) { return channel.selected_address_ids.length > 0 && channel.status !== 'suspended' && channel.models.some(model => model.enabled && !model.excluded && model.probe_state === 'pending') }
 
 export type GroupChannel = components['schemas']['GroupChannel']
 export type GroupSource = components['schemas']['GroupChannelSource']
@@ -13,12 +10,10 @@ export type ChannelUpdate = components['schemas']['GroupChannelUpdate']
 export type Choice = components['schemas']['GroupChannelChoice']
 
 export function useGroupChannels(admin = false) {
-  const visible = usePageVisible()
-  return useQuery({ queryKey: ['group-channels', 'list', admin], queryFn: () => admin ? apiGet<'listAdminGroupChannels'>('/api/admin/group-channels') : apiGet<'listGroupChannels'>('/api/group-channels'), refetchOnWindowFocus: true, refetchInterval: query => visible && query.state.data?.items.some(probing) ? 5000 : false })
+  return useQuery({ queryKey: ['group-channels', 'list', admin], queryFn: () => admin ? apiGet<'listAdminGroupChannels'>('/api/admin/group-channels') : apiGet<'listGroupChannels'>('/api/group-channels') })
 }
 export function useGroupChannel(id: string, admin = false) {
-  const visible = usePageVisible()
-  return useQuery({ queryKey: ['group-channels', 'detail', id, admin], queryFn: () => admin ? apiGet<'getAdminGroupChannel'>(`/api/admin/group-channels/${id}`) : apiGet<'getGroupChannel'>(`/api/group-channels/${id}`), enabled: Boolean(id), refetchOnWindowFocus: true, refetchInterval: query => visible && query.state.data && probing(query.state.data) ? 5000 : false })
+  return useQuery({ queryKey: ['group-channels', 'detail', id, admin], queryFn: () => admin ? apiGet<'getAdminGroupChannel'>(`/api/admin/group-channels/${id}`) : apiGet<'getGroupChannel'>(`/api/group-channels/${id}`), enabled: Boolean(id), refetchInterval: (query) => query.state.data?.models.some((model) => model.enabled && !model.excluded && model.probe_state === 'pending') && query.state.data.selected_address_ids.length > 0 && query.state.data.status !== 'suspended' ? 5000 : false })
 }
 export function useGroupSources() {
   return useQuery({ queryKey: ['group-channels', 'sources'], queryFn: () => apiGet<'groupChannelSources'>('/api/group-channels/sources') })

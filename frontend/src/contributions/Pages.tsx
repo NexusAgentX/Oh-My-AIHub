@@ -1,14 +1,5 @@
-import { SaveBar } from '../ui/SaveBar'
-import { Pager } from '../ui/Pager'
-import { useBack } from '../ui/urlState'
-import { useUnsavedGuard } from '../ui/UnsavedGuard'
-import { formatClockTime, formatDateTime } from '../money/time'
-import { ApiError } from '../api/client'
-import { DefaultsEditor } from './DefaultsEditor'
-import { QuotePricesEditor, priceNames } from './PriceEditors'
-import { DomainNav } from '../layouts/DomainNav'
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Outlet, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useState, type FormEvent } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { errorMessage } from '../api/query'
 import {
@@ -44,7 +35,7 @@ import {
   type Kind,
 } from './queries'
 import './contributions.css'
-import { DetectionSection } from './DetectionSection'
+import { ReportPicker } from './ReportPicker'
 
 const stateNames: Record<string, string> = {
   draft: '草稿',
@@ -87,44 +78,113 @@ function Status({ value }: { value: string }) {
   )
 }
 function stamp(v: string) {
-  return formatDateTime(v)
+  return new Date(v).toLocaleString('zh-CN', { hour12: false })
 }
 
-export function ContributionsPage({ queue = false, title }: { queue?: boolean; initialKind?: Kind; title?: string }) {
-  const query = useContributions(queue), location = useLocation()
-  const base = queue ? '/admin/contributions' : '/supply/contributions'
-  return <><PageHeader title={title ?? (queue ? '贡献审核' : '我的贡献')} actions={<ButtonLink to={base + '/new'} state={{ overlayFrom: location.pathname + location.search }} variant="primary">新建贡献</ButtonLink>} />{!queue && <DomainNav domain="供应" />}<Card><QueryBoundary query={query} isEmpty={data => data.items.length === 0} empty={<EmptyState title={queue ? '暂无待审核贡献' : '还没有贡献'} />}>{data => <><div className="contribution-list">{data.items.map(item => <article key={item.id}><div><strong>{item.title}</strong><p className="muted-copy">{kinds[item.kind as Kind] ?? item.kind} · {stamp(item.updated_at)}</p></div><Status value={item.state} /><ButtonLink size="sm" to={`${base}/${item.id}`} state={{ from: { to: location.pathname + location.search, label: queue ? '贡献审核' : '我的贡献' } }}>查看</ButtonLink></article>)}</div><Pager hasMore={query.hasNextPage} loading={query.isFetchingNextPage} error={query.isFetchNextPageError ? errorMessage(query.error, '加载失败，请重试') : undefined} onMore={() => void query.fetchNextPage()} /></>}</QueryBoundary></Card><Outlet /></>
-}
-export function NewContributionRoute() {
-  const location = useLocation(), navigate = useNavigate(), [params] = useSearchParams()
-  const admin = location.pathname.startsWith('/admin/')
-  const base = admin ? '/admin/contributions' : '/supply/contributions'
-  const kind = params.get('kind') as Kind
-  const initialKind = ['supplier', 'group', 'group_model', ...(admin ? ['model_id'] : [])].includes(kind) ? kind : 'supplier'
-  return <NewContribution initialKind={initialKind} initialTarget={params.get('target_id') || params.get('parent_id') || ''} initialMode={params.get('action') || (params.has('target_id') ? 'edit' : undefined)} open close={() => location.state?.overlayFrom ? navigate(-1) : navigate(base, { replace: true })} onCreated={id => navigate(`${base}/${id}`, { replace: true, state: { from: location.state?.from ?? { to: base, label: admin ? '贡献审核' : '我的贡献' } } })} />
+export function ContributionsPage({ queue = false, initialKind='supplier',title }: { queue?: boolean;initialKind?:Kind;title?:string }) {
+  const [cursor, setCursor] = useState(''),
+    [creating, setCreating] = useState(false)
+  const query = useContributions(queue, cursor),
+    navigate = useNavigate()
+  return (
+    <>
+      <PageHeader
+        title={title??(queue ? '贡献审核' : '我的贡献')}
+        actions={
+          <Button type="button" onClick={() => setCreating(true)}>
+            新建贡献
+          </Button>
+        }
+      />
+      <Card>
+        <QueryBoundary
+          query={query}
+          isEmpty={(d) => d.items.length === 0}
+          empty={
+            <EmptyState
+              title={queue ? '暂无待审核贡献' : '还没有贡献'}
+              description={
+                queue
+                  ? '成员提交后会出现在这里。'
+                  : '可以贡献供应商、分组和模型报价。'
+              }
+            />
+          }
+        >
+          {(data) => (
+            <>
+              <div className="contribution-list">
+                {data.items.map((v) => (
+                  <article key={v.id}>
+                    <div>
+                      <strong>{v.title}</strong>
+                      <p className="muted-copy">
+                        {kinds[v.kind as Kind] ?? v.kind} ·{' '}
+                        {stamp(v.updated_at)}
+                      </p>
+                    </div>
+                    <Status value={v.state} />
+                    <ButtonLink
+                      size="sm"
+                      to={`${queue ? '/admin' : ''}/contributions/${v.id}`}
+                    >
+                      查看
+                    </ButtonLink>
+                  </article>
+                ))}
+              </div>
+              <div className="form-actions">
+                <Button
+                  type="button"
+                  variant="quiet"
+                  disabled={!cursor}
+                  onClick={() => setCursor('')}
+                >
+                  回到最新
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={!data.next_cursor}
+                  onClick={() => setCursor(data.next_cursor ?? '')}
+                >
+                  下一页
+                </Button>
+              </div>
+            </>
+          )}
+        </QueryBoundary>
+      </Card>
+      <NewContribution
+		initialKind={initialKind}
+        open={creating}
+        close={() => setCreating(false)}
+        onCreated={(id) =>
+          navigate(`${queue ? '/admin' : ''}/contributions/${id}`)
+        }
+      />
+    </>
+  )
 }
 export function ContributionQueuePage() {
   return <ContributionsPage queue />
 }
 function NewContribution({
-  initialKind, initialTarget = '', initialMode,
+	initialKind,
   open,
   close,
   onCreated,
 }: {
-	initialKind: Kind
-  initialTarget?: string
-  initialMode?: string
+	initialKind:Kind
   open: boolean
   close: () => void
   onCreated: (id: string) => void
 }) {
   const { account } = useAuth(),
     action = useNewContribution()
-  const startingMode = initialMode && (initialKind === 'model_id' ? ['disable', 'restore'] : ['new', 'edit', 'disable', 'restore', 'delete']).includes(initialMode) ? initialMode : initialKind === 'model_id' ? 'disable' : 'new'
   const [kind, setKind] = useState<Kind>(initialKind),
-    [mode, setMode] = useState(startingMode),
-    [selected, setSelected] = useState(initialTarget),
+    [mode, setMode] = useState(initialKind==='model_id'?'disable':'new'),
+    [selected, setSelected] = useState(''),
     [cursor, setCursor] = useState(''),
     [starter, setStarter] = useState(true)
   const parentKind =
@@ -140,7 +200,6 @@ function NewContribution({
     cursor,
     open && (mode !== 'new' || kind === 'group' || kind === 'group_model'),
   )
-  const allowNavigation = useUnsavedGuard(selected !== initialTarget || kind !== initialKind || mode !== startingMode || !starter, { busy: action.isPending })
   const submit = (e: FormEvent) => {
     e.preventDefault()
     action.mutate(
@@ -155,13 +214,13 @@ function NewContribution({
         starter: mode === 'new' && starter,
         model_type: 'text',
       },
-      { onSuccess: ({ draft }) => { allowNavigation(); onCreated(draft.id) } },
+      { onSuccess: ({ draft }) => onCreated(draft.id) },
     )
   }
   const needTarget =
     mode !== 'new' || kind === 'group' || kind === 'group_model'
   return (
-    <Dialog open={open} busy={action.isPending} onClose={close} title="新建贡献">
+    <Dialog open={open} onClose={close} title="新建贡献">
       <form onSubmit={submit} className="stack-form">
         <SelectField
           label="对象"
@@ -216,7 +275,6 @@ function NewContribution({
                 onChange={(e) => setSelected(e.target.value)}
               >
                 <option value="">请选择</option>
-                {selected && !targets.data?.items.some(v => v.id === selected) && <option value={selected}>已选择的对象</option>}
                 {targets.data?.items.map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.name}
@@ -224,7 +282,6 @@ function NewContribution({
                   </option>
                 ))}
               </SelectField>
-              {targets.isError && <TextField label="对象 ID" value={selected} onChange={event => setSelected(event.target.value)} required />}
               <InlineError>
                 {targets.isError && errorMessage(targets.error, '无法加载对象')}
               </InlineError>
@@ -280,17 +337,25 @@ function NewContribution({
 }
 
 export function ContributionDetailPage() {
-  const { draftID = '' } = useParams(), query = useContribution(draftID), location = useLocation()
-  const admin = location.pathname.startsWith('/admin/')
-  const back = useBack(admin ? '/admin/contributions' : '/supply/contributions', admin ? '贡献审核' : '我的贡献')
-  return <><PageHeader title={query.data?.draft.title || '贡献详情'} back={back} /><QueryBoundary query={query} errorFallback="贡献加载失败">{data => <Editor key={data.draft.id} data={data} reload={async () => (await query.refetch({ throwOnError: true })).data} />}</QueryBoundary></>
+  const { draftID = '' } = useParams(),
+    query = useContribution(draftID)
+  return (
+    <QueryBoundary query={query}>
+      {(data) => (
+        <Editor
+          key={`${data.draft.id}:${data.draft.revision}`}
+          data={data}
+          reload={() => void query.refetch()}
+        />
+      )}
+    </QueryBoundary>
+  )
 }
 type Detail = NonNullable<ReturnType<typeof useContribution>['data']>
-function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail | undefined> }) {
-  const [d, setBaseline] = useState(data.draft)
-  const { account } = useAuth(), location = useLocation()
-  const admin = location.pathname.startsWith('/admin/') && Boolean(account?.is_admin)
-  const [savedAt, setSavedAt] = useState(''), [generation, setGeneration] = useState(0), [reloadOpen, setReloadOpen] = useState(false), [reloading, setReloading] = useState(false), [reloadError, setReloadError] = useState('')
+function Editor({ data, reload }: { data: Detail; reload: () => void }) {
+  const d = data.draft,
+    { account } = useAuth(),
+    admin = !!account?.is_admin
   const [title, setTitle] = useState(d.title),
     [c, setC] = useState<Changes>(structuredClone(d.changes)),
     [reports, setReports] = useState(d.report_ids.join('\n')),
@@ -310,23 +375,17 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
     title !== d.title ||
     reports !== d.report_ids.join('\n') ||
     JSON.stringify(c) !== JSON.stringify(d.changes)
-  const busy = save.isPending || action.isPending || add.isPending || iconBusy || reloading,
+  const busy = save.isPending || action.isPending || add.isPending || iconBusy,
     invalid = Object.values(jsonErrors).some(Boolean)
   const reportIDs = reports.split(/\s+/).filter(Boolean)
-  const conflict = data.draft.revision !== d.revision || (save.error instanceof ApiError && save.error.status === 409)
-  const applyDraft = useCallback((latest: Detail['draft']) => { setBaseline(latest); setTitle(latest.title); setC(structuredClone(latest.changes)); setReports(latest.report_ids.join('\n')); setJsonErrors({}); setReason(''); setGeneration(value => value + 1); setConfirm(false) }, [])
-  useEffect(() => { if (!dirty && !invalid && !busy && !reason.trim() && data.draft.revision !== d.revision) applyDraft(data.draft) }, [dirty, invalid, busy, reason, data.draft, d.revision, applyDraft])
-  useUnsavedGuard(dirty || invalid || Boolean(reason.trim()), { busy })
-
   const saveDraft = (e: FormEvent) => {
     e.preventDefault()
-    if (!editable || busy || invalid || conflict) return
     save.mutate({
       revision: d.revision,
       title,
       changes: c,
       report_ids: reportIDs,
-    }, { onSuccess: ({ draft }) => { applyDraft(draft); save.reset(); setSavedAt(formatClockTime(new Date())) } })
+    })
   }
   const update = <K extends keyof Changes>(
     key: K,
@@ -340,7 +399,8 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
   const jsonValid = (id: string, bad: boolean) =>
     setJsonErrors((v) => ({ ...v, [id]: bad }))
   const act = (type: 'submit' | 'withdraw' | 'approve' | 'reject') =>
-    action.mutate({ action: type, revision: d.revision, reason }, { onSuccess: ({ draft }) => applyDraft(draft) })
+    action.mutate({ action: type, revision: d.revision, reason })
+  const basePath = admin ? '/admin/contributions' : '/contributions'
   const fetchIcon = async (index: number) => {
     const source = c.suppliers[index].value.website_url
     setIconBusy(true)
@@ -363,7 +423,14 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
   }
   return (
     <>
-      {conflict && <Notice tone="warning">草稿已被更新，请载入最新内容后继续。<Button variant="quiet" onClick={() => setReloadOpen(true)}>载入最新</Button></Notice>}
+      <PageHeader
+        title={d.title}
+        actions={
+          <ButtonLink to={basePath} variant="secondary">
+            返回列表
+          </ButtonLink>
+        }
+      />
       <div className="contribution-status">
         <Status value={data.stage} />
         <span className="muted-copy">
@@ -389,10 +456,8 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
         </Notice>
       )}
       {dirty && <Notice tone="info">请先保存修改，再检测或提交审核。</Notice>}
-      <form key={generation} onSubmit={saveDraft} className="contribution-form">
-        {editable && <SaveBar dirtyCount={dirty ? 1 : invalid ? 1 : 0} busy={busy} disabled={invalid || conflict} savedAt={savedAt} onDiscard={() => { if (conflict) setReloadOpen(true); else { applyDraft(d); save.reset() } }} />}
-        <InlineError>{save.isError && errorMessage(save.error, '保存失败')}</InlineError>
-        <Card title="1. 内容">
+      <form onSubmit={saveDraft} className="contribution-form">
+        <Card title="贡献内容">
           <fieldset
             disabled={!editable || busy}
             className="contribution-fields"
@@ -511,7 +576,7 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
                     <Button
                       type="button"
                       variant="secondary"
-                      disabled={dirty || invalid || conflict}
+                      disabled={dirty}
                       onClick={() =>
                         add.mutate({
                           revision: d.revision,
@@ -551,7 +616,12 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
                     value={v.status_url}
                     onChange={(e) => set({ status_url: e.target.value })}
                   />
-                  <DefaultsEditor value={v.defaults} onChange={defaults => set({ defaults })} onInvalid={bad => jsonValid('defaults-' + v.id, bad)} />
+                  <JSONField
+                    label="默认设置"
+                    value={v.defaults}
+                    set={(value) => set({ defaults: value })}
+                    valid={(bad) => jsonValid('defaults-' + v.id, bad)}
+                  />
                   <Checkbox
                     label="启用分组"
                     checked={v.enabled}
@@ -561,7 +631,7 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
                     <Button
                       type="button"
                       variant="secondary"
-                      disabled={dirty || invalid || conflict}
+                      disabled={dirty}
                       onClick={() =>
                         add.mutate({
                           revision: d.revision,
@@ -575,7 +645,7 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
                     <Button
                       type="button"
                       variant="secondary"
-                      disabled={dirty || invalid || conflict}
+                      disabled={dirty}
                       onClick={() =>
                         add.mutate({
                           revision: d.revision,
@@ -595,7 +665,7 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
                       draft={d}
                       groupID={v.id}
                       supplierID={v.supplier_id}
-                      disabled={dirty || busy || invalid || conflict}
+                      disabled={dirty || busy}
                     />
                   )}
                 </section>
@@ -784,7 +854,41 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
                     <option value="per_request">每次请求</option>
                     <option value="per_successful_image">每张成功图片</option>
                   </SelectField>
-                  <QuotePricesEditor value={v} onChange={value => update('quotes', index, value)} onInvalid={bad => jsonValid('quote-' + v.id, bad)} />
+                  {v.billing_unit === 'per_million_tokens' &&
+                    (
+                      ['input', 'output', 'cache_write', 'cache_read'] as const
+                    ).map((key) => (
+                      <TextField
+                        key={key}
+                        inputMode="decimal"
+                        label={priceNames[key]}
+                        value={v.prices[key]}
+                        placeholder="请填写价格，免费请明确填写 0"
+                        onChange={(e) =>
+                          set({
+                            prices: { ...v.prices, [key]: e.target.value },
+                          })
+                        }
+                      />
+                    ))}
+                  <JSONField
+                    label="模态 / 缓存细分价格"
+                    value={v.prices.details}
+                    set={(details) => set({ prices: { ...v.prices, details } })}
+                    valid={(bad) => jsonValid('prices-' + v.id, bad)}
+                  />
+                  <JSONField
+                    label="条件价格"
+                    value={v.tiers}
+                    set={(tiers) => set({ tiers })}
+                    valid={(bad) => jsonValid('tiers-' + v.id, bad)}
+                  />
+                  <JSONField
+                    label="按次、图片与调用内工具单价"
+                    value={v.unit_prices}
+                    set={(unit_prices) => set({ unit_prices })}
+                    valid={(bad) => jsonValid('units-' + v.id, bad)}
+                  />
                 </section>
               )
             })}
@@ -817,14 +921,81 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
                 </section>
               )
             })}
+            <ReportPicker
+              tasks={d.task_ids}
+              targets={data.evaluation.targets.map((t) => t.id)}
+              value={reportIDs}
+              onChange={(values) => setReports(values.join('\n'))}
+            />
           </fieldset>
+          <InlineError>
+            {save.isError && errorMessage(save.error, '保存失败')}
+          </InlineError>
           <InlineError>
             {add.isError && errorMessage(add.error, '无法添加对象')}
           </InlineError>
+          {editable && (
+            <div className="form-actions">
+              <Button
+                type="submit"
+                disabled={!dirty || invalid || busy}
+                loading={save.isPending}
+              >
+                保存草稿
+              </Button>
+            </div>
+          )}
         </Card>
       </form>
-      <Card title="2. 检测">
-        <DetectionSection key={generation} draftID={d.id} targets={data.evaluation.targets} taskIDs={data.draft.task_ids} selected={reportIDs} onChange={ids => setReports(ids.join('\n'))} editable={editable} dirty={dirty} blocked={busy || invalid || conflict} from={{ to: location.pathname + location.search, label: title }} />
+      <Card title="检测与报告">
+        <Notice tone="info">
+          创建需要全部适用项目测完，检测失败或不支持也可以提交。未实现套件和未执行项目不会算作完成。
+        </Notice>
+        {data.evaluation.targets.length === 0 && (
+          <p className="muted-copy">
+            资料未填完整时，请先保存。纯供应商资料及紧急停用、删除不要求付费检测。
+          </p>
+        )}
+        <div className="contribution-list">
+          {data.evaluation.targets.map((target) => (
+            <article key={target.id}>
+              <span>{target.model_id || '分组检测'}</span>
+              <Status value={target.state} />
+              {target.report ? (
+                <ButtonLink
+                  size="sm"
+                  to={`/detection/reports/${target.report.report_id}`}
+                >
+                  {target.report.reused ? '查看复用报告' : '查看报告'}
+                </ButtonLink>
+              ) : (
+                <ButtonLink
+                  size="sm"
+                  to={`/detection?draft_id=${d.id}&target_kind=${target.kind}&target_id=${target.id}`}
+                  aria-disabled={dirty}
+                  onClick={(e) => {
+                    if (dirty) e.preventDefault()
+                  }}
+                >
+                  开始全测
+                </ButtonLink>
+              )}
+              {target.report && (
+                <p className="muted-copy">
+                  {stamp(target.report.finished_at)} · 范围{' '}
+                  {target.report.manifest_version}
+                </p>
+              )}
+            </article>
+          ))}
+        </div>
+        {d.task_ids.map((id) => (
+          <p key={id}>
+            <ButtonLink variant="quiet" to={`/detection/${id}`}>
+              查看关联检测任务
+            </ButtonLink>
+          </p>
+        ))}
       </Card>
       <Card title="变更与影响">
         <p>
@@ -837,8 +1008,7 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
         )}
         <ChangeDiff base={d.base} changes={c} />
       </Card>
-      <Card title={admin ? '3. 审核' : '3. 提交'}>
-        {!admin && data.stage !== 'ready' && <p className="muted-copy">当前内容或检测尚未满足提交条件。</p>}
+      <Card title={admin ? '审核操作' : '提交审核'}>
         <InlineError>
           {action.isError && errorMessage(action.error, '操作失败')}
         </InlineError>
@@ -854,7 +1024,7 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
           {['draft', 'rejected', 'withdrawn'].includes(d.state) && (
             <Button
               type="button"
-              disabled={busy || dirty || conflict || invalid || data.stage !== 'ready'}
+              disabled={busy || dirty || invalid || data.stage !== 'ready'}
               loading={action.isPending}
               onClick={() => act('submit')}
             >
@@ -865,7 +1035,7 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
             <Button
               type="button"
               variant="quiet"
-              disabled={busy || dirty || conflict || invalid}
+              disabled={busy || dirty}
               onClick={() => act('withdraw')}
             >
               撤回
@@ -874,7 +1044,7 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
           {admin && ['submitted', 'publication_pending'].includes(d.state) && (
             <Button
               type="button"
-              disabled={busy || dirty || conflict || invalid}
+              disabled={busy || dirty}
               loading={action.isPending}
               onClick={() => setConfirm(true)}
             >
@@ -885,7 +1055,7 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
             <Button
               type="button"
               variant="secondary"
-              disabled={busy || dirty || conflict || invalid || !reason.trim()}
+              disabled={busy || dirty || !reason.trim()}
               onClick={() => act('reject')}
             >
               驳回
@@ -895,24 +1065,73 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
             type="button"
             variant="quiet"
             disabled={busy}
-            onClick={() => setReloadOpen(true)}
+            onClick={reload}
           >
             重新载入
           </Button>
         </div>
       </Card>
-      <ConfirmDialog open={reloadOpen} busy={reloading} error={reloadError} title="载入最新内容？" description="未保存的修改将被丢弃。" confirmLabel="载入最新" onClose={() => setReloadOpen(false)} onConfirm={() => { setReloading(true); setReloadError(''); void reload().then(latest => { if (latest) { applyDraft(latest.draft); save.reset(); action.reset(); setReloadOpen(false) } else setReloadError('载入失败，请重试') }).catch(error => setReloadError(errorMessage(error, '载入失败，请重试'))).finally(() => setReloading(false)) }} />
       <ConfirmDialog
         open={confirm}
         onClose={() => setConfirm(false)}
         title="批准此修订"
         description={`本次影响 ${data.linked_channels} 个关联渠道。${c.groups.some((v) => v.value.deleted_at) ? '关联渠道将被业务删除。' : '渠道将同步使用批准后的配置。'}历史账本和在途结算保留。`}
         confirmLabel="确认批准"
-        busy={action.isPending}
-        error={action.isError ? errorMessage(action.error, '操作失败') : ''}
-        onConfirm={() => act('approve')}
+        onConfirm={() => {
+          setConfirm(false)
+          act('approve')
+        }}
       />
     </>
+  )
+}
+const priceNames = {
+  input: '输入单价',
+  output: '输出单价',
+  cache_write: '缓存写入单价',
+  cache_read: '缓存读取单价',
+}
+function JSONField<T>({
+  label,
+  value,
+  set,
+  valid,
+}: {
+  label: string
+  value: T
+  set: (value: T) => void
+  valid: (bad: boolean) => void
+}) {
+  const [text, setText] = useState(() => JSON.stringify(value, null, 2)),
+    [error, setError] = useState('')
+  return (
+    <Disclosure title={label}>
+      <TextareaField
+        label={label}
+        rows={8}
+        className="contribution-json"
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value)
+          try {
+            const v = JSON.parse(e.target.value) as T
+            if (
+              (Array.isArray(value) && !Array.isArray(v)) ||
+              !v ||
+              typeof v !== 'object'
+            )
+              throw Error()
+            set(v)
+            setError('')
+            valid(false)
+          } catch {
+            setError('请输入有效的 JSON')
+            valid(true)
+          }
+        }}
+      />
+      <InlineError>{error}</InlineError>
+    </Disclosure>
   )
 }
 const labels: Record<string, string> = {

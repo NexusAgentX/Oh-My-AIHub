@@ -62,13 +62,3 @@ export function useBack(to: string, label: string) {
     ? { to: from.to, label: typeof from.label === 'string' ? from.label : label }
     : { to, label }
 }
-
-export function useRouteClose(fallback: string) {
-  const location = useLocation()
-  const navigate = useNavigate()
-  return () => {
-    const origin = location.state?.overlayFrom
-    if (typeof origin === 'string' && origin.startsWith('/') && !origin.startsWith('//')) navigate(-1)
-    else navigate(`${fallback}${location.search}`, { replace: true })
-  }
-}

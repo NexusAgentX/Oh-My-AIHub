@@ -57,23 +57,6 @@ type c2cMyOrderEnvelopeJSON struct {
 	Order c2cMyOrderJSON `json:"order"`
 }
 
-type c2cOrderEnvelopeJSON struct {
-	Order c2cOrderJSON `json:"order"`
-}
-
-func (a *app) getC2CMarketOrder(w http.ResponseWriter, r *http.Request) {
-	orderID, ok := pathUUID(w, r, "orderID")
-	if !ok {
-		return
-	}
-	order, err := a.c2c.GetMarketOrder(r.Context(), accountFromContext(r.Context()).ID, orderID)
-	if err != nil {
-		writeDomainError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, c2cOrderEnvelopeJSON{Order: newC2cOrderJSON(order)})
-}
-
 // c2cTradeJSON is the OpenAPI C2CTrade schema.
 type c2cTradeJSON struct {
 	ID               string              `json:"id"`
@@ -340,15 +323,15 @@ func (a *app) createC2CTrade(w http.ResponseWriter, r *http.Request) {
 func (a *app) listMyC2CTrades(w http.ResponseWriter, r *http.Request) {
 	limit, ok := pageLimit(r)
 	query := r.URL.Query()
-	pending, active, role, status := query.Get("pending"), query.Get("active"), query.Get("role"), c2c.TradeStatus(query.Get("status"))
+	pending, role, status := query.Get("pending"), query.Get("role"), c2c.TradeStatus(query.Get("status"))
 	if !ok || (pending != "" && pending != "true" && pending != "false") || (role != "" && role != "buyer" && role != "seller") ||
-		(active != "" && active != "true" && active != "false") || (status != "" && !status.Valid()) {
+		(status != "" && !status.Valid()) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "查询参数无效")
 		return
 	}
 	page, err := a.c2c.ListMyTrades(r.Context(), c2c.TradeFilter{
 		UserID: accountFromContext(r.Context()).ID, Role: role, Status: status,
-		Pending: pending == "true", Active: active == "true", Limit: limit,
+		Pending: pending == "true", Limit: limit,
 	}, query.Get("cursor"))
 	if err != nil {
 		writeDomainError(w, err)
@@ -495,7 +478,6 @@ func (a *app) resolveAdminC2CTrade(w http.ResponseWriter, r *http.Request) {
 // registerC2CRoutes 注册 C2C 卖单市场与管理员仲裁（Feature C）。
 func (a *app) registerC2CRoutes(r *router) {
 	r.implement("C", "GET /api/c2c/orders", accessReady, a.listC2COrders)
-	r.implement("C", "GET /api/c2c/orders/{orderID}", accessReady, a.getC2CMarketOrder)
 	r.implement("C", "POST /api/c2c/orders", accessReady, a.createC2COrder)
 	r.implement("C", "GET /api/c2c/my/orders", accessReady, a.listMyC2COrders)
 	r.implement("C", "POST /api/c2c/orders/{orderID}/close", accessReady, a.closeC2COrder)

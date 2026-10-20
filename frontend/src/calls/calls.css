@@ -100,7 +100,7 @@
   inset: 0;
   content: '';
 }
-.call-row-new, .data-row-new {
+.call-row-new {
   animation: call-row-flash 2.4s ease;
 }
 @keyframes call-row-flash {
@@ -642,4 +642,4 @@
 .section-nav-link.is-active { border-color: var(--line); background: var(--mustard); color: var(--on-color); box-shadow: var(--shadow-xs); }
 .query-updating { opacity: .65; }
 .filter-pending { color: var(--warning); font-size: var(--text-xs); }
-@media (prefers-reduced-motion: reduce) { .call-row-new, .data-row-new { animation: none; background: var(--mustard-tint); } }
+@media (prefers-reduced-motion: reduce) { .call-row-new { animation: none; background: var(--mustard-tint); } }

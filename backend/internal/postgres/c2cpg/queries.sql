@@ -47,12 +47,6 @@ WHERE o.seller_id = sqlc.arg(seller_id)
 ORDER BY o.created_at DESC, o.id DESC
 LIMIT sqlc.arg(row_limit);
 
--- name: GetMarketOrder :one
-SELECT sqlc.embed(o), a.display_name AS seller_name
-FROM c2c_orders o JOIN accounts a ON a.id = o.seller_id
-WHERE o.id = sqlc.arg(id) AND o.status = 'open' AND o.available_nano > 0
-  AND o.seller_id <> sqlc.arg(viewer_id);
-
 -- Sealed payment methods of every order, whatever its status: sellers list
 -- closed and filled orders, and sellers and administrators open the trades of
 -- finished orders. Paged by id for the startup keyring check.
@@ -129,7 +123,6 @@ WHERE (CASE sqlc.arg(role)::text
   AND (NOT sqlc.arg(pending)::bool
        OR (t.buyer_id = sqlc.arg(user_id) AND t.status = 'awaiting_payment')
        OR (t.seller_id = sqlc.arg(user_id) AND t.status = 'paid'))
-  AND (NOT sqlc.arg(active)::bool OR t.status IN ('awaiting_payment', 'paid', 'disputed'))
   AND (NOT sqlc.arg(has_cursor)::bool OR (t.created_at, t.id) < (sqlc.arg(after_time)::timestamptz, sqlc.arg(after_id)::uuid))
 ORDER BY t.created_at DESC, t.id DESC
 LIMIT sqlc.arg(row_limit);
