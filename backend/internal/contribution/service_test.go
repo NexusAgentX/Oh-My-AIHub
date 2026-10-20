@@ -211,32 +211,3 @@ func TestDraftPermissionsIdentityAndCommitAcknowledgement(t *testing.T) {
 		t.Fatal("lost COMMIT acknowledgement treated as rollback", err)
 	}
 }
-
-type previewOnlyStore struct {
-	*memoryReview
-	previews int
-}
-
-func (s *previewOnlyStore) Edit(context.Context, string, func(*Draft, UnitOfWork) error) (Draft, error) {
-	panic("preview must not acquire publication edit locks")
-}
-func (s *previewOnlyStore) Preview(ctx context.Context, id string, fn func(*Draft, UnitOfWork) error) (Draft, error) {
-	s.previews++
-	draft, err := s.Get(ctx, id)
-	if err != nil {
-		return draft, err
-	}
-	err = fn(&draft, s.memoryReview)
-	return draft, err
-}
-func TestDetailUsesReadOnlyPreviewAndKeepsOwnershipChecks(t *testing.T) {
-	store := &previewOnlyStore{memoryReview: &memoryReview{draft: Draft{ID: "draft", OwnerID: "owner", State: "approved", Revision: 7}}}
-	service := &Service{Store: store}
-	detail, err := service.Detail(context.Background(), Actor{ID: "owner"}, "draft")
-	if err != nil || detail.Stage != "approved" || store.previews != 1 || store.draft.Revision != 7 {
-		t.Fatalf("preview=%+v, err=%v, calls=%d", detail, err, store.previews)
-	}
-	if _, err = service.Detail(context.Background(), Actor{ID: "other"}, "draft"); !errors.Is(err, ErrNotFound) {
-		t.Fatal("foreign preview visible", err)
-	}
-}

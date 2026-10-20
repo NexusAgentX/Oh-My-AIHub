@@ -1,5 +1,5 @@
 import { formatNanoPoints, parseNanoPoints } from '../money/amount'
-import { formatExactPoints as formatPoints } from '../money'
+import { formatPoints } from './format'
 import type { AdminPoints, AdminPointsBalances, LedgerCheck, LedgerChecks } from './types'
 
 export type EquationTerm = { label: string; value: string; note?: string }

@@ -27,13 +27,7 @@ type impactReader interface {
 
 func (s *Service) Detail(ctx context.Context, actor Actor, id string) (Detail, error) {
 	out := Detail{Addresses: []market.Address{}, Evaluation: Evaluation{Targets: []TargetReview{}}}
-	read := s.Store.Edit
-	if preview, ok := s.Store.(interface {
-		Preview(context.Context, string, func(*Draft, UnitOfWork) error) (Draft, error)
-	}); ok {
-		read = preview.Preview
-	}
-	draft, err := read(ctx, id, func(d *Draft, u UnitOfWork) error {
+	draft, err := s.Store.Edit(ctx, id, func(d *Draft, u UnitOfWork) error {
 		if !authorized(actor, *d) {
 			return ErrNotFound
 		}
@@ -225,7 +219,7 @@ func (s *Service) Choices(ctx context.Context, actor Actor, kind, after string, 
 		return nil, false, ErrInvalid
 	}
 	slices.SortFunc(items, func(a, b TargetChoice) int { return strings.Compare(a.ID, b.ID) })
-	items = slices.DeleteFunc(items, func(v TargetChoice) bool { return v.ID <= after || parentID != "" && v.ParentID != parentID })
+	items = slices.DeleteFunc(items, func(v TargetChoice) bool { return v.ID <= after })
 	more := len(items) > limit
 	if more {
 		items = items[:limit]

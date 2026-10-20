@@ -8,8 +8,6 @@ import { LegacyRedirect } from './LegacyRedirect'
 it.each([
   ['/channels/abc?group=selected#config', '/channels', '/supply/channels', '/supply/channels/abc?group=selected#config'],
   ['/forum/tickets/new?from=home', '/forum/tickets', '/tickets', '/tickets/new?from=home'],
-  ['/admin/disputes/trade?status=paid#history', '/admin/disputes', '/admin/trades', '/admin/trades/trade?status=paid#history'],
-  ['/admin/detection-search?target=context', '/admin/detection-search', '/admin/settings/detection', '/admin/settings/detection?target=context'],
   ['/detection/reports/id', '/detection', '/supply/detection', '/supply/detection/reports/id'],
 ])('preserves object, filters and anchor when redirecting %s', async (source, from, to, expected) => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })

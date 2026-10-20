@@ -1,4 +1,3 @@
-import { InboxProvider } from './inbox/InboxProvider'
 import { MarketHallPage, MarketHallChannelPage } from './market/Hall'
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
@@ -23,7 +22,7 @@ import { TradeDetailPage } from './points/TradeDetailPage'
 import { KeysPage } from './keys/KeysPage'
 import { KeyCreateDrawer, KeyDetailPage } from './keys/KeyDrawer'
 import { KeyRoutingDrawer } from './keys/KeyRouting'
-import { clearSecretHandoffs } from './ui/secretHandoff'
+import { clearKeySecret } from './keys/secret'
 import { UnsavedGuardProvider } from './ui/UnsavedGuard'
 import { createQueryClient } from './api/query'
 import { adminRoutes } from './admin/routes'
@@ -46,7 +45,7 @@ function RequireReadyAccount() {
   if (account?.must_change_password) {
     return <Navigate replace to="/account/password?first=1" />
   }
-  return <InboxProvider><Outlet /></InboxProvider>
+  return <Outlet />
 }
 
 
@@ -62,7 +61,7 @@ function SessionQueryReset() {
     if (previous.current !== accountID) {
       previous.current = accountID
       client.clear()
-      clearSecretHandoffs()
+      clearKeySecret()
     }
   }, [accountID, client])
   return null
@@ -94,7 +93,6 @@ export const appRoutes = createRoutesFromElements(
       <Route element={<RequireReadyAccount />}>
         <Route element={<ProductLayout />}>
           <Route element={<HomePage />} path="/home" />
-          <Route lazy={async()=>({Component:(await import('./inbox/InboxPage')).InboxPage})} path="/inbox" />
           <Route element={<LegacyRedirect from="/channels" to="/supply/channels" />} path="/channels/*" />
           <Route element={<LegacyRedirect from="/contributions" to="/supply/contributions" />} path="/contributions/*" />
           <Route element={<LegacyRedirect from="/detection" to="/supply/detection" />} path="/detection/*" />

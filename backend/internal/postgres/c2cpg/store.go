@@ -334,21 +334,6 @@ func (s *Store) ListDisputes(ctx context.Context, status c2c.TradeStatus, after 
 	return trades, nil
 }
 
-func (s *Store) ListAdminTrades(ctx context.Context, status c2c.TradeStatus, after *c2c.Cursor, limit int) ([]c2c.Trade, error) {
-	has, _, at, id := cursorArgs(after)
-	rows, err := s.q.ListAdminTrades(ctx, ListAdminTradesParams{
-		Status: string(status), HasCursor: has, AfterTime: at, AfterID: id, RowLimit: int32(limit),
-	})
-	if err != nil {
-		return nil, err
-	}
-	trades := make([]c2c.Trade, 0, len(rows))
-	for _, row := range rows {
-		trades = append(trades, tradeOf(tradeRow(row)))
-	}
-	return trades, nil
-}
-
 func (s *Store) DueTrades(ctx context.Context, limit int) ([]string, error) {
 	return s.q.ListDueTrades(ctx, int32(limit))
 }

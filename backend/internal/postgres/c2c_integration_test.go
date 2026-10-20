@@ -162,35 +162,6 @@ func (f *c2cFixture) expireDeadline(tradeID string) {
 
 func amount(t *testing.T, value string) money.Amount { return mustAmount(t, value) }
 
-func TestAdminTradeBrowserAcrossStatesAndPages(t *testing.T) {
-	f := newC2CFixture(t, "0", "0", "0")
-	ctx := context.Background()
-	f.fund(0, "100")
-	order := f.list(0, "50", 92)
-	first := f.mustBuy(1, order.ID, "10")
-	second := f.mustBuy(2, order.ID, "10")
-	if _, err := f.service.MarkPaid(ctx, second.ID, f.members[2].ID, "test"); err != nil {
-		t.Fatal(err)
-	}
-	admin := c2c.Viewer{ID: f.admin.ID, IsAdmin: true}
-	page, err := f.service.ListAdminTrades(ctx, admin, "", "", 1)
-	if err != nil || len(page.Items) != 1 || page.Next == "" {
-		t.Fatalf("first admin page: %+v, %v", page, err)
-	}
-	next, err := f.service.ListAdminTrades(ctx, admin, "", page.Next, 1)
-	if err != nil || len(next.Items) != 1 || next.Next != "" || next.Items[0].ID == page.Items[0].ID {
-		t.Fatalf("next admin page: %+v, %v", next, err)
-	}
-	awaiting, err := f.service.ListAdminTrades(ctx, admin, c2c.TradeAwaitingPayment, "", 1)
-	if err != nil || len(awaiting.Items) != 1 || awaiting.Items[0].ID != first.ID || awaiting.Next != "" {
-		t.Fatalf("filtered admin page: %+v, %v", awaiting, err)
-	}
-	if _, err := f.service.ListAdminTrades(ctx, c2c.Viewer{ID: f.members[1].ID}, "", "", 1); !errors.Is(err, c2c.ErrForbidden) {
-		t.Fatalf("member admin list: %v", err)
-	}
-	f.assertInvariants()
-}
-
 func TestC2CFullRound(t *testing.T) {
 	f := newC2CFixture(t, "0", "0", "0")
 	ctx := context.Background()

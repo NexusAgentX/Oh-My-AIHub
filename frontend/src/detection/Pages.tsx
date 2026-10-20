@@ -1,4 +1,3 @@
-import { DomainStatusBadge } from '../ui/status'
 import { formatDateTime } from '../money/time'
 import { useBack } from '../ui/urlState'
 import { useUnsavedGuard } from '../ui/UnsavedGuard'
@@ -7,21 +6,22 @@ import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { errorMessage } from '../api/query'
-import { Button, ButtonLink, Card, EmptyState, InlineError, Metric, MetricGrid, Notice, PageHeader, PasswordField, QueryBoundary } from '../ui'
+import { Badge, Button, ButtonLink, Card, EmptyState, InlineError, Metric, MetricGrid, Notice, PageHeader, PasswordField, QueryBoundary } from '../ui'
 import { useDetectionAction, useDetectionArtifacts, useDetectionJob, useDetectionJobs, useSavedDetectionReport,useDetectionReports, type Job } from './queries'
 import './detection.css'
 import { DetectionObservations } from './Observations'
 
+const states: Record<string, string> = { queued: '排队中', running: '检测中', finished: '已结束', cancelled: '已取消', interrupted: '已中断', suite_pending: '检测套件待实现', failed: '检测器异常', outdated: '配置已变化', pass: '通过', partial: '部分支持', fail: '未通过', unsupported: '不支持', inconclusive: '无法确认', unobserved: '未观测', untested: '未执行' }
 const reasons: Record<string, string> = { ok: '已核验', unsupported: '上游不支持', assertion_failed: '断言未通过', prerequisite_failed: '前置未通过，无法继续核验', external_error: '上游或网络异常', detector_error: '检测器异常', not_observed: '条件未出现', client_disabled: '客户端未启用', platform_unavailable: '平台代理暂不可用', body_limit: '超出单次大小保护上限', timeout: '单次请求超时', network_error: '网络错误', invalid_response: '响应不符合约定', cancelled: '已取消', interrupted: '进程中断' }
 const layers: Record<string, string> = { upstream_protocol: '上游协议', gateway_proxy: '平台代理', official_cli: '官方 CLI' }
-function State({ state }: { state: string }) { return <DomainStatusBadge domain="detection" value={state} /> }
+function State({ state }: { state: string }) { return <Badge tone={state === 'pass' ? 'success' : ['running', 'queued'].includes(state) ? 'info' : ['failed', 'fail'].includes(state) ? 'danger' : 'neutral'}>{states[state] ?? state}</Badge> }
 function stamp(value: string) { return formatDateTime(value) }
 
 export function DetectionPage() {
   const [cursor, setCursor] = useState(''), [params] = useSearchParams(), location = useLocation()
   const query = useDetectionJobs(cursor), { account } = useAuth()
   if (params.has('target_id')) return <Navigate to={`/supply/detection/new${location.search}`} state={location.state} replace />
-  return <><PageHeader title="检测任务" actions={account?.is_admin && <ButtonLink to="/admin/settings/detection">搜索参数</ButtonLink>} /><DomainNav domain="供应" />
+  return <><PageHeader title="检测任务" actions={account?.is_admin && <ButtonLink to="/admin/detection-search">搜索参数</ButtonLink>} /><DomainNav domain="供应" />
     <Card title="任务记录"><QueryBoundary query={query} isEmpty={data => data.items.length === 0} empty={<EmptyState title="还没有检测记录" description="从贡献、供应商分组或模型页面发起检测。" action={<ButtonLink to="/suppliers">浏览供应商</ButtonLink>} />}>
       {data => <><div className="detection-list" aria-busy={query.isFetching}>{data.items.map(job => <article className="detection-row" key={job.id}><div><strong>{job.target.model || '分组检测'}</strong><p className="muted-copy">{stamp(job.created_at)} · {job.finished_scenarios}/{job.scenarios} 场景</p></div><State state={job.state} /><ButtonLink size="sm" to={`/supply/detection/${job.id}`} state={{ from: { to: location.pathname + location.search, label: '检测任务' } }}>查看任务</ButtonLink></article>)}</div><div className="form-actions"><Button variant="quiet" disabled={!cursor || query.isFetching} onClick={() => setCursor('')}>回到最新</Button><Button variant="secondary" disabled={!data.next_cursor || query.isFetching} onClick={() => setCursor(data.next_cursor ?? '')}>更早任务</Button></div></>}
     </QueryBoundary></Card></>

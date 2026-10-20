@@ -449,21 +449,6 @@ func (a *app) disputeC2CTrade(w http.ResponseWriter, r *http.Request) {
 	writeTrade(w, http.StatusOK, view)
 }
 
-func (a *app) listAdminC2CTrades(w http.ResponseWriter, r *http.Request) {
-	limit, ok := pageLimit(r)
-	status := c2c.TradeStatus(r.URL.Query().Get("status"))
-	if !ok || (status != "" && !status.Valid()) {
-		writeError(w, http.StatusBadRequest, "invalid_request", "查询参数无效")
-		return
-	}
-	page, err := a.c2c.ListAdminTrades(r.Context(), a.viewer(r), status, r.URL.Query().Get("cursor"), limit)
-	if err != nil {
-		writeDomainError(w, err)
-		return
-	}
-	writePage(w, page, newC2cTradeJSON)
-}
-
 func (a *app) listAdminDisputes(w http.ResponseWriter, r *http.Request) {
 	limit, ok := pageLimit(r)
 	status := c2c.TradeStatus(r.URL.Query().Get("status"))
@@ -522,6 +507,5 @@ func (a *app) registerC2CRoutes(r *router) {
 	r.implement("C", "POST /api/c2c/trades/{tradeID}/cancel", accessReady, a.cancelC2CTrade)
 	r.implement("C", "POST /api/c2c/trades/{tradeID}/dispute", accessReady, a.disputeC2CTrade)
 	r.implement("C", "GET /api/admin/disputes", accessAdmin, a.listAdminDisputes)
-	r.implement("C", "GET /api/admin/c2c/trades", accessAdmin, a.listAdminC2CTrades)
 	r.implement("C", "POST /api/admin/c2c/trades/{tradeID}/resolve", accessAdmin, a.resolveAdminC2CTrade)
 }

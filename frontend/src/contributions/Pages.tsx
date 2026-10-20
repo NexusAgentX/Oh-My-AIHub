@@ -1,4 +1,3 @@
-import { DomainStatusBadge } from '../ui/status'
 import { SaveBar } from '../ui/SaveBar'
 import { Pager } from '../ui/Pager'
 import { useBack } from '../ui/urlState'
@@ -13,6 +12,7 @@ import { Outlet, useLocation, useNavigate, useParams, useSearchParams } from 're
 import { useAuth } from '../auth/AuthProvider'
 import { errorMessage } from '../api/query'
 import {
+  Badge,
   Button,
   ButtonLink,
   Card,
@@ -46,13 +46,46 @@ import {
 import './contributions.css'
 import { DetectionSection } from './DetectionSection'
 
+const stateNames: Record<string, string> = {
+  draft: '草稿',
+  detecting: '检测中',
+  invalid: '请补充内容',
+  ready: '可提交',
+  submitted: '待审核',
+  rejected: '已驳回',
+  withdrawn: '已撤回',
+  publication_pending: '发布待完成',
+  approved: '已批准',
+  conflict: '生效版本已变化',
+  supplier_has_groups: '供应商仍有分组',
+  suite_pending: '检测套件待实现',
+  report_required: '需要完整报告',
+}
 const kinds: Record<Kind, string> = {
   supplier: '供应商',
   group: '分组',
   group_model: '模型报价',
   model_id: '模型 ID 治理',
 }
-function Status({ value }: { value: string }) { return <DomainStatusBadge domain="contribution" value={value} /> }
+function Status({ value }: { value: string }) {
+  return (
+    <Badge
+      tone={
+        value === 'approved' || value === 'ready'
+          ? 'success'
+          : value === 'submitted' ||
+              value === 'publication_pending' ||
+              value === 'detecting'
+            ? 'info'
+            : value === 'conflict'
+              ? 'danger'
+              : 'neutral'
+      }
+    >
+      {stateNames[value] ?? value}
+    </Badge>
+  )
+}
 function stamp(v: string) {
   return formatDateTime(v)
 }
@@ -66,12 +99,9 @@ export function NewContributionRoute() {
   const location = useLocation(), navigate = useNavigate(), [params] = useSearchParams()
   const admin = location.pathname.startsWith('/admin/')
   const base = admin ? '/admin/contributions' : '/supply/contributions'
-  const kind = (params.get('create_kind') || params.get('kind')) as Kind
+  const kind = params.get('kind') as Kind
   const initialKind = ['supplier', 'group', 'group_model', ...(admin ? ['model_id'] : [])].includes(kind) ? kind : 'supplier'
-  const host = location.pathname.startsWith('/admin/catalog/') ? '/admin/catalog' : base
-  const originParams = new URLSearchParams(params); for (const key of ['create_kind', 'action', 'target_id']) originParams.delete(key)
-  const origin = host + (host === '/admin/catalog' && originParams.size ? '?' + originParams : '')
-  return <NewContribution initialKind={initialKind} initialTarget={params.get('target_id') || params.get('parent_id') || ''} initialMode={params.get('action') || (params.has('target_id') ? 'edit' : undefined)} open close={() => location.state?.overlayFrom ? navigate(-1) : navigate(origin, { replace: true })} onCreated={id => navigate(`${base}/${id}`, { replace: true, state: { from: location.state?.from ?? { to: origin, label: host === '/admin/catalog' ? '目录治理' : admin ? '贡献审核' : '我的贡献' } } })} />
+  return <NewContribution initialKind={initialKind} initialTarget={params.get('target_id') || params.get('parent_id') || ''} initialMode={params.get('action') || (params.has('target_id') ? 'edit' : undefined)} open close={() => location.state?.overlayFrom ? navigate(-1) : navigate(base, { replace: true })} onCreated={id => navigate(`${base}/${id}`, { replace: true, state: { from: location.state?.from ?? { to: base, label: admin ? '贡献审核' : '我的贡献' } } })} />
 }
 export function ContributionQueuePage() {
   return <ContributionsPage queue />
@@ -283,10 +313,9 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
   const busy = save.isPending || action.isPending || add.isPending || iconBusy || reloading,
     invalid = Object.values(jsonErrors).some(Boolean)
   const reportIDs = reports.split(/\s+/).filter(Boolean)
-  const evaluationPending = data.draft.revision < d.revision
-  const conflict = data.draft.revision > d.revision || (save.error instanceof ApiError && save.error.status === 409)
+  const conflict = data.draft.revision !== d.revision || (save.error instanceof ApiError && save.error.status === 409)
   const applyDraft = useCallback((latest: Detail['draft']) => { setBaseline(latest); setTitle(latest.title); setC(structuredClone(latest.changes)); setReports(latest.report_ids.join('\n')); setJsonErrors({}); setReason(''); setGeneration(value => value + 1); setConfirm(false) }, [])
-  useEffect(() => { if (!dirty && !invalid && !busy && !reason.trim() && data.draft.revision > d.revision) applyDraft(data.draft) }, [dirty, invalid, busy, reason, data.draft, d.revision, applyDraft])
+  useEffect(() => { if (!dirty && !invalid && !busy && !reason.trim() && data.draft.revision !== d.revision) applyDraft(data.draft) }, [dirty, invalid, busy, reason, data.draft, d.revision, applyDraft])
   useUnsavedGuard(dirty || invalid || Boolean(reason.trim()), { busy })
 
   const saveDraft = (e: FormEvent) => {
@@ -334,7 +363,6 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
   }
   return (
     <>
-      {evaluationPending && <Notice tone="warning">保存成功，提交条件尚未刷新。<Button variant="quiet" onClick={() => { void reload().catch(() => {}) }}>重试刷新</Button></Notice>}
       {conflict && <Notice tone="warning">草稿已被更新，请载入最新内容后继续。<Button variant="quiet" onClick={() => setReloadOpen(true)}>载入最新</Button></Notice>}
       <div className="contribution-status">
         <Status value={data.stage} />
@@ -826,7 +854,7 @@ function Editor({ data, reload }: { data: Detail; reload: () => Promise<Detail |
           {['draft', 'rejected', 'withdrawn'].includes(d.state) && (
             <Button
               type="button"
-              disabled={busy || dirty || conflict || invalid || data.stage !== 'ready' || evaluationPending}
+              disabled={busy || dirty || conflict || invalid || data.stage !== 'ready'}
               loading={action.isPending}
               onClick={() => act('submit')}
             >

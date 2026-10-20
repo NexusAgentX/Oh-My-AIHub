@@ -146,18 +146,6 @@ WHERE t.status = sqlc.arg(status)::text
 ORDER BY t.disputed_at, t.id
 LIMIT sqlc.arg(row_limit);
 
--- name: ListAdminTrades :many
-SELECT sqlc.embed(t), b.display_name AS buyer_name, s.display_name AS seller_name,
-       o.payment_methods_ciphertext, o.payment_methods_nonce, o.payment_methods_key_id
-FROM c2c_trades t
-JOIN c2c_orders o ON o.id = t.order_id
-JOIN accounts b ON b.id = t.buyer_id
-JOIN accounts s ON s.id = t.seller_id
-WHERE (sqlc.arg(status)::text = '' OR t.status = sqlc.arg(status)::text)
-  AND (NOT sqlc.arg(has_cursor)::bool OR (t.created_at, t.id) < (sqlc.arg(after_time)::timestamptz, sqlc.arg(after_id)::uuid))
-ORDER BY t.created_at DESC, t.id DESC
-LIMIT sqlc.arg(row_limit);
-
 -- name: ListDueTrades :many
 SELECT id FROM c2c_trades
 WHERE status = 'awaiting_payment' AND payment_deadline <= now()

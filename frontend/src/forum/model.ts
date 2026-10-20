@@ -1,4 +1,3 @@
-import { formatTime as formatShanghaiTime } from '../money/time'
 import type { components } from '../api/schema.gen'
 
 export type Board = components['schemas']['ForumBoard']
@@ -27,5 +26,5 @@ export function attachmentSize(size: number) {
   return size >= 1048576 ? (size / 1048576).toFixed(1) + ' MiB' : Math.max(1, Math.ceil(size / 1024)) + ' KiB'
 }
 export function forumTime(value: string) {
-  return formatShanghaiTime(value)
+  return new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }

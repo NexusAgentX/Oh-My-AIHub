@@ -308,31 +308,3 @@ func (s *Store) SyncPublications(ctx context.Context) error {
 	}
 	return tx.Commit(ctx)
 }
-
-// Preview evaluates a proposal in a consistent read-only snapshot. It does not
-// acquire the publication fence or a draft row lock; mutations still use Edit
-// and revalidate their bases and reports in the publication transaction.
-func (s *Store) Preview(ctx context.Context, id string, fn func(*contribution.Draft, contribution.UnitOfWork) error) (contribution.Draft, error) {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
-	if err != nil {
-		return contribution.Draft{}, domainError(err)
-	}
-	defer func() {
-		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
-		defer cancel()
-		_ = tx.Rollback(cleanup)
-	}()
-	row, err := New(tx).GetContribution(ctx, id)
-	if err != nil {
-		return contribution.Draft{}, domainError(err)
-	}
-	draft, err := value(row)
-	if err != nil {
-		return draft, err
-	}
-	if err = fn(&draft, &unit{tx: tx, id: id}); err != nil {
-		return contribution.Draft{}, domainError(err)
-	}
-	// No write or commit is needed for a preview.
-	return draft, nil
-}

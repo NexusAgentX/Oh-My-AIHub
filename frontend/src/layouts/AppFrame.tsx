@@ -1,4 +1,3 @@
-import { InboxBell, InboxNavCount } from '../inbox/Components'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { errorMessage } from '../api/query'
@@ -53,7 +52,7 @@ function NavGroups({ groups, onNavigate }: { groups: NavGroup[]; onNavigate?: ()
               onClick={onNavigate}
             >
               <Icon name={item.icon} />
-              <span>{item.label}</span><InboxNavCount to={item.to} />
+              <span>{item.label}</span>
             </Link>
           ))}
         </div>
@@ -224,11 +223,11 @@ export function AppFrame({ navigation }: { navigation: NavGroup[] }) {
           </Link>
           {/* 页面标题区把“‹ 上一级”和滚出屏幕后的标题渲染到这里；页面顶部时不重复标题 */}
           <div className="topbar-context" ref={setTopbarSlot} />
-          <div className="topbar-actions">{admin && <Badge tone="warning">治理</Badge>}
-          <InboxBell /><ThemeToggle />
+          {admin && <Badge tone="warning">治理</Badge>}
+          <ThemeToggle />
           <Link className="topbar-account" to="/account" aria-label="账户">
             <span className="avatar" aria-hidden="true">{account?.display_name.slice(0, 1) || '用'}</span>
-          </Link></div>
+          </Link>
         </header>
         {(sessionError || signOutError) && (
           <div className="session-alert" ref={alertReference} role="alert" tabIndex={-1}>
@@ -242,7 +241,7 @@ export function AppFrame({ navigation }: { navigation: NavGroup[] }) {
       {admin ? <>
         <nav aria-label="治理高频导航" className="bottom-bar">
           {adminTabs.map(item => <Link key={item.to} to={item.to} className={`bottom-tab${adminCurrent?.to === item.to ? ' bottom-tab-active' : ''}`} aria-current={adminCurrent?.to === item.to ? 'page' : undefined}>
-            <Icon name={item.icon} size={20} /><span>{item.label}</span><InboxNavCount to={item.to} />
+            <Icon name={item.icon} size={20} /><span>{item.label}</span>
           </Link>)}
           <button type="button" className={`bottom-tab${adminCurrent && !adminTabs.includes(adminCurrent) ? ' bottom-tab-active' : ''}`} aria-haspopup="dialog" aria-expanded={moreOpen} onClick={() => setMoreOpen(true)}><Icon name="more" size={20} /><span>更多</span></button>
         </nav>

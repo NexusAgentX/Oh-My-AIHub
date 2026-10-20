@@ -1,4 +1,3 @@
-import { secretSession } from '../ui/secretHandoff'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiSend, pathSegment } from '../api/client'
 import type { ApiKeyCreateRequest, ApiKeyUpdateRequest, RoutingPreferenceInput } from '../api/types'
@@ -43,9 +42,8 @@ export function useCreateKey() {
   const invalidate = useInvalidateKeys()
   return useMutation({
     mutationFn: async (input: ApiKeyCreateRequest) => {
-      const session = secretSession()
       const result = await apiSend<'createKey'>('POST', '/api/keys', input)
-      handoffKeySecret(result.key.id, result.secret, session)
+      handoffKeySecret(result.key.id, result.secret)
       return { key: result.key }
     },
     onSuccess: invalidate,

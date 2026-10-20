@@ -1,9 +1,17 @@
-import { statusRegistry } from '../ui/status'
-import type { C2CTrade, PaymentMethod, TransactionType } from '../api/types'
+import type { C2CTrade, PaymentMethod, TradeStatus, TransactionType } from '../api/types'
+import type { BadgeTone } from '../ui'
 import { parseNanoPoints, formatNanoPoints } from '../money/amount'
 import { isPositiveAmount, parseYuanToFen } from '../money/format'
 
-export const tradeStatusLabels = statusRegistry.trade
+export const tradeStatusLabels: Record<TradeStatus, { label: string; tone: BadgeTone }> = {
+  awaiting_payment: { label: '待付款', tone: 'warning' },
+  paid: { label: '已付款', tone: 'info' },
+  released: { label: '已完成', tone: 'success' },
+  cancelled: { label: '已取消', tone: 'neutral' },
+  disputed: { label: '申诉中', tone: 'danger' },
+  resolved_to_buyer: { label: '判给买家', tone: 'success' },
+  resolved_to_seller: { label: '退回卖家', tone: 'neutral' },
+}
 
 export const transactionTypeLabels: Record<TransactionType, string> = {
   api_call: '调用',

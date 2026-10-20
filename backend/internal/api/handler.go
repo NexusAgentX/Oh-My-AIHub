@@ -53,7 +53,6 @@ type Dependencies struct {
 }
 
 type app struct {
-	inboxSlots        chan struct{}
 	typical           *typical.Service
 	groupChannels     *groupchannel.Service
 	detectionMCP      *detection.MCPFixture
@@ -89,7 +88,6 @@ func NewHandler(dependencies Dependencies) http.Handler {
 // buildHandler 同时返回路由表，供契约测试与 OpenAPI 规范对照。
 func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application := &app{
-		inboxSlots:        make(chan struct{}, 2),
 		typical:           dependencies.Typical,
 		groupChannels:     dependencies.GroupChannels,
 		detectionMCP:      dependencies.DetectionMCP,

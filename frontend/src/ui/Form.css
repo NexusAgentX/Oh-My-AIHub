@@ -232,5 +232,3 @@ input[type='checkbox']:disabled { cursor: not-allowed; opacity: 0.5; }
 .drawer .save-bar { top: 0; }
 .inherited-field { display: grid; align-content: start; gap: var(--space-1); }
 .inherited-field-source { display: flex; align-items: center; gap: var(--space-1); min-height: 32px; }
-
-.flat-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }

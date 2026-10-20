@@ -1,11 +1,5 @@
-import { errorMessage } from '../api/query'
-import { Pager } from '../ui/Pager'
-import { CommittedInput } from '../ui/CommittedInput'
-import { enumField, stringField, useBack, useQueryOverlay, useUrlState } from '../ui/urlState'
-import { shanghaiDate } from '../money/time'
-import { FinanceNav } from './SectionNav'
 import { useEffect, useState } from 'react'
-import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import {
   Badge,
   Button,
@@ -17,12 +11,13 @@ import {
   QueryBoundary,
   Segmented,
   SelectField,
+  Tabs,
   TextField,
   Toolbar,
   type Column,
 } from '../ui'
-import { ConfirmActionDialog } from './components'
-import { daysSince, formatDateTime, formatExactPoints as formatPoints, formatRatio } from '../money'
+import { ConfirmActionDialog, LoadMore } from './components'
+import { daysSince, formatDateTime, formatPoints, formatRatio } from './format'
 import { LineChart } from './LineChart'
 import { ledgerChecks, ledgerEquation, sortedTrend, type EquationTerm, type TrendWindow } from './pointsView'
 import {
@@ -407,7 +402,6 @@ export const riskColumns: Column<AdminPointsRisk>[] = [
 ]
 
 function Risks({ points }: { points: AdminPoints }) {
-  const location = useLocation()
   const { concentration } = points
   const largest = concentration.top[0]
   return (
@@ -439,7 +433,7 @@ function Risks({ points }: { points: AdminPoints }) {
         caption="风险账户"
         columns={riskColumns}
         empty={<p className="muted-copy empty-pad">没有超额或长期负余额的账户</p>}
-        rowHref={risk => `/admin/users/${risk.account.id}`} rowState={() => ({ overlayFrom: location.pathname + location.search + location.hash })} rowKey={(risk) => `${risk.kind}-${risk.account.id}`}
+        rowKey={(risk) => `${risk.kind}-${risk.account.id}`}
         rows={points.risks}
       />
     </Card>
@@ -456,9 +450,7 @@ function useScrollToHash(ready: boolean) {
 }
 
 function Overview() {
-  const [filters, setFilters] = useUrlState({ days: enumField(['7', '30', '90'] as const, '30') })
-  const days = Number(filters.days) as TrendWindow
-  const setDays = (days: TrendWindow) => setFilters({ days: String(days) as typeof filters.days })
+  const [days, setDays] = useState<TrendWindow>(30)
   const points = useAdminPoints(days)
   useScrollToHash(Boolean(points.data))
   return (
@@ -499,7 +491,7 @@ const transactionColumns = (open: (id: string) => void): Column<LedgerTransactio
 function dateParam(value: string, endOfDay = false) {
   if (!value) return undefined
   const date = new Date(`${value}T00:00:00+08:00`)
-  if (endOfDay) date.setTime(date.getTime() + 86400000)
+  if (endOfDay) date.setDate(date.getDate() + 1)
   return date.toISOString()
 }
 
@@ -510,16 +502,37 @@ const relatedTypeLabels: Record<RelatedType, string> = {
   account: '账户',
 }
 
-const transactionSchema = { account_id: stringField(''), type: enumField(['', 'api_call', 'c2c_list', 'c2c_release', 'c2c_return', 'admin_adjust', 'bad_debt_writeoff'] as const, ''), related_type: enumField(['', 'call', 'c2c_order', 'c2c_trade', 'account'] as const, ''), related_id: stringField(''), from: stringField(''), to: stringField('') }
 function Transactions() {
-  const [filters, setFilters] = useUrlState(transactionSchema), [selected, setSelected] = useQueryOverlay('tx')
-  const accountID = filters.account_id, relatedType = filters.related_type as RelatedType | '', relatedID = filters.related_id
+  const [params, setParams] = useSearchParams()
+  const accountID = params.get('account_id') ?? ''
+  const selected = params.get('transaction')
+  const relatedType = (params.get('related_type') ?? '') as RelatedType | ''
+  const relatedID = params.get('related_id') ?? ''
+  const [relatedInput, setRelatedInput] = useState(relatedID)
+  const [type, setType] = useState<TransactionType | ''>('')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
   const accounts = useAdminAccounts({})
-  const relatedReady = !relatedType && !relatedID || Boolean(relatedType) && uuidPattern.test(relatedID)
-  const transactions = useAdminTransactions({ account_id: accountID || undefined, type: filters.type || undefined, related_type: relatedType || undefined, related_id: relatedID || undefined, from: filters.from || undefined, to: filters.to || undefined }, relatedReady)
-  const relatedError = !relatedReady ? relatedType ? '请输入完整的关联对象 ID' : '请选择关联对象类型' : ''
-  const update = (key: keyof typeof filters, value: string | null) => setFilters({ [key]: value ?? '' })
-  const dateValue = (value: string, end = false) => { const at = new Date(value).getTime(); return Number.isNaN(at) ? '' : shanghaiDate(new Date(at - (end ? 1 : 0))) }
+  const relatedReady = Boolean(relatedType) && uuidPattern.test(relatedID)
+  const transactions = useAdminTransactions({
+    account_id: accountID || undefined,
+    type: type || undefined,
+    related_type: relatedReady ? relatedType || undefined : undefined,
+    related_id: relatedReady ? relatedID : undefined,
+    from: dateParam(from),
+    to: dateParam(to, true),
+  })
+  const relatedError = relatedType && relatedInput.trim() && !uuidPattern.test(relatedInput.trim()) ? '请输入完整的 ID' : ''
+  const update = (key: string, value: string | null) =>
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current)
+        if (value) next.set(key, value)
+        else next.delete(key)
+        return next
+      },
+      { replace: true },
+    )
 
   return (
     <>
@@ -535,7 +548,7 @@ function Transactions() {
             </option>
           ))}
         </SelectField>
-        <SelectField label="类型" onChange={(event) => setFilters({ type: event.target.value as typeof filters.type })} value={filters.type}>
+        <SelectField label="类型" onChange={(event) => setType(event.target.value as TransactionType | '')} value={type}>
           <option value="">全部类型</option>
           {(Object.keys(transactionTypeLabels) as TransactionType[]).map((key) => (
             <option key={key} value={key}>
@@ -546,7 +559,11 @@ function Transactions() {
         <SelectField
           label="关联对象"
           onChange={(event) => {
-            setFilters({ related_type: event.target.value as typeof filters.related_type, ...(!event.target.value ? { related_id: '' } : {}) })
+            update('related_type', event.target.value || null)
+            if (!event.target.value) {
+              setRelatedInput('')
+              update('related_id', null)
+            }
           }}
           value={relatedType}
         >
@@ -557,31 +574,42 @@ function Transactions() {
             </option>
           ))}
         </SelectField>
-        {(relatedType || relatedID) && <label className="field"><span className="field-label">{relatedTypeLabels[relatedType as RelatedType] ?? '关联对象'} ID</span><CommittedInput className="input" aria-label="关联对象 ID" value={relatedID} onCommit={id => update('related_id', id.trim())} />{relatedError && <small className="field-error">{relatedError}</small>}</label>}
-        <TextField label="开始日期" type="date" value={dateValue(filters.from)} onChange={event => update('from', dateParam(event.target.value) || null)} />
-        <TextField label="结束日期" type="date" value={dateValue(filters.to, true)} onChange={event => update('to', dateParam(event.target.value, true) || null)} />
+        {relatedType && (
+          <TextField
+            error={relatedError}
+            label={`${relatedTypeLabels[relatedType]} ID`}
+            onBlur={() => update('related_id', relatedInput.trim() || null)}
+            onChange={(event) => setRelatedInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') update('related_id', relatedInput.trim() || null)
+            }}
+            value={relatedInput}
+          />
+        )}
+        <TextField label="开始日期" onChange={(event) => setFrom(event.target.value)} type="date" value={from} />
+        <TextField label="结束日期" onChange={(event) => setTo(event.target.value)} type="date" value={to} />
       </Toolbar>
-      {!relatedReady ? <p className="muted-copy" role="status">{relatedError}后查看交易。</p> : <Card flush>
+      <Card flush>
         <QueryBoundary query={transactions}>
           {(rows) => (
             <>
               <DataTable
                 caption="账本交易"
-                columns={transactionColumns(setSelected)}
+                columns={transactionColumns((id) => update('transaction', id))}
                 empty={<p className="muted-copy empty-pad">没有符合条件的交易</p>}
                 rowKey={(transaction) => transaction.id}
                 rows={rows}
               />
-              <Pager
-                hasMore={transactions.hasNextPage || transactions.limited} limited={transactions.limited} error={transactions.isFetchNextPageError ? errorMessage(transactions.error, '加载失败，请重试') : undefined}
+              <LoadMore
+                hasMore={Boolean(transactions.hasNextPage)}
                 loading={transactions.isFetchingNextPage}
-                onMore={() => void transactions.fetchNextPage()}
+                onLoad={() => void transactions.fetchNextPage()}
               />
             </>
           )}
         </QueryBoundary>
-      </Card>}
-      <Drawer onClose={() => setSelected(null)} open={Boolean(selected)} title="交易详情">
+      </Card>
+      <Drawer onClose={() => update('transaction', null)} open={Boolean(selected)} title="交易详情">
         {selected && <TransactionDrawerBody transactionID={selected} />}
       </Drawer>
     </>
@@ -604,13 +632,10 @@ const auditColumns: Column<AuditEntry>[] = [
   { key: 'reason', header: '原因', cell: (entry) => entry.reason || '—' },
 ]
 
-const auditSchema = { action: stringField(''), actor_id: stringField(''), target_type: stringField(''), target_id: stringField('') }
 function AuditLog() {
-  const [filters, setFilters] = useUrlState(auditSchema)
-  const valid = (!filters.actor_id || uuidPattern.test(filters.actor_id)) && (!filters.target_id || uuidPattern.test(filters.target_id))
-  const audit = useAdminAudit(filters, valid)
+  const audit = useAdminAudit({})
   return (
-    <><Toolbar>{([['action', '操作类型'], ['actor_id', '操作者 ID'], ['target_type', '对象类型'], ['target_id', '对象 ID']] as const).map(([key, label]) => <label className="field" key={key}><span className="field-label">{label}</span><CommittedInput className="input" value={filters[key]} onCommit={value => setFilters({ [key]: value.trim() })} /></label>)}</Toolbar>{!valid ? <p className="muted-copy" role="status">请输入完整的操作者或对象 ID。</p> : <Card flush>
+    <Card flush>
       <QueryBoundary query={audit}>
         {(rows) => (
           <>
@@ -621,22 +646,37 @@ function AuditLog() {
               rowKey={(entry) => entry.id}
               rows={rows}
             />
-            <Pager hasMore={audit.hasNextPage || audit.limited} limited={audit.limited} error={audit.isFetchNextPageError ? errorMessage(audit.error, '加载失败，请重试') : undefined} loading={audit.isFetchingNextPage} onMore={() => void audit.fetchNextPage()} />
+            <LoadMore hasMore={Boolean(audit.hasNextPage)} loading={audit.isFetchingNextPage} onLoad={() => void audit.fetchNextPage()} />
           </>
         )}
       </QueryBoundary>
-    </Card>}</>
+    </Card>
   )
 }
 
+type PointsTab = 'overview' | 'transactions' | 'audit'
+
 export function PointsPage() {
-  const [params] = useSearchParams(), location = useLocation(), tab = params.get('tab')
-  if (tab === 'transactions' || tab === 'audit' || params.has('transaction')) {
-    const next = new URLSearchParams(params); next.delete('tab')
-    if (next.has('transaction')) { next.set('tx', next.get('transaction')!); next.delete('transaction') }
-    return <Navigate replace to={`${tab === 'audit' ? '/admin/audit' : '/admin/points/transactions'}${next.size ? '?' + next : ''}${location.hash}`} state={location.state} />
-  }
-  return <><PageHeader title="积分全局" /><FinanceNav /><Overview /></>
+  const [params, setParams] = useSearchParams()
+  const raw = params.get('tab')
+  const tab: PointsTab = raw === 'transactions' || raw === 'audit' ? raw : 'overview'
+  return (
+    <>
+      <PageHeader title="积分" />
+      <Tabs
+        items={[
+          { key: 'overview', label: '全局' },
+          { key: 'transactions', label: '交易浏览' },
+          { key: 'audit', label: '操作记录' },
+        ]}
+        label="积分视图"
+        onChange={(key) => setParams(key === 'overview' ? {} : { tab: key }, { replace: true })}
+        value={tab}
+      >
+        {tab === 'overview' && <Overview />}
+        {tab === 'transactions' && <Transactions />}
+        {tab === 'audit' && <AuditLog />}
+      </Tabs>
+    </>
+  )
 }
-export function AdminTransactionsPage() { const location = useLocation(), back = useBack('/admin/points', '积分全局'); return <><PageHeader title="交易浏览" back={location.state?.from ? back : undefined} /><FinanceNav /><Transactions /></> }
-export function AuditPage() { return <><PageHeader title="操作记录" /><FinanceNav /><AuditLog /></> }
