@@ -26,7 +26,7 @@ function TopicDetail({ topic }: { topic: Topic }) {
   const [draft, setDraft] = useState(0)
   const canEdit = Boolean(account?.is_admin || account?.id === topic.author.id)
   const tickets = topic.kind === 'ticket'
-  const back = tickets ? '/tickets' : '/forum' + (topic.board_id ? '?board=' + topic.board_id : '')
+  const back = tickets ? '/forum/tickets' : '/forum' + (topic.board_id ? '?board=' + topic.board_id : '')
   return <div className="forum-page forum-detail">
     <PageHeader title={topic.title} back={{ to: back, label: tickets ? '工单' : '论坛' }}
       actions={canEdit && <><ButtonLink to={'/forum/topics/' + topic.id + '/edit'}>编辑</ButtonLink><Button type="button" variant="quiet" onClick={() => { remove.reset(); setDeleting(true) }}>删除</Button></>} />

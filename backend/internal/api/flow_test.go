@@ -144,16 +144,6 @@ func TestAccountLifecycleAndPoints(t *testing.T) {
 		t.Fatal("account list leaked the one-time password")
 	}
 
-	detail := admin.expect(t, http.StatusOK, http.MethodGet, "/api/admin/accounts/"+memberID, nil)["account"].(map[string]any)
-	if detail["id"] != memberID || detail["available"] != "100" {
-		t.Fatal("account deep link did not load exact account")
-	}
-	if strings.Contains(admin.call(t, http.MethodGet, "/api/admin/accounts/"+memberID, nil).Body.String(), initialPassword) {
-		t.Fatal("account detail leaked one-time password")
-	}
-	admin.expect(t, http.StatusNotFound, http.MethodGet, "/api/admin/accounts/not-uuid", nil)
-	admin.expect(t, http.StatusNotFound, http.MethodGet, "/api/admin/accounts/00000000-0000-4000-8000-00000000dead", nil)
-
 	// 首次登录只能改密，其他接口被拒绝。
 	wang := &client{spec: spec, handler: handler}
 	wang.expect(t, http.StatusOK, http.MethodPost, "/api/auth/login", map[string]string{"username": "wang", "password": initialPassword})
@@ -163,7 +153,6 @@ func TestAccountLifecycleAndPoints(t *testing.T) {
 	if recorder := wang.call(t, http.MethodGet, "/api/admin/accounts", nil); recorder.Code != http.StatusForbidden {
 		t.Fatalf("admin route for member = %d", recorder.Code)
 	}
-	wang.expect(t, http.StatusForbidden, http.MethodGet, "/api/admin/accounts/"+memberID, nil)
 	wang.expect(t, http.StatusOK, http.MethodGet, "/api/me", nil)
 	if recorder := wang.call(t, http.MethodPatch, "/api/me", map[string]string{"display_name": "王"}); recorder.Code != http.StatusForbidden || errorCode(t, recorder) != "password_change_required" {
 		t.Fatalf("display name before password change = %d %s", recorder.Code, recorder.Body.String())

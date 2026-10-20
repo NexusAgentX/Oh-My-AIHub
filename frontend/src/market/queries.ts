@@ -1,19 +1,16 @@
-import { keepPreviousData, useInfiniteQuery, useMutation,useQuery,useQueryClient } from '@tanstack/react-query'
-import { usePageVisible } from '../api/visibility'
-import { normalizeMarketParams } from './filters'
+import { useMutation,useQuery,useQueryClient } from '@tanstack/react-query'
 import { apiGet,apiSend,pathSegment,request } from '../api/client'
 import type {ResponseBody,RoutingPreferenceInput} from '../api/types'
 
 export const marketKeys={all:['market']as const,model:(id:string)=>['market','model',id]as const}
 
 export function useMarketModels(params: URLSearchParams) {
-  const search = normalizeMarketParams(params).toString()
-  const query = useInfiniteQuery({ queryKey: ['market', 'models', search], initialPageParam: '', queryFn: ({ pageParam, signal }) => { const next = new URLSearchParams(search); next.set('limit', '50'); if (pageParam) next.set('cursor', pageParam); return request<ResponseBody<'listMarketModels'>>(`/api/market/models?${next}`, { signal }) }, getNextPageParam: (last, pages) => pages.length < 10 ? last.next_cursor ?? undefined : undefined, placeholderData: keepPreviousData })
-  return { ...query, limited: query.data?.pages.length === 10 && Boolean(query.data.pages.at(-1)?.next_cursor), data: query.data ? { ...query.data.pages[0], items: [...new Map(query.data.pages.flatMap(page => page.items).map(item => [item.id, item])).values()] } : undefined }
+  const search = params.toString()
+  return useQuery({ queryKey: ['market', 'models', search], queryFn: () => apiGet<'listMarketModels'>(`/api/market/models?${search}`) })
 }
 export function useMarketModel(id: string, params: URLSearchParams) {
-  const visible = usePageVisible(), search = normalizeMarketParams(params).toString()
-  return useQuery({ queryKey: ['market', 'model', id, search], queryFn: ({ signal }) => request<ResponseBody<'getMarketModel'>>(`/api/market/models/${pathSegment(id)}${search ? '?' + search : ''}`, { signal }), enabled: Boolean(id), refetchOnWindowFocus: true, refetchInterval: visible ? 60000 : false })
+  const search = params.toString()
+  return useQuery({ queryKey: ['market', 'model', id, search], queryFn: () => apiGet<'getMarketModel'>(`/api/market/models/${pathSegment(id)}?${search}`), enabled: Boolean(id) })
 }
 export function useMarketSuppliers() {
   return useQuery({ queryKey: ['market', 'suppliers'], queryFn: () => apiGet<'listMarketSuppliers'>('/api/market/suppliers') })
@@ -25,9 +22,8 @@ export function useMarketReport(id: string) {
   return useQuery({ queryKey: ['market', 'report', id], queryFn: () => apiGet<'getMarketPublicReport'>(`/api/market/reports/${pathSegment(id)}`), enabled: Boolean(id) })
 }
 export function useMarketHall(params:URLSearchParams){
-  const search=normalizeMarketParams(params,true).toString()
-  const query=useInfiniteQuery({queryKey:['market','hall',search],initialPageParam:'',queryFn:({pageParam,signal})=>{const next=new URLSearchParams(search);next.set('limit','50');if(pageParam)next.set('cursor',pageParam);return request<ResponseBody<'listMarketChannels'>>(`/api/market/channels?${next}`,{signal})},getNextPageParam:(last,pages)=>pages.length<10?last.next_cursor??undefined:undefined,placeholderData:keepPreviousData})
-  return {...query,limited:query.data?.pages.length===10&&Boolean(query.data.pages.at(-1)?.next_cursor),data:query.data?{...query.data.pages[0],items:[...new Map(query.data.pages.flatMap(page=>page.items).map(item=>[item.id,item])).values()]}:undefined}
+  const search=params.toString()
+  return useQuery({queryKey:['market','hall',search],queryFn:()=>apiGet<'listMarketChannels'>(`/api/market/channels?${search}`)})
 }
 export function useMarketChannel(id:string){
   return useQuery({queryKey:['market','channel',id],queryFn:()=>apiGet<'getMarketChannel'>(`/api/market/channels/${pathSegment(id)}`),enabled:Boolean(id)})

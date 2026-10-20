@@ -89,16 +89,6 @@ func (s *fakeC2CStore) ListMarket(_ context.Context, viewerID string, _ *c2c.Cur
 	return orders, nil
 }
 
-func (s *fakeC2CStore) GetMarketOrder(_ context.Context, viewerID, orderID string) (c2c.Order, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	order, ok := s.orders[orderID]
-	if !ok || order.Status != c2c.OrderOpen || order.Available <= 0 || order.Seller.ID == viewerID {
-		return c2c.Order{}, c2c.ErrNotFound
-	}
-	return order, nil
-}
-
 func (s *fakeC2CStore) ListSellerOrders(_ context.Context, sellerID string, status c2c.OrderStatus, _ *c2c.Cursor, limit int) ([]c2c.Order, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -179,37 +169,13 @@ func (s *fakeC2CStore) ListTrades(_ context.Context, f c2c.TradeFilter) ([]c2c.T
 			mine = trade.Seller.ID == f.UserID
 		}
 		pending := (trade.Buyer.ID == f.UserID && trade.Status == c2c.TradeAwaitingPayment) || (trade.Seller.ID == f.UserID && trade.Status == c2c.TradePaid)
-		if f.After != nil && (!trade.CreatedAt.Before(f.After.Time) && !(trade.CreatedAt.Equal(f.After.Time) && trade.ID < f.After.ID)) {
-			continue
-		}
-		if mine && (f.Status == "" || trade.Status == f.Status) && (!f.Pending || pending) && (!f.Active || trade.Status.Unfinished()) {
+		if mine && (f.Status == "" || trade.Status == f.Status) && (!f.Pending || pending) {
 			trades = append(trades, trade)
 		}
 	}
 	sort.Slice(trades, func(i, j int) bool { return trades[i].CreatedAt.After(trades[j].CreatedAt) })
 	if len(trades) > f.Limit {
 		trades = trades[:f.Limit]
-	}
-	return trades, nil
-}
-
-func (s *fakeC2CStore) ListAdminTrades(_ context.Context, status c2c.TradeStatus, after *c2c.Cursor, limit int) ([]c2c.Trade, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	trades := []c2c.Trade{}
-	for _, trade := range s.trades {
-		if (status == "" || trade.Status == status) && (after == nil || trade.CreatedAt.Before(after.Time) || trade.CreatedAt.Equal(after.Time) && trade.ID < after.ID) {
-			trades = append(trades, trade)
-		}
-	}
-	sort.Slice(trades, func(i, j int) bool {
-		if trades[i].CreatedAt.Equal(trades[j].CreatedAt) {
-			return trades[i].ID > trades[j].ID
-		}
-		return trades[i].CreatedAt.After(trades[j].CreatedAt)
-	})
-	if len(trades) > limit {
-		trades = trades[:limit]
 	}
 	return trades, nil
 }
@@ -407,21 +373,6 @@ func TestC2CHandlers(t *testing.T) {
 	if own := seller.expect(t, http.StatusOK, http.MethodGet, "/api/c2c/orders", nil); len(own["items"].([]any)) != 0 {
 		t.Fatalf("own order in market: %v", own)
 	}
-	// A buy deep link reads one public order without relying on the first market page.
-	publicPath := "/api/c2c/orders/" + orderID
-	public := buyer.expect(t, http.StatusOK, http.MethodGet, publicPath, nil)["order"].(map[string]any)
-	if public["id"] != orderID || len(public["payment_channels"].([]any)) != 2 {
-		t.Fatalf("public order = %v", public)
-	}
-	if _, private := public["payment_methods"]; private || strings.Contains(buyer.call(t, http.MethodGet, publicPath, nil).Body.String(), "seller@example.com") {
-		t.Fatal("public order exposes payment accounts")
-	}
-	if recorder := seller.call(t, http.MethodGet, publicPath, nil); recorder.Code != http.StatusNotFound {
-		t.Fatalf("own public order = %d", recorder.Code)
-	}
-	if recorder := buyer.call(t, http.MethodGet, publicPath, nil, withoutCookie); recorder.Code != http.StatusUnauthorized {
-		t.Fatalf("anonymous public order = %d", recorder.Code)
-	}
 	if recorder := buyer.call(t, http.MethodGet, "/api/c2c/orders?cursor=bogus", nil); recorder.Code != http.StatusBadRequest || errorCode(t, recorder) != "invalid_cursor" {
 		t.Fatalf("bad cursor = %d %s", recorder.Code, recorder.Body.String())
 	}
@@ -452,39 +403,6 @@ func TestC2CHandlers(t *testing.T) {
 		t.Fatalf("duplicate = %d %s", recorder.Code, recorder.Body.String())
 	}
 
-	adminTradesPath := "/api/admin/c2c/trades"
-	adminList := admin.expect(t, http.StatusOK, http.MethodGet, adminTradesPath+"?status=awaiting_payment", nil)["items"].([]any)
-	if len(adminList) != 1 || adminList[0].(map[string]any)["id"] != tradeID {
-		t.Fatal("ordinary trade absent from admin browser")
-	}
-	if len(admin.expect(t, http.StatusOK, http.MethodGet, adminTradesPath+"?status=disputed", nil)["items"].([]any)) != 0 {
-		t.Fatal("trade status filter ignored")
-	}
-	buyer.expect(t, http.StatusForbidden, http.MethodGet, adminTradesPath, nil)
-	other.expect(t, http.StatusForbidden, http.MethodGet, adminTradesPath, nil)
-	admin.expect(t, http.StatusBadRequest, http.MethodGet, adminTradesPath+"?status=bogus", nil)
-	admin.expect(t, http.StatusBadRequest, http.MethodGet, adminTradesPath+"?cursor=bogus", nil)
-
-	cloneID := "00000000-0000-4000-8000-000000000529"
-	c2cStore.mu.Lock()
-	clone := c2cStore.trades[tradeID]
-	clone.ID, clone.CreatedAt = cloneID, clone.CreatedAt.Add(time.Second)
-	c2cStore.trades[cloneID] = clone
-	c2cStore.mu.Unlock()
-	firstAdminPage := admin.expect(t, http.StatusOK, http.MethodGet, adminTradesPath+"?status=awaiting_payment&limit=1", nil)
-	if firstAdminPage["items"].([]any)[0].(map[string]any)["id"] != cloneID || firstAdminPage["next_cursor"] == nil {
-		t.Fatal("admin page did not use creation order")
-	}
-	nextAdminPage := admin.expect(t, http.StatusOK, http.MethodGet, adminTradesPath+"?status=awaiting_payment&limit=1&cursor="+firstAdminPage["next_cursor"].(string), nil)
-	if len(nextAdminPage["items"].([]any)) != 1 || nextAdminPage["items"].([]any)[0].(map[string]any)["id"] != tradeID || nextAdminPage["next_cursor"] != nil {
-		t.Fatal("admin trade cursor repeated or skipped a trade")
-	}
-	c2cStore.mu.Lock()
-	delete(c2cStore.trades, cloneID)
-	c2cStore.mu.Unlock()
-	admin.expect(t, http.StatusUnauthorized, http.MethodGet, adminTradesPath, nil, withoutCookie)
-	admin.expect(t, http.StatusConflict, http.MethodPost, "/api/admin/c2c/trades/"+tradeID+"/resolve", map[string]string{"result": "buyer", "reason": "Cannot arbitrate an ordinary trade"})
-
 	// Visibility: parties and administrators only.
 	tradePath := "/api/c2c/trades/" + tradeID
 	if recorder := other.call(t, http.MethodGet, tradePath, nil); recorder.Code != http.StatusNotFound {
@@ -506,12 +424,6 @@ func TestC2CHandlers(t *testing.T) {
 	}
 	if pending := seller.expect(t, http.StatusOK, http.MethodGet, "/api/c2c/my/trades?pending=true", nil); len(pending["items"].([]any)) != 0 {
 		t.Fatalf("seller pending before paid = %v", pending)
-	}
-	if active := seller.expect(t, http.StatusOK, http.MethodGet, "/api/c2c/my/trades?active=true", nil); len(active["items"].([]any)) != 1 {
-		t.Fatalf("seller active includes waiting on the buyer = %v", active)
-	}
-	if recorder := buyer.call(t, http.MethodGet, "/api/c2c/my/trades?active=bogus", nil); recorder.Code != http.StatusBadRequest {
-		t.Fatalf("invalid active filter = %d", recorder.Code)
 	}
 	if recorder := seller.call(t, http.MethodPost, tradePath+"/paid", nil); recorder.Code != http.StatusForbidden {
 		t.Fatalf("seller marks paid = %d", recorder.Code)
@@ -565,9 +477,6 @@ func TestC2CHandlers(t *testing.T) {
 	if resolved["status"] != "resolved_to_buyer" || resolved["resolution_reason"] != "转账记录属实" {
 		t.Fatalf("resolved = %v", resolved)
 	}
-	if active := buyer.expect(t, http.StatusOK, http.MethodGet, "/api/c2c/my/trades?active=true", nil); len(active["items"].([]any)) != 0 {
-		t.Fatalf("finished trade in active = %v", active)
-	}
 	if view := buyer.expect(t, http.StatusOK, http.MethodGet, tradePath, nil)["trade"].(map[string]any); len(view["payment_methods"].([]any)) != 0 {
 		t.Fatalf("buyer still sees accounts after the ruling: %v", view["payment_methods"])
 	}
@@ -579,9 +488,6 @@ func TestC2CHandlers(t *testing.T) {
 	closed := seller.expect(t, http.StatusOK, http.MethodPost, "/api/c2c/orders/"+orderID+"/close", nil)["order"].(map[string]any)
 	if closed["status"] != "closed" || closed["available"] != "0" || closed["closed"] != "10" || closed["sold"] != "30" {
 		t.Fatalf("closed = %v", closed)
-	}
-	if recorder := buyer.call(t, http.MethodGet, publicPath, nil); recorder.Code != http.StatusNotFound {
-		t.Fatalf("closed public order = %d", recorder.Code)
 	}
 	if recorder := buyer.call(t, http.MethodPost, tradesPath, map[string]string{"amount": "5"}); recorder.Code != http.StatusConflict || errorCode(t, recorder) != "order_not_open" {
 		t.Fatalf("buy on closed = %d %s", recorder.Code, recorder.Body.String())

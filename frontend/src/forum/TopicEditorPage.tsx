@@ -14,7 +14,7 @@ function NewTopic({ kind }: { kind: Kind }) {
   if (kind === 'ticket') return <TopicForm key="new-ticket" kind={kind} boards={[]} />
   return <QueryBoundary query={boards}>{(data) => data.items.length ? <TopicForm key="new-discussion" kind={kind} boards={data.items} /> : <>
     <PageHeader title="发表帖子" back={{ to: '/forum', label: '论坛' }} />
-    <EmptyState title="暂时没有板块" description={account?.is_admin ? '先创建一个板块' : '请等待管理员创建板块'} action={account?.is_admin ? <ButtonLink to="/admin/forum/boards">管理板块</ButtonLink> : undefined} />
+    <EmptyState title="暂时没有板块" description={account?.is_admin ? '先创建一个板块' : '请等待管理员创建板块'} action={account?.is_admin ? <ButtonLink to="/forum/boards">管理板块</ButtonLink> : undefined} />
   </>}</QueryBoundary>
 }
 export function EditTopicPage() {
@@ -35,7 +35,7 @@ function TopicForm({ kind, topic, boards }: { kind: Kind; topic?: Topic; boards:
   const [board, setBoard] = useState(boards.find((item) => item.id === params.get('board'))?.id || boards[0]?.id || '')
   const create = useForumAction(forumApi.createTopic)
   const update = useForumAction(forumApi.updateTopic)
-  const back = topic ? '/forum/topics/' + topic.id : kind === 'ticket' ? '/tickets' : '/forum'
+  const back = topic ? '/forum/topics/' + topic.id : kind === 'ticket' ? '/forum/tickets' : '/forum'
   return <div className="forum-page">
     <PageHeader title={(topic ? '编辑' : kind === 'ticket' ? '提交' : '发表') + (kind === 'ticket' ? '工单' : '帖子')}
       description={kind === 'ticket' ? '仅你和管理员可见' : undefined} back={{ to: back, label: topic ? (kind === 'ticket' ? '工单' : '帖子') : kind === 'ticket' ? '工单' : '论坛' }} />
@@ -43,7 +43,7 @@ function TopicForm({ kind, topic, boards }: { kind: Kind; topic?: Topic; boards:
       onCancel={() => navigate(back)} validate={() => titleError(title) || (!topic && kind === 'discussion' && !board ? '请选择板块' : '')}
       onSave={async (body, attachment_ids) => {
         const saved = topic ? await update.mutateAsync({ id: topic.id, body: { title: title.trim(), body, attachment_ids } }) : await create.mutateAsync({ kind, title: title.trim(), body, attachment_ids, board_id: kind === 'discussion' ? board : null })
-        if (active.current) navigate((kind === 'ticket' ? '/tickets/' : '/forum/topics/') + saved.id, { replace: true })
+        if (active.current) navigate('/forum/topics/' + saved.id, { replace: true })
       }}>
       {!topic && kind === 'discussion' && <SelectField label="板块" required value={board} onChange={(event) => setBoard(event.target.value)}>{boards.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</SelectField>}
       <TextField label="标题" required maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} />

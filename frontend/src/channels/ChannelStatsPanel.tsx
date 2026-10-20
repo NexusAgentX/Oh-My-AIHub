@@ -112,7 +112,7 @@ export function ChannelStatsPanel({ channelId, onViewFailures }: { channelId: st
       <QueryBoundary errorFallback="渠道统计加载失败" query={stats}>
         {(data) => (
           <div className="channel-stats">
-            <ChannelMetricValues data={data} />
+            {!onViewFailures && <ChannelMetricValues data={data} />}
             <div className={onViewFailures ? 'channel-chart-grid' : 'channel-stats'}>
               {range === '24h' ? (
                 <BarChart
@@ -186,6 +186,11 @@ function ChannelMetricValues({ data }: { data: ChannelStats }) {
       />
     </MetricGrid>
   )
+}
+
+export function ChannelMetrics({ channelId }: { channelId: string }) {
+  const stats = useChannelStats(channelId)
+  return <QueryBoundary errorFallback="渠道统计加载失败" query={stats}>{(data) => <ChannelMetricValues data={data} />}</QueryBoundary>
 }
 
 export function ChannelHealth({ channelId, events }: { channelId: string; events: ChannelEvent[] }) {

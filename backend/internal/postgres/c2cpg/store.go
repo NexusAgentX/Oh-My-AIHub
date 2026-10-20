@@ -298,7 +298,7 @@ func (s *Store) GetTrade(ctx context.Context, tradeID string) (c2c.Trade, error)
 func (s *Store) ListTrades(ctx context.Context, f c2c.TradeFilter) ([]c2c.Trade, error) {
 	has, _, at, id := cursorArgs(f.After)
 	rows, err := s.q.ListUserTrades(ctx, ListUserTradesParams{
-		Role: f.Role, UserID: f.UserID, Status: string(f.Status), Pending: f.Pending, Active: f.Active,
+		Role: f.Role, UserID: f.UserID, Status: string(f.Status), Pending: f.Pending,
 		HasCursor: has, AfterTime: at, AfterID: id, RowLimit: int32(f.Limit),
 	})
 	if err != nil {
@@ -311,32 +311,9 @@ func (s *Store) ListTrades(ctx context.Context, f c2c.TradeFilter) ([]c2c.Trade,
 	return trades, nil
 }
 
-func (s *Store) GetMarketOrder(ctx context.Context, viewerID, orderID string) (c2c.Order, error) {
-	row, err := s.q.GetMarketOrder(ctx, GetMarketOrderParams{ID: orderID, ViewerID: viewerID})
-	if err != nil {
-		return c2c.Order{}, notFound(err)
-	}
-	return orderOf(orderRow(row)), nil
-}
-
 func (s *Store) ListDisputes(ctx context.Context, status c2c.TradeStatus, after *c2c.Cursor, limit int) ([]c2c.Trade, error) {
 	has, _, at, id := cursorArgs(after)
 	rows, err := s.q.ListDisputedTrades(ctx, ListDisputedTradesParams{
-		Status: string(status), HasCursor: has, AfterTime: at, AfterID: id, RowLimit: int32(limit),
-	})
-	if err != nil {
-		return nil, err
-	}
-	trades := make([]c2c.Trade, 0, len(rows))
-	for _, row := range rows {
-		trades = append(trades, tradeOf(tradeRow(row)))
-	}
-	return trades, nil
-}
-
-func (s *Store) ListAdminTrades(ctx context.Context, status c2c.TradeStatus, after *c2c.Cursor, limit int) ([]c2c.Trade, error) {
-	has, _, at, id := cursorArgs(after)
-	rows, err := s.q.ListAdminTrades(ctx, ListAdminTradesParams{
 		Status: string(status), HasCursor: has, AfterTime: at, AfterID: id, RowLimit: int32(limit),
 	})
 	if err != nil {

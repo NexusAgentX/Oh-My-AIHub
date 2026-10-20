@@ -1,23 +1,22 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiSend } from '../api/client'
 import type { components } from '../api/schema.gen'
 export type Draft = components['schemas']['ContributionDraft']
 export type Changes = Draft['changes']
 export type Kind = Draft['kind']
 export type NewInput = components['schemas']['ContributionNew']
-export function useContributions(queue: boolean) {
-  const query = useInfiniteQuery({
-    queryKey: ['contributions', 'list', queue],
-    queryFn: ({ pageParam }) => queue ? apiGet<'reviewContributions'>('/api/admin/contributions', { cursor: pageParam || undefined, limit: 50 }) : apiGet<'listContributions'>('/api/contributions', { cursor: pageParam || undefined, limit: 50 }),
-    initialPageParam: '', getNextPageParam: last => last.next_cursor || undefined,
-    refetchOnWindowFocus: true,
+export function useContributions(queue: boolean, cursor: string) {
+  return useQuery({
+    queryKey: ['contributions', 'list', queue, cursor],
+    queryFn: () =>
+      queue
+        ? apiGet<'reviewContributions'>('/api/admin/contributions', { cursor })
+        : apiGet<'listContributions'>('/api/contributions', { cursor }),
   })
-  return { ...query, data: query.data ? { items: query.data.pages.flatMap(page => page.items), next_cursor: query.data.pages.at(-1)?.next_cursor ?? null } : undefined }
 }
 export function useContribution(id: string) {
   return useQuery({
     queryKey: ['contributions', 'detail', id],
-    refetchOnWindowFocus: true,
     queryFn: () =>
       apiGet<'getContribution'>(`/api/contributions/${encodeURIComponent(id)}`),
   })

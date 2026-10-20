@@ -38,7 +38,6 @@ type Store interface {
 	// inserts the order. A repeated order ID returns the stored order.
 	CreateOrder(ctx context.Context, order NewOrder) (Order, error)
 	ListMarket(ctx context.Context, viewerID string, after *Cursor, limit int) ([]Order, error)
-	GetMarketOrder(ctx context.Context, viewerID, orderID string) (Order, error)
 	ListSellerOrders(ctx context.Context, sellerID string, status OrderStatus, after *Cursor, limit int) ([]Order, error)
 	CloseOrder(ctx context.Context, orderID, sellerID string) (Order, error)
 
@@ -46,7 +45,6 @@ type Store interface {
 	GetTrade(ctx context.Context, tradeID string) (Trade, error)
 	ListTrades(ctx context.Context, filter TradeFilter) ([]Trade, error)
 	ListDisputes(ctx context.Context, status TradeStatus, after *Cursor, limit int) ([]Trade, error)
-	ListAdminTrades(ctx context.Context, status TradeStatus, after *Cursor, limit int) ([]Trade, error)
 	MarkPaid(ctx context.Context, tradeID, buyerID, note string) (Trade, error)
 	Release(ctx context.Context, tradeID, sellerID string) (Trade, error)
 	// Cancel cancels a trade for the buyer; an empty actorID is the timeout job.
@@ -162,34 +160,17 @@ func (s *Service) ListMarket(ctx context.Context, viewerID, cursor string, limit
 	})
 	page := Page[MarketOrder]{Items: make([]MarketOrder, 0, len(orders)), Next: next}
 	for _, order := range orders {
-		public, err := s.marketOrder(order)
+		methods, err := s.openMethods(order.ID, order.Methods)
 		if err != nil {
 			return Page[MarketOrder]{}, err
 		}
-		page.Items = append(page.Items, public)
+		channels := make([]string, 0, len(methods))
+		for _, method := range methods {
+			channels = append(channels, method.Channel)
+		}
+		page.Items = append(page.Items, MarketOrder{Order: order, Channels: channels})
 	}
 	return page, nil
-}
-
-// GetMarketOrder uses the same public visibility as the market, independently of its first page.
-func (s *Service) GetMarketOrder(ctx context.Context, viewerID, orderID string) (MarketOrder, error) {
-	order, err := s.store.GetMarketOrder(ctx, viewerID, orderID)
-	if err != nil {
-		return MarketOrder{}, err
-	}
-	return s.marketOrder(order)
-}
-
-func (s *Service) marketOrder(order Order) (MarketOrder, error) {
-	methods, err := s.openMethods(order.ID, order.Methods)
-	if err != nil {
-		return MarketOrder{}, err
-	}
-	channels := make([]string, 0, len(methods))
-	for _, method := range methods {
-		channels = append(channels, method.Channel)
-	}
-	return MarketOrder{Order: order, Channels: channels}, nil
 }
 
 func (s *Service) ListMyOrders(ctx context.Context, sellerID string, status OrderStatus, cursor string, limit int) (Page[MyOrder], error) {
@@ -263,25 +244,6 @@ func (s *Service) ListMyTrades(ctx context.Context, filter TradeFilter, cursor s
 		return Page[TradeView]{}, err
 	}
 	return s.tradePage(Viewer{ID: filter.UserID}, trades, limit, func(t Trade) Cursor { return Cursor{Time: t.CreatedAt, ID: t.ID} })
-}
-
-// ListAdminTrades reads every trade state; mutations retain their own state guards.
-func (s *Service) ListAdminTrades(ctx context.Context, admin Viewer, status TradeStatus, cursor string, limit int) (Page[TradeView], error) {
-	if !admin.IsAdmin || admin.ID == "" {
-		return Page[TradeView]{}, ErrForbidden
-	}
-	if (status != "" && !status.Valid()) || limit < 1 || limit > 100 {
-		return Page[TradeView]{}, ErrInvalidInput
-	}
-	after, err := decodeCursor(cursor, false)
-	if err != nil {
-		return Page[TradeView]{}, err
-	}
-	trades, err := s.store.ListAdminTrades(ctx, status, after, limit+1)
-	if err != nil {
-		return Page[TradeView]{}, err
-	}
-	return s.tradePage(admin, trades, limit, func(t Trade) Cursor { return Cursor{Time: t.CreatedAt, ID: t.ID} })
 }
 
 // ListDisputes lists disputed trades, oldest dispute first. status defaults

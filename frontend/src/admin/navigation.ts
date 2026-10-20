@@ -8,23 +8,21 @@ export type AdminNavItem = {
   end?: boolean
 }
 
-const pages = {
-  overview: { label: '待处理', to: '/admin', icon: 'gauge', end: true },
-  users: { label: '用户', to: '/admin/users', icon: 'users' },
-  points: { label: '积分全局', to: '/admin/points', icon: 'wallet' },
-  calls: { label: '调用', to: '/admin/calls', icon: 'list' },
-  transactions: { label: '交易浏览', to: '/admin/points/transactions', icon: 'swap' },
-  trades: { label: 'C2C 交易', to: '/admin/trades', icon: 'scale' },
-  audit: { label: '操作记录', to: '/admin/audit', icon: 'history' },
-  contributions: { label: '贡献审核', to: '/admin/contributions', icon: 'contribute' },
-  channels: { label: '渠道治理', to: '/admin/channels', icon: 'shield' },
-  catalog: { label: '目录治理', to: '/admin/catalog', icon: 'layers' },
-  settings: { label: '平台设置', to: '/admin/settings', icon: 'settings' },
-  boards: { label: '板块管理', to: '/admin/forum/boards', icon: 'message' },
-} satisfies Record<string, AdminNavItem>
-
-/** 前四项进入手机底栏，其余按治理领域进入更多菜单。 */
-export const adminNavigation: AdminNavItem[] = Object.values(pages)
+/** 管理后台导航：前 4 项进入移动端底部 Tab，其余进「更多」。 */
+export const adminNavigation: AdminNavItem[] = [
+  { label: '概览', to: '/admin', icon: 'gauge', end: true },
+  { label: '调用', to: '/admin/calls', icon: 'list' },
+  { label: '积分', to: '/admin/points', icon: 'wallet' },
+  { label: '用户', to: '/admin/users', icon: 'users' },
+  { label: '模型 ID 治理', to: '/admin/models', icon: 'layers' },
+  { label: '供应商与分组', to: '/admin/suppliers', icon: 'globe' },
+  { label: '渠道', to: '/admin/channels', icon: 'shield' },
+  { label: '申诉', to: '/admin/disputes', icon: 'scale' },
+  { label: '设置', to: '/admin/settings', icon: 'settings' },
+ {label:'典型费用',to:'/admin/typical-costs',icon:'chart'},
+ {label:'检测参数',to:'/admin/detection-search',icon:'flask'},
+ {label:'贡献审核',to:'/admin/contributions',icon:'contribute'},
+]
 
 export const adminTabCount = 4
 
@@ -39,11 +37,3 @@ export function findAdminNavItem(pathname: string) {
   }
   return best
 }
-
-export const adminGroups = [
-  { label: '', items: [pages.overview, pages.users] },
-  { label: '资金', items: [pages.points, pages.transactions, pages.trades, pages.audit] },
-  { label: '目录', items: [pages.contributions, pages.channels, pages.catalog] },
-  { label: '观测', items: [pages.calls] },
-  { label: '设置', items: [pages.settings, pages.boards] },
-]

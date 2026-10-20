@@ -1,16 +1,15 @@
-import { PriceSnapshotView, pricingNotes } from '../money/PriceSnapshotView'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter, matchRoutes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { appRoutes } from '../App'
 import { adminStreamPath } from './CallsPage'
 import { adminNavigation, adminTabCount, findAdminNavItem } from './navigation'
-import { formatLastActive } from '../money'
+import { formatLastActive } from './format'
 import { segments } from './LineChart'
 import { AttentionList, Indicators, attentionMeta } from './OverviewPage'
 import { Figures, LedgerEquation, riskColumns, trendGroups } from './PointsPage'
 import { ledgerChecks, ledgerEquation } from './pointsView'
-import { TransactionDetail, ledgerAccountLabel } from './transactions'
+import { PriceSnapshotView, TransactionDetail, ledgerAccountLabel, pricingNotes } from './transactions'
 import type { AdminOverview, AdminPoints, AdminPointsBalances, LedgerChecks, LedgerTransaction } from './types'
 
 const balances: AdminPointsBalances = {
@@ -374,28 +373,22 @@ describe('overview indicators', () => {
 
 describe('admin shell', () => {
   it('uses one icon per item and four mobile tabs', () => {
-    expect(adminNavigation.slice(0, 4).map(item => item.to)).toEqual(['/admin', '/admin/users', '/admin/points', '/admin/calls'])
+    expect(adminNavigation.map((item) => item.label)).toEqual(['概览', '调用', '积分', '用户', '模型 ID 治理', '供应商与分组', '渠道', '申诉', '设置', '典型费用', '检测参数', '贡献审核'])
     expect(new Set(adminNavigation.map((item) => item.icon)).size).toBe(adminNavigation.length)
     expect(adminTabCount).toBe(4)
   })
 
   it('matches nested admin routes to their navigation item', () => {
-    expect(findAdminNavItem('/admin')?.label).toBe('待处理')
-    expect(findAdminNavItem('/admin/channels/abc')?.label).toBe('渠道治理')
-    expect(findAdminNavItem('/admin/catalog')?.label).toBe('目录治理')
-    expect(findAdminNavItem('/admin/trades/abc')?.label).toBe('C2C 交易')
+    expect(findAdminNavItem('/admin')?.label).toBe('概览')
+    expect(findAdminNavItem('/admin/channels/abc')?.label).toBe('渠道')
+    expect(findAdminNavItem('/admin/models')?.label).toBe('模型 ID 治理')
+    expect(findAdminNavItem('/admin/disputes/abc')?.label).toBe('申诉')
   })
 
   it.each([
     ['/admin', undefined],
     ['/admin/points', 'points'],
-    ['/admin/trades/x', 'trades/:tradeID'],
-    ['/admin/disputes/x', 'disputes/*'],
-    ['/admin/users/x', ':id'],
-    ['/admin/users/new', 'new'],
-    ['/admin/catalog/new', 'new'],
-    ['/admin/points/transactions', 'points/transactions'],
-    ['/admin/audit', 'audit'],
+    ['/admin/disputes/x', 'disputes/:tradeID'],
     ['/admin/settings', 'settings'],
   ])('routes %s inside the admin layout', (pathname, path) => {
     const matches = matchRoutes(appRoutes, pathname)

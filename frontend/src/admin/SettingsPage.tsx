@@ -1,8 +1,4 @@
-import { SaveBar } from '../ui/SaveBar'
-import { useUnsavedGuard } from '../ui/UnsavedGuard'
-import { formatClockTime } from '../money/time'
-import { SettingsNav } from './SectionNav'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { errorMessage } from '../api/query'
 import {
   Button,
@@ -17,8 +13,8 @@ import {
   TextareaField,
   TextField,
 } from '../ui'
-import { Disclosure } from '../ui'
-import { formatDateTime } from '../money'
+import { Collapsible } from './components'
+import { formatDateTime } from './format'
 import { useAdminSettings, useSyncExchangeRate, useUpdateSettings } from './queries'
 import {
   changedAdvancedCount,
@@ -30,19 +26,11 @@ import {
 import type { Settings } from './types'
 
 function SettingsEditor({ settings }: { settings: Settings }) {
-  const lastRemote = useRef(settings)
   const [form, setForm] = useState<SettingsForm>(() => settingsToForm(settings))
-  const [baseline, setBaseline] = useState<SettingsForm>(() => settingsToForm(settings))
-  const [savedAt, setSavedAt] = useState('')
   const [errors, setErrors] = useState<SettingsErrors>({})
   const [message, setMessage] = useState('')
   const update = useUpdateSettings()
   const sync = useSyncExchangeRate()
-  const busy = update.isPending || sync.isPending
-  const dirtyCount = (Object.keys(form) as (keyof SettingsForm)[]).filter(key => form[key] !== baseline[key]).length
-  useUnsavedGuard(dirtyCount > 0, { busy })
-  useEffect(() => { if (lastRemote.current === settings) return; lastRemote.current = settings; if (!dirtyCount && !busy) { const next = settingsToForm(settings); setForm(next); setBaseline(next) } }, [settings, dirtyCount, busy])
-
   const set = (key: keyof SettingsForm) => (event: { target: { value: string } }) => {
     setForm((current) => ({ ...current, [key]: event.target.value }))
     setMessage('')
@@ -58,8 +46,8 @@ function SettingsEditor({ settings }: { settings: Settings }) {
     setErrors({})
     update.mutate(result.body, {
       onSuccess: (data) => {
-        const next = settingsToForm(data.settings); setForm(next); setBaseline(next); setSavedAt(formatClockTime(new Date()))
-        setMessage('')
+        setForm(settingsToForm(data.settings))
+        setMessage('已保存')
       },
     })
   }
@@ -84,14 +72,13 @@ function SettingsEditor({ settings }: { settings: Settings }) {
     sync.mutate(undefined, {
       onSuccess: (data) => {
         setForm((current) => ({ ...current, usdCnyRate: data.settings.usd_cny_rate }))
-        setBaseline((current) => ({ ...current, usdCnyRate: data.settings.usd_cny_rate }))
         setMessage(`汇率已同步：1 美元 = ${data.settings.usd_cny_rate} 积分`)
       },
     })
   }
 
   return (
-    <form className="stack-form" noValidate onSubmit={submit}><SaveBar dirtyCount={dirtyCount} busy={busy} savedAt={savedAt} onDiscard={() => { setForm(baseline); setErrors({}); update.reset() }} /><fieldset className="flat-fieldset stack-form" disabled={busy}>
+    <form className="stack-form" noValidate onSubmit={submit}>
       <div className="field-row">
         {field('feePercent', '手续费率（%）')}
         {field('paymentTimeoutMinutes', 'C2C 付款超时（分钟）', { inputMode: 'numeric' })}
@@ -132,7 +119,7 @@ function SettingsEditor({ settings }: { settings: Settings }) {
           </Button>
         </div>
       </FormSection>
-      <Disclosure changed={changedAdvancedCount(form)} title="高级设置">
+      <Collapsible changed={changedAdvancedCount(form)} title="高级设置">
         <div className="stack-form">
           <div className="field-row">
             {field('defaultCreditLimit', '新用户默认信用额度（积分）')}
@@ -162,13 +149,14 @@ function SettingsEditor({ settings }: { settings: Settings }) {
             value={form.extraBlockedHosts}
           />
         </div>
-      </Disclosure>
+      </Collapsible>
       <InlineError>{update.isError ? errorMessage(update.error, '保存失败，请重试') : ''}</InlineError>
       <SuccessMessage>{message}</SuccessMessage>
       <div className="form-actions">
         <span className="muted-copy form-actions-note">更新于 {formatDateTime(settings.updated_at)}</span>
+        <Button loading={update.isPending}>保存</Button>
       </div>
-    </fieldset></form>
+    </form>
   )
 }
 
@@ -176,7 +164,7 @@ export function SettingsPage() {
   const settings = useAdminSettings()
   return (
     <>
-      <PageHeader title="平台设置" /><SettingsNav />
+      <PageHeader title="设置" />
       <Card>
         <QueryBoundary query={settings}>
           {(data) => <SettingsEditor settings={data.settings} />}

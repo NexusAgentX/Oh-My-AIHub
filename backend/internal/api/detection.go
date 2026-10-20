@@ -103,12 +103,11 @@ func (a *app) listDetectionJobs(w http.ResponseWriter, r *http.Request) {
 	}
 	limit, ok := pageLimit(r)
 	cursor, cursorOK := detectionCursor(r)
-	draftID := r.URL.Query().Get("draft_id")
-	if !ok || !cursorOK || (draftID != "" && !uuidPattern.MatchString(draftID)) {
+	if !ok || !cursorOK {
 		writeBadCursor(w)
 		return
 	}
-	jobs, err := a.detection.List(r.Context(), detectionActor(r), draftID, cursor, limit+1)
+	jobs, err := a.detection.List(r.Context(), detectionActor(r), cursor, limit+1)
 	if err != nil {
 		writeDetectionError(w, err)
 		return

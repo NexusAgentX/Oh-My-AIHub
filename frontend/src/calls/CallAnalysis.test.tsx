@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { CallAnalysis } from './CallAnalysis'
 const values = { calls: 2, finished: 2, succeeded: 1, charged: '0.026' }
-vi.mock('@tanstack/react-query', () => ({ keepPreviousData: (value: unknown) => value, useQuery: () => ({ data: {
+vi.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: {
   from: '2026-10-01T00:30:00Z', to: '2026-10-01T01:30:00Z', previous_from: '2026-09-30T23:30:00Z', previous_to: '2026-10-01T00:30:00Z',
   current: values, previous: values, bucket_seconds: 3600,
   trend: [{ key: '2026-10-01T00:00:00Z', values }, { key: '2026-10-01T01:00:00Z', values }],

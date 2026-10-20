@@ -26,9 +26,6 @@ const timeOnly = new Intl.DateTimeFormat('zh-CN', {
   hour12: false,
 })
 
-/** 保存状态使用的北京时间时分。 */
-export function formatClockTime(value: Date) { return timeOnly.format(value).slice(0, 5) }
-
 /** 列表时间：今天只显示时分秒，其余显示月-日 时:分。 */
 export function formatTime(value: string | null | undefined, now = new Date()) {
   if (!value) return '—'
@@ -90,19 +87,4 @@ export function formatCountdown(seconds: number) {
   const safe = Math.max(0, Math.floor(seconds))
   const minutes = Math.floor(safe / 60)
   return `${minutes}:${String(safe % 60).padStart(2, '0')}`
-}
-
-/** 从现在起已过去的整天数。 */
-export function daysSince(value: string | null | undefined, now = Date.now()) {
-  if (!value) return null
-  return Math.max(0, Math.floor((now - new Date(value).getTime()) / 86_400_000))
-}
-
-/** 最近活跃：1 小时内「刚刚」，24 小时内「N 小时前」，其余「N 天前」，从未活跃「从未」。 */
-export function formatLastActive(value: string | null | undefined, now = Date.now()) {
-  if (!value) return '从未'
-  const hours = Math.floor((now - new Date(value).getTime()) / 3_600_000)
-  if (hours < 1) return '刚刚'
-  if (hours < 24) return `${hours} 小时前`
-  return `${Math.floor(hours / 24)} 天前`
 }

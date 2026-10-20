@@ -1,13 +1,4 @@
-import { Facts } from '../ui/Facts'
-import { Outlet, useLocation, useOutletContext, useParams } from 'react-router-dom'
-import { Pager } from '../ui/Pager'
-import { SaveBar } from '../ui/SaveBar'
-import { UrlSearchInput } from '../ui/UrlSearchInput'
-import { enumField, stringField, useRouteClose, useUrlState } from '../ui/urlState'
-import { useUnsavedGuard } from '../ui/UnsavedGuard'
-import { formatClockTime } from '../money/time'
-import { takeAdminSecret } from './secret'
-import { useEffect, useReducer, useRef, useState, type FormEvent } from 'react'
+import { useReducer, useState, type FormEvent } from 'react'
 import { errorMessage } from '../api/query'
 import { useAuth } from '../auth/AuthProvider'
 import { useInstance } from '../auth/InstanceProvider'
@@ -25,18 +16,19 @@ import {
   InlineError,
   PageHeader,
   QueryBoundary,
+  SearchInput,
   Segmented,
+  SuccessMessage,
   TextField,
   Toolbar,
   type Column,
 } from '../ui'
-import { ConfirmActionDialog, OneTimeSecretDialog } from './components'
+import { ConfirmActionDialog, DetailList, LoadMore, OneTimeSecretDialog } from './components'
 import { secretReducer } from './confirm'
-import { formatDateTime, formatLastActive, formatExactPoints as formatPoints, isAmount, isNegative, pointsRatio } from '../money'
+import { formatDateTime, formatLastActive, formatPoints, isAmount, isNegative, pointsRatio } from './format'
 import {
   useAdjustAccount,
   useAdminAccounts,
-  useAdminAccount,
   useAdminSettings,
   useCreateAccount,
   useResetPassword,
@@ -78,7 +70,7 @@ const columns: Column<AdminAccount>[] = [
     cell: (account) => (
       <span className="badge-row">
         <Badge tone={account.status === 'active' ? 'success' : 'warning'}>{account.status === 'active' ? '启用' : '停用'}</Badge>
-        {account.must_change_password && <Badge tone="info">待改密</Badge>}{parseNanoPoints(account.balance) < -parseNanoPoints(account.credit_limit) ? <Badge tone="danger">超额</Badge> : isNegative(account.balance) && <Badge tone="warning">负余额</Badge>}
+        {account.must_change_password && <Badge tone="info">待改密</Badge>}
       </span>
     ),
   },
@@ -104,7 +96,6 @@ function CreateUserDialog({
   const [isAdmin, setIsAdmin] = useState(false)
   const [error, setError] = useState('')
   const defaultCredit = settings.data ? formatPoints(settings.data.settings.default_credit_limit) : undefined
-  const allowNavigation = useUnsavedGuard(Boolean(username || displayName || creditLimit || isAdmin), { busy: create.isPending })
 
   const reset = () => {
     setUsername('')
@@ -142,9 +133,8 @@ function CreateUserDialog({
       {
         onSuccess: (result) => {
           // 初始密码只交给一次性展示，立即清掉 mutation 中的副本
-          onCreated(result.account, takeAdminSecret(result.account.id))
+          onCreated(result.account, result.initial_password)
           reset()
-          allowNavigation()
           onClose()
         },
       },
@@ -154,13 +144,16 @@ function CreateUserDialog({
   return (
     <Dialog
       busy={create.isPending}
-      onClose={onClose}
+      onClose={() => {
+        reset()
+        onClose()
+      }}
       open={open}
       title="新建用户"
     >
       <form className="stack-form" noValidate onSubmit={submit}>
         <TextField autoComplete="off" label="用户名" onChange={(event) => setUsername(event.target.value)} value={username} />
-        <TextField disabled={create.isPending} label="显示名" maxLength={64} onChange={(event) => setDisplayName(event.target.value)} value={displayName} />
+        <TextField label="显示名" maxLength={64} onChange={(event) => setDisplayName(event.target.value)} value={displayName} />
         <TextField
           hint={defaultCredit !== undefined ? `留空使用平台默认 ${defaultCredit}` : '留空使用平台默认'}
           inputMode="decimal"
@@ -183,13 +176,12 @@ type DrawerAction = 'reset' | 'adjust' | 'write-off' | null
 
 function UserDrawerBody({
   account,
-  onReveal, onBusyChange,
+  onReveal,
 }: {
   account: AdminAccount
   onReveal: (account: AdminAccount, password: string) => void
-  onBusyChange: (busy: boolean) => void
 }) {
-  const { account: me } = useAuth(), location = useLocation()
+  const { account: me } = useAuth()
   const self = me?.id === account.id
   const { fixedAdminUsername } = useInstance()
   const protectedAdmin = account.username === fixedAdminUsername
@@ -197,8 +189,6 @@ function UserDrawerBody({
   const reset = useResetPassword()
   const adjust = useAdjustAccount()
   const writeOff = useWriteOffAccount()
-  const lastRemote = useRef(account)
-  const [baseline, setBaseline] = useState(account)
   const [displayName, setDisplayName] = useState(account.display_name)
   const [creditLimit, setCreditLimit] = useState(formatPoints(account.credit_limit))
   const [active, setActive] = useState(account.status === 'active')
@@ -208,17 +198,8 @@ function UserDrawerBody({
   const [action, setAction] = useState<DrawerAction>(null)
   const [amount, setAmount] = useState('')
   const [idempotencyKey, setIdempotencyKey] = useState('')
-  const busy = update.isPending || reset.isPending || adjust.isPending || writeOff.isPending
-  const creditDirty = !isAmount(creditLimit) || parseNanoPoints(creditLimit) !== parseNanoPoints(baseline.credit_limit)
-  const dirtyCount = Number(displayName.trim() !== baseline.display_name) + Number(creditDirty) + Number(active !== (baseline.status === 'active')) + Number(isAdmin !== baseline.is_admin)
-  const apply = (latest: AdminAccount) => { setBaseline(latest); setDisplayName(latest.display_name); setCreditLimit(formatPoints(latest.credit_limit)); setActive(latest.status === 'active'); setIsAdmin(latest.is_admin); setFormError('') }
-  useEffect(() => { onBusyChange(busy) }, [busy, onBusyChange])
-  useEffect(() => { if (lastRemote.current === account) return; lastRemote.current = account; if (!dirtyCount && !busy) { setBaseline(account); setDisplayName(account.display_name); setCreditLimit(formatPoints(account.credit_limit)); setActive(account.status === 'active'); setIsAdmin(account.is_admin) } }, [account, baseline, dirtyCount, busy])
-  useUnsavedGuard(dirtyCount > 0 || action !== null, { busy })
-
 
   const openAction = (next: DrawerAction) => {
-    if (busy) return
     setAmount('')
     setIdempotencyKey(crypto.randomUUID())
     setAction(next)
@@ -228,15 +209,15 @@ function UserDrawerBody({
     event.preventDefault()
     setSaved('')
     const body: Record<string, unknown> = {}
-    if (displayName.trim() !== baseline.display_name) body.display_name = displayName.trim()
+    if (displayName.trim() !== account.display_name) body.display_name = displayName.trim()
     const credit = creditLimit.trim()
     if (!isAmount(credit) || credit.startsWith('-')) {
       setFormError('信用额度不小于 0，最多 9 位小数')
       return
     }
-    if (parseNanoPoints(credit) !== parseNanoPoints(baseline.credit_limit)) body.credit_limit = credit
-    if (active !== (baseline.status === 'active')) body.status = active ? 'active' : 'disabled'
-    if (isAdmin !== baseline.is_admin) body.is_admin = isAdmin
+    if (parseNanoPoints(credit) !== parseNanoPoints(account.credit_limit)) body.credit_limit = credit
+    if (active !== (account.status === 'active')) body.status = active ? 'active' : 'disabled'
+    if (isAdmin !== account.is_admin) body.is_admin = isAdmin
     if (!displayName.trim()) {
       setFormError('请填写显示名')
       return
@@ -246,20 +227,19 @@ function UserDrawerBody({
       return
     }
     setFormError('')
-    if (busy) return
-    update.mutate({ id: account.id, body }, { onSuccess: data => { apply(data.account); setSaved(formatClockTime(new Date())) } })
+    update.mutate({ id: account.id, body }, { onSuccess: () => setSaved('已保存') })
   }
 
   const negative = isNegative(account.balance)
   const normalizedAmount = amount.trim().replace(/^\+/, '')
   return (
     <div className="drawer-sections">
-      <Facts
+      <DetailList
         items={[
           /* oxlint-disable react/jsx-key -- [标签, 值] 元组，不是渲染的子元素列表 */
           ['用户名', <span className="mono">@{account.username}</span>],
           ['余额', <Balance value={account.balance} />],
-          ['可用额度', <span className="num">{formatPoints(account.available)}</span>],
+          ['还能透支', <span className="num">{formatPoints(account.available)}</span>],
           ['已用信用', `${formatPoints(creditUsed(account))}（${Math.round(pointsRatio(creditUsed(account), account.credit_limit))}%）`],
           ['最近活跃', account.last_active_at ? formatDateTime(account.last_active_at) : '从未'],
           ['创建时间', formatDateTime(account.created_at)],
@@ -268,7 +248,7 @@ function UserDrawerBody({
         ]}
       />
       <div className="drawer-links">
-        <ButtonLink size="sm" to={`/admin/points/transactions?account_id=${account.id}`} state={{ from: { to: location.pathname + location.search, label: account.display_name } }}>
+        <ButtonLink size="sm" to={`/admin/points?tab=transactions&account_id=${account.id}`}>
           账单
         </ButtonLink>
         <ButtonLink size="sm" to={`/admin/calls?account_id=${account.id}`}>
@@ -276,13 +256,19 @@ function UserDrawerBody({
         </ButtonLink>
       </div>
 
-      <form className="stack-form" noValidate onSubmit={save}><SaveBar dirtyCount={dirtyCount} busy={busy} savedAt={saved} onDiscard={() => { apply(baseline); update.reset() }} />
+      <form className="stack-form" noValidate onSubmit={save}>
         <h3 className="section-title">资料与额度</h3>
-        <TextField disabled={busy} label="显示名" maxLength={64} onChange={(event) => setDisplayName(event.target.value)} value={displayName} />
-        <TextField disabled={busy} inputMode="decimal" label="信用额度（积分）" onChange={(event) => setCreditLimit(event.target.value)} value={creditLimit} />
-        <Checkbox checked={active} disabled={self || protectedAdmin || busy} label="启用（停用后立即退出全部会话）" onChange={(event) => setActive(event.target.checked)} />
-        <Checkbox checked={isAdmin} disabled={self || protectedAdmin || busy} label="管理员" onChange={(event) => setIsAdmin(event.target.checked)} />
+        <TextField label="显示名" maxLength={64} onChange={(event) => setDisplayName(event.target.value)} value={displayName} />
+        <TextField inputMode="decimal" label="信用额度（积分）" onChange={(event) => setCreditLimit(event.target.value)} value={creditLimit} />
+        <Checkbox checked={active} disabled={self || protectedAdmin} label="启用（停用后立即退出全部会话）" onChange={(event) => setActive(event.target.checked)} />
+        <Checkbox checked={isAdmin} disabled={self || protectedAdmin} label="管理员" onChange={(event) => setIsAdmin(event.target.checked)} />
         <InlineError>{formError || (update.isError ? errorMessage(update.error, '保存失败，请重试') : '')}</InlineError>
+        <SuccessMessage>{saved}</SuccessMessage>
+        <div className="form-actions">
+          <Button loading={update.isPending} size="sm">
+            保存
+          </Button>
+        </div>
       </form>
 
       <div className="stack-form">
@@ -291,10 +277,10 @@ function UserDrawerBody({
           <Button onClick={() => openAction('adjust')} size="sm" type="button" variant="secondary">
             调账
           </Button>
-          <Button disabled={!negative || busy} onClick={() => openAction('write-off')} size="sm" type="button" variant="secondary">
+          <Button disabled={!negative} onClick={() => openAction('write-off')} size="sm" type="button" variant="secondary">
             坏账核销
           </Button>
-          <Button disabled={self || protectedAdmin || busy} onClick={() => openAction('reset')} size="sm" type="button" variant="secondary">
+          <Button disabled={self || protectedAdmin} onClick={() => openAction('reset')} size="sm" type="button" variant="secondary">
             重置密码
           </Button>
         </div>
@@ -354,7 +340,7 @@ function UserDrawerBody({
         onConfirm={async () => {
           const result = await reset.mutateAsync(account.id)
           reset.reset()
-          onReveal(result.account, takeAdminSecret(result.account.id))
+          onReveal(result.account, result.initial_password)
         }}
         open={action === 'reset'}
         requireReason={false}
@@ -369,29 +355,81 @@ function UserDrawerBody({
   )
 }
 
-type Reveal = (account: AdminAccount, password: string) => void
-type UsersContext = { created: Reveal; reset: Reveal }
-const usersSchema = { q: stringField(''), status: enumField(['all', 'active', 'disabled'] as const, 'all') }
-
 export function UsersPage() {
-  const [filters, setFilters] = useUrlState(usersSchema), location = useLocation()
-  const accounts = useAdminAccounts({ q: filters.q || undefined, status: filters.status === 'all' ? undefined : filters.status })
+  const [q, setQ] = useState('')
+  const [status, setStatus] = useState<'all' | 'active' | 'disabled'>('all')
+  const accounts = useAdminAccounts({ q: q.trim() || undefined, status: status === 'all' ? undefined : status })
+  const [creating, setCreating] = useState(false)
+  const [selectedID, setSelectedID] = useState<string | null>(null)
   const [secret, dispatchSecret] = useReducer(secretReducer, null)
-  const reveal = (title: string): Reveal => (account, password) => dispatchSecret({ type: 'reveal', secret: { title, username: account.username, password } })
-  const origin = location.pathname + location.search
-  return <>
-    <PageHeader title="用户" actions={<ButtonLink to={`/admin/users/new${location.search}`} state={{ overlayFrom: origin }} icon={<Icon name="plus" />}>新建用户</ButtonLink>} />
-    <Toolbar><UrlSearchInput label="搜索用户" value={filters.q} onCommit={q => setFilters({ q })} placeholder="用户名、显示名或 ID" /><Segmented label="状态" value={filters.status} onChange={status => setFilters({ status })} options={[{ key: 'all', label: '全部' }, { key: 'active', label: '启用' }, { key: 'disabled', label: '停用' }]} /></Toolbar>
-    <Card flush><QueryBoundary query={accounts}>{rows => <div aria-busy={accounts.isFetching}><DataTable caption="用户列表" columns={[...columns, { key: 'action', header: '操作', cell: account => <ButtonLink size="sm" variant="secondary" to={`/admin/users/${account.id}${location.search}`} state={{ overlayFrom: origin }}>管理</ButtonLink> }]} empty={<p className="muted-copy empty-pad">没有匹配的用户</p>} rowKey={account => account.id} rows={rows} /><Pager hasMore={accounts.hasNextPage || accounts.limited} limited={accounts.limited} error={accounts.isFetchNextPageError ? errorMessage(accounts.error, '加载失败，请重试') : undefined} loading={accounts.isFetchingNextPage} onMore={() => void accounts.fetchNextPage()} /></div>}</QueryBoundary></Card>
-    <Outlet context={{ created: reveal('用户已创建'), reset: reveal('密码已重置') } satisfies UsersContext} />
-    <OneTimeSecretDialog onDismiss={() => dispatchSecret({ type: 'dismiss' })} secret={secret} />
-  </>
-}
-export function NewUserRoute() {
-  const close = useRouteClose('/admin/users'), { created } = useOutletContext<UsersContext>()
-  return <CreateUserDialog open onClose={close} onCreated={created} />
-}
-export function UserRoute() {
-  const { id = '' } = useParams(), query = useAdminAccount(id), close = useRouteClose('/admin/users'), { reset } = useOutletContext<UsersContext>(), [busy, setBusy] = useState(false)
-  return <Drawer open busy={busy} title={query.data?.account.display_name || '用户详情'} onClose={close}>{query.isError && query.data && <InlineError>资料刷新失败，正在保留上次数据。<Button variant="quiet" onClick={() => void query.refetch()}>重试读取</Button></InlineError>}<QueryBoundary query={query}>{({ account }) => <UserDrawerBody key={account.id} account={account} onReveal={reset} onBusyChange={setBusy} />}</QueryBoundary></Drawer>
+  const selected = accounts.data?.find((account) => account.id === selectedID) ?? null
+
+  const reveal = (title: string) => (account: AdminAccount, password: string) =>
+    dispatchSecret({ type: 'reveal', secret: { title, username: account.username, password } })
+
+  return (
+    <>
+      <PageHeader
+        actions={
+          <Button icon={<Icon name="plus" />} onClick={() => setCreating(true)} type="button">
+            新建用户
+          </Button>
+        }
+        title="用户"
+      />
+      <Toolbar>
+        <SearchInput label="搜索用户" onChange={(event) => setQ(event.target.value)} placeholder="用户名、显示名或 ID" value={q} />
+        <Segmented
+          label="状态"
+          onChange={setStatus}
+          options={[
+            { key: 'all', label: '全部' },
+            { key: 'active', label: '启用' },
+            { key: 'disabled', label: '停用' },
+          ]}
+          value={status}
+        />
+      </Toolbar>
+      <Card flush>
+        <QueryBoundary query={accounts}>
+          {(rows) => (
+            <>
+              <DataTable
+                caption="用户列表"
+                columns={[
+                  ...columns,
+                  {
+                    key: 'action',
+                    header: '操作',
+                    cell: (account) => (
+                      <Button onClick={() => setSelectedID(account.id)} size="sm" type="button" variant="secondary">
+                        管理
+                      </Button>
+                    ),
+                  },
+                ]}
+                empty={<p className="muted-copy empty-pad">没有匹配的用户</p>}
+                rowKey={(account) => account.id}
+                rows={rows}
+              />
+              <LoadMore
+                hasMore={Boolean(accounts.hasNextPage)}
+                loading={accounts.isFetchingNextPage}
+                onLoad={() => void accounts.fetchNextPage()}
+              />
+            </>
+          )}
+        </QueryBoundary>
+      </Card>
+      <CreateUserDialog onClose={() => setCreating(false)} onCreated={reveal('用户已创建')} open={creating} />
+      <Drawer
+        onClose={() => setSelectedID(null)}
+        open={selected !== null}
+        title={selected ? selected.display_name : ''}
+      >
+        {selected && <UserDrawerBody account={selected} key={selected.id} onReveal={reveal('密码已重置')} />}
+      </Drawer>
+      <OneTimeSecretDialog onDismiss={() => dispatchSecret({ type: 'dismiss' })} secret={secret} />
+    </>
+  )
 }

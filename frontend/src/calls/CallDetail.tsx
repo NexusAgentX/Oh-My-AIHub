@@ -1,12 +1,12 @@
 import { Link, useLocation } from 'react-router-dom'
 import { CallNetwork } from './CallNetwork'
 import { CallDiagnostics } from './CallDiagnostics'
-import { PriceSnapshotView } from '../money/PriceSnapshotView'
+import { PriceSnapshotView } from '../admin/transactions'
 import type { CallDetail } from '../api/types'
 import { formatMs, formatPoints, formatTokens } from '../money/format'
 import { MultiplierText } from '../money/MultiplierText'
 import { formatDateTime } from '../money/time'
-import { ButtonLink, CopyButton, Drawer, QueryBoundary } from '../ui'
+import { CopyButton, Drawer, QueryBoundary } from '../ui'
 import { AttemptTimeline } from './AttemptTimeline'
 import { formatLabels, routingModeLabels } from './labels'
 import { OutcomeBadge } from './OutcomeBadge'
@@ -72,7 +72,7 @@ export function CallDetailView({ call, onRefresh }: { call: CallDetail; onRefres
         {call.ledger_transaction_id && (
           <Row label="账本交易">
             <Link
-              to={admin ? `/admin/points?tab=transactions&transaction=${call.ledger_transaction_id}` : `/points?transaction_id=${call.ledger_transaction_id}`}
+              to={`${admin ? '/admin/points?tab=transactions' : '/points?tab=bill'}&transaction=${call.ledger_transaction_id}`}
             >
               {call.ledger_transaction_id}
             </Link>
@@ -163,11 +163,8 @@ export function CallDetailDrawer({
   onClose: () => void
   query: QueryLike<CallDetail>
 }) {
-  const location = useLocation()
-  const base = location.pathname.startsWith('/admin/') ? '/admin/calls' : '/calls'
   return (
     <Drawer onClose={onClose} open={open} title="调用详情">
-      {query.data && <ButtonLink variant="quiet" to={`${base}/${query.data.id}`} state={{ from: { to: `${location.pathname}${location.search}`, label: location.pathname === '/home' ? '首页' : '调用列表' } }}>打开完整页面</ButtonLink>}
       <QueryBoundary errorFallback="调用详情加载失败" query={query}>
         {(call) => <CallDetailView call={call} onRefresh={query.refetch} />}
       </QueryBoundary>

@@ -1,6 +1,4 @@
-export { useCountdown } from '../ui/countdown'
-import { useCountdown } from '../ui/countdown'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { errorMessage } from '../api/query'
 import type { C2CTrade } from '../api/types'
 import { formatFen, formatPoints } from '../money/format'
@@ -11,6 +9,16 @@ import { useTradeAction } from './queries'
 
 export function TradeStatusBadge({ status }: { status: C2CTrade['status'] }) {
   return <Badge tone={tradeStatusLabels[status].tone}>{tradeStatusLabels[status].label}</Badge>
+}
+
+/** 付款倒计时（秒），到期后为 0。 */
+export function useCountdown(deadline: string) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+  return Math.max(0, (new Date(deadline).getTime() - now) / 1000)
 }
 
 /** 收款信息：方式 + 文字账号（只对交易双方可见）、备注交易号与应付金额。 */
@@ -70,7 +78,6 @@ export function TradeActions({ trade, onChanged }: { trade: C2CTrade; onChanged?
   const [confirm, setConfirm] = useState<Confirm>(null)
   const buyer = trade.viewer_role === 'buyer'
   const seller = trade.viewer_role === 'seller'
-  const left = useCountdown(trade.status === 'awaiting_payment' ? trade.payment_deadline : null)
   const run = (kind: 'paid' | 'release' | 'cancel' | 'dispute', text?: string) =>
     action.mutate(
       { id: trade.id, action: kind, text },
@@ -93,11 +100,10 @@ export function TradeActions({ trade, onChanged }: { trade: C2CTrade; onChanged?
             <Button onClick={() => setConfirm('cancel')} type="button" variant="secondary">
               取消交易
             </Button>
-            <Button disabled={left === 0} loading={action.isPending && action.variables?.action === 'paid'} onClick={() => { if (Date.now() < new Date(trade.payment_deadline).getTime()) run('paid', note.trim() || undefined) }} type="button">
+            <Button loading={action.isPending && action.variables?.action === 'paid'} onClick={() => run('paid', note.trim() || undefined)} type="button">
               我已付款
             </Button>
           </div>
-          {left === 0 && <p className="muted-copy" role="status">已超时，等待系统取消</p>}
         </>
       )}
       {((seller && trade.status === 'paid') || canDispute) && (

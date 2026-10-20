@@ -1,10 +1,9 @@
-import { DomainNav } from '../layouts/DomainNav'
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { errorMessage } from '../api/query'
 import { Button, ButtonLink, EmptyState, InlineError, PageHeader, QueryBoundary, SearchInput } from '../ui'
-import { ForumPagination, TicketBadge } from './components'
+import { ForumPagination, ForumTabs, TicketBadge } from './components'
 import { forumTime, pageNumber, type Kind } from './model'
 import { useBoards, useTopics } from './queries'
 
@@ -25,12 +24,12 @@ function TopicList({ kind }: { kind: Kind }) {
     if (value) next.set(key, value); else next.delete(key)
     setParams(next)
   }
-  const base = tickets ? '/tickets' : '/forum'
+  const base = tickets ? '/forum/tickets' : '/forum'
   return <div className="forum-page">
     <PageHeader title={tickets ? account?.is_admin ? '全部工单' : '我的工单' : '论坛'}
       description={tickets ? '仅提交者和管理员可见' : undefined}
       actions={<ButtonLink to={base + '/new' + (boardID ? '?board=' + boardID : '')} variant="primary">{tickets ? '提交工单' : '发表帖子'}</ButtonLink>} />
-    <DomainNav domain="社区" />
+    <ForumTabs />
     <div className="forum-filters">
       <ForumSearch key={query} query={query} onSearch={(value) => setFilter('q', value)} />
       {/* 和搜索框同一行，不显示字段标签（“全部板块”已说明用途），标签只给读屏 */}
@@ -38,17 +37,17 @@ function TopicList({ kind }: { kind: Kind }) {
         <option value="">全部板块</option>
         {boards.data?.items.map((board) => <option key={board.id} value={board.id}>{board.name}</option>)}
       </select>}
-      {!tickets && account?.is_admin && <ButtonLink to="/admin/forum/boards">管理板块</ButtonLink>}
+      {!tickets && account?.is_admin && <ButtonLink to="/forum/boards">管理板块</ButtonLink>}
     </div>
     {!tickets && boards.isError && <InlineError>{errorMessage(boards.error, '板块加载失败')}</InlineError>}
     {boardID && <p className="muted-copy">{boards.data?.items.find((board) => board.id === boardID)?.description}</p>}
     <QueryBoundary query={topics} errorFallback="帖子加载失败">
       {(data) => <>
         {data.items.length === 0 ? <EmptyState title={query || boardID ? '没有匹配的内容' : tickets ? '还没有工单' : '还没有帖子'}
-          action={page > 1 ? <Button onClick={() => setFilter('page', '')}>返回第一页</Button> : !tickets && boards.data?.items.length === 0 && account?.is_admin ? <ButtonLink to="/admin/forum/boards">创建第一个板块</ButtonLink> : undefined} /> :
+          action={page > 1 ? <Button onClick={() => setFilter('page', '')}>返回第一页</Button> : !tickets && boards.data?.items.length === 0 && account?.is_admin ? <ButtonLink to="/forum/boards">创建第一个板块</ButtonLink> : undefined} /> :
           <ul className="forum-topic-list">{data.items.map((topic) => <li key={topic.id}>
             <div className="forum-topic-main">
-              <Link className="forum-topic-title" to={(tickets ? '/tickets/' : '/forum/topics/') + topic.id}>{topic.title}</Link>
+              <Link className="forum-topic-title" to={'/forum/topics/' + topic.id}>{topic.title}</Link>
               <div className="forum-meta">
                 {!tickets && <span>{boards.data?.items.find((board) => board.id === topic.board_id)?.name || '板块'}</span>}
                 <span>{topic.author.display_name}</span><time dateTime={topic.updated_at}>{forumTime(topic.updated_at)}</time>

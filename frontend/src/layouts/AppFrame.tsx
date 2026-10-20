@@ -1,4 +1,3 @@
-import { InboxBell, InboxNavCount } from '../inbox/Components'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { errorMessage } from '../api/query'
@@ -6,16 +5,12 @@ import { useAuth } from '../auth/AuthProvider'
 import { usePoints } from '../points/queries'
 import { amountSign, formatPoints } from '../money/format'
 import { ThemeToggle } from '../theme/ThemeSwitcher'
-import { Badge, Drawer, Icon, TopbarSlot } from '../ui'
-import { adminNavigation, adminTabCount, findAdminNavItem } from '../admin/navigation'
-import { WorkspaceSwitcher } from './WorkspaceSwitcher'
+import { Icon, TopbarSlot } from '../ui'
 import { Brand } from './Brand'
 import {
   findMobileTab,
   findNavItem,
   mobileTabs,
-  flattenNavigation,
-  productNavigation,
   type MobileTab,
   type NavGroup,
 } from './navigation'
@@ -36,24 +31,23 @@ export function useSignOut() {
   return { signOut, error }
 }
 
-function NavGroups({ groups, onNavigate }: { groups: NavGroup[]; onNavigate?: () => void }) {
+function NavGroups({ groups }: { groups: NavGroup[] }) {
   const { pathname } = useLocation()
   const current = findNavItem(groups, pathname)
   return (
     <>
       {groups.map((group) => (
-        <div aria-label={group.label || '快捷入口'} className="nav-group" key={group.label} role="group">
-          {group.label && <h6 aria-hidden="true">{group.label}</h6>}
+        <div aria-label={group.label} className="nav-group" key={group.label} role="group">
+          <h6 aria-hidden="true">{group.label}</h6>
           {group.items.map((item) => (
             <Link
               className={`nav-item ${current?.to === item.to ? 'nav-item-active' : ''}`}
               aria-current={current?.to === item.to ? 'page' : undefined}
               key={item.to}
               to={item.to}
-              onClick={onNavigate}
             >
               <Icon name={item.icon} />
-              <span>{item.label}</span><InboxNavCount to={item.to} />
+              <span>{item.label}</span>
             </Link>
           ))}
         </div>
@@ -109,6 +103,12 @@ function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
             <Icon name="settings" />
             账户设置
           </Link>
+          {account?.is_admin && (
+            <Link className="account-menu-item" role="menuitem" to="/admin">
+              <Icon name="shield" />
+              管理后台
+            </Link>
+          )}
           <button
             className="account-menu-item"
             onClick={() => {
@@ -137,7 +137,7 @@ function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
         <span className="sidebar-account-copy">
           <strong>{account?.display_name}</strong>
           <span>
-            {location.pathname.startsWith('/admin') ? '管理员' : <>余额 <BalanceText /></>}
+            余额 <BalanceText />
           </span>
         </span>
         <Icon name="more" />
@@ -148,13 +148,6 @@ function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
 
 function BottomTabs({ tabs, pathname }: { tabs: MobileTab[]; pathname: string }) {
   const current = findMobileTab(tabs, pathname)
-  const location = useLocation()
-  const recent = useRef(new Map<string, string>())
-  useEffect(() => {
-    const list = flattenNavigation(productNavigation).some(item => item.to === pathname) || pathname === '/calls/insights'
-    const query = new URLSearchParams(location.search)
-    if (current && list && !['call', 'tx', 'sell', 'draft_id', 'target_id'].some(key => query.has(key))) recent.current.set(current.to, `${pathname}${location.search}`)
-  }, [current, pathname, location.search])
   return (
     <nav aria-label="底部导航" className="bottom-bar">
       {tabs.map((tab) => {
@@ -164,7 +157,7 @@ function BottomTabs({ tabs, pathname }: { tabs: MobileTab[]; pathname: string })
             aria-current={active ? 'page' : undefined}
             className={`bottom-tab ${active ? 'bottom-tab-active' : ''}`}
             key={tab.to}
-            to={active ? tab.to : recent.current.get(tab.to) ?? tab.to}
+            to={tab.to}
           >
             <Icon name={tab.icon} size={20} />
             <span>{tab.label}</span>
@@ -176,17 +169,12 @@ function BottomTabs({ tabs, pathname }: { tabs: MobileTab[]; pathname: string })
 }
 
 export function AppFrame({ navigation }: { navigation: NavGroup[] }) {
-  const { account, sessionError } = useAuth()
+  const { sessionError } = useAuth()
   const { signOut, error: signOutError } = useSignOut()
   const location = useLocation()
   const alertReference = useRef<HTMLDivElement>(null)
   const mainReference = useRef<HTMLElement>(null)
   const [topbarSlot, setTopbarSlot] = useState<HTMLDivElement | null>(null)
-  const admin = location.pathname.startsWith('/admin')
-  const [moreOpen, setMoreOpen] = useState(false)
-  const adminTabs = adminNavigation.slice(0, adminTabCount)
-  const adminCurrent = findAdminNavItem(location.pathname)
-  useEffect(() => setMoreOpen(false), [location.pathname])
 
   useEffect(() => {
     if (signOutError) alertReference.current?.focus()
@@ -203,32 +191,33 @@ export function AppFrame({ navigation }: { navigation: NavGroup[] }) {
 
   return (
     <TopbarSlot.Provider value={topbarSlot}>
-    <div className={`app-shell${admin ? ' admin-shell' : ''}`}>
+    <div className="app-shell">
       <a className="skip-link" href="#main-content">
         跳到主要内容
       </a>
-      <aside aria-label={admin ? '治理侧边栏' : '产品侧边栏'} className="sidebar">
-        <Link aria-label={admin ? '治理首页' : '首页'} className="sidebar-brand" to={admin ? '/admin' : '/home'}>
+      <aside aria-label="产品侧边栏" className="sidebar">
+        <Link aria-label="首页" className="sidebar-brand" to="/home">
           <Brand />
         </Link>
-        <WorkspaceSwitcher />
-        <nav aria-label={admin ? '治理导航' : '产品导航'} className="sidebar-nav">
+        <nav aria-label="产品导航" className="sidebar-nav">
           <NavGroups groups={navigation} />
         </nav>
         <AccountMenu onSignOut={() => void signOut()} />
       </aside>
       <div className="workspace">
         <header className="topbar">
-          <Link aria-label={admin ? '治理首页' : '首页'} className="topbar-brand" to={admin ? '/admin' : '/home'}>
+          <Link aria-label="首页" className="topbar-brand" to="/home">
             <Brand />
           </Link>
           {/* 页面标题区把“‹ 上一级”和滚出屏幕后的标题渲染到这里；页面顶部时不重复标题 */}
           <div className="topbar-context" ref={setTopbarSlot} />
-          <div className="topbar-actions">{admin && <Badge tone="warning">治理</Badge>}
-          <InboxBell /><ThemeToggle />
-          <Link className="topbar-account" to="/account" aria-label="账户">
-            <span className="avatar" aria-hidden="true">{account?.display_name.slice(0, 1) || '用'}</span>
-          </Link></div>
+          <ThemeToggle />
+          <Link className="wallet-chip" to="/points">
+            <span>余额</span>
+            <strong>
+              <BalanceText />
+            </strong>
+          </Link>
         </header>
         {(sessionError || signOutError) && (
           <div className="session-alert" ref={alertReference} role="alert" tabIndex={-1}>
@@ -239,18 +228,7 @@ export function AppFrame({ navigation }: { navigation: NavGroup[] }) {
           <Outlet />
         </main>
       </div>
-      {admin ? <>
-        <nav aria-label="治理高频导航" className="bottom-bar">
-          {adminTabs.map(item => <Link key={item.to} to={item.to} className={`bottom-tab${adminCurrent?.to === item.to ? ' bottom-tab-active' : ''}`} aria-current={adminCurrent?.to === item.to ? 'page' : undefined}>
-            <Icon name={item.icon} size={20} /><span>{item.label}</span><InboxNavCount to={item.to} />
-          </Link>)}
-          <button type="button" className={`bottom-tab${adminCurrent && !adminTabs.includes(adminCurrent) ? ' bottom-tab-active' : ''}`} aria-haspopup="dialog" aria-expanded={moreOpen} onClick={() => setMoreOpen(true)}><Icon name="more" size={20} /><span>更多</span></button>
-        </nav>
-        <Drawer open={moreOpen} onClose={() => setMoreOpen(false)} placement="bottom" title="治理">
-          <nav aria-label="治理全部导航" className="sidebar-nav"><NavGroups groups={navigation} onNavigate={() => setMoreOpen(false)} /></nav>
-          <Link className="button button-secondary" to="/home">回到成员</Link>
-        </Drawer>
-      </> : <BottomTabs pathname={location.pathname} tabs={mobileTabs} />}
+      <BottomTabs pathname={location.pathname} tabs={mobileTabs} />
     </div>
     </TopbarSlot.Provider>
   )

@@ -73,49 +73,6 @@ func (q *Queries) FinishTrade(ctx context.Context, arg FinishTradeParams) error 
 	return err
 }
 
-const getMarketOrder = `-- name: GetMarketOrder :one
-SELECT o.id, o.seller_id, o.total_nano, o.available_nano, o.in_trade_nano, o.sold_nano, o.closed_nano, o.unit_price_fen, o.min_per_trade_nano, o.max_per_trade_nano, o.payment_methods_ciphertext, o.payment_methods_nonce, o.payment_methods_key_id, o.status, o.created_at, o.updated_at, o.closed_at, a.display_name AS seller_name
-FROM c2c_orders o JOIN accounts a ON a.id = o.seller_id
-WHERE o.id = $1 AND o.status = 'open' AND o.available_nano > 0
-  AND o.seller_id <> $2
-`
-
-type GetMarketOrderParams struct {
-	ID       string
-	ViewerID string
-}
-
-type GetMarketOrderRow struct {
-	C2cOrder   C2cOrder
-	SellerName string
-}
-
-func (q *Queries) GetMarketOrder(ctx context.Context, arg GetMarketOrderParams) (GetMarketOrderRow, error) {
-	row := q.db.QueryRow(ctx, getMarketOrder, arg.ID, arg.ViewerID)
-	var i GetMarketOrderRow
-	err := row.Scan(
-		&i.C2cOrder.ID,
-		&i.C2cOrder.SellerID,
-		&i.C2cOrder.TotalNano,
-		&i.C2cOrder.AvailableNano,
-		&i.C2cOrder.InTradeNano,
-		&i.C2cOrder.SoldNano,
-		&i.C2cOrder.ClosedNano,
-		&i.C2cOrder.UnitPriceFen,
-		&i.C2cOrder.MinPerTradeNano,
-		&i.C2cOrder.MaxPerTradeNano,
-		&i.C2cOrder.PaymentMethodsCiphertext,
-		&i.C2cOrder.PaymentMethodsNonce,
-		&i.C2cOrder.PaymentMethodsKeyID,
-		&i.C2cOrder.Status,
-		&i.C2cOrder.CreatedAt,
-		&i.C2cOrder.UpdatedAt,
-		&i.C2cOrder.ClosedAt,
-		&i.SellerName,
-	)
-	return i, err
-}
-
 const getOrder = `-- name: GetOrder :one
 SELECT o.id, o.seller_id, o.total_nano, o.available_nano, o.in_trade_nano, o.sold_nano, o.closed_nano, o.unit_price_fen, o.min_per_trade_nano, o.max_per_trade_nano, o.payment_methods_ciphertext, o.payment_methods_nonce, o.payment_methods_key_id, o.status, o.created_at, o.updated_at, o.closed_at, a.display_name AS seller_name
 FROM c2c_orders o JOIN accounts a ON a.id = o.seller_id
@@ -277,90 +234,6 @@ func (q *Queries) InsertTrade(ctx context.Context, arg InsertTradeParams) (strin
 	var id string
 	err := row.Scan(&id)
 	return id, err
-}
-
-const listAdminTrades = `-- name: ListAdminTrades :many
-SELECT t.id, t.order_id, t.buyer_id, t.seller_id, t.amount_nano, t.unit_price_fen, t.total_fen, t.status, t.payment_deadline, t.buyer_note, t.dispute_opened_by, t.buyer_statement, t.seller_statement, t.resolution_reason, t.resolved_by, t.created_at, t.paid_at, t.released_at, t.cancelled_at, t.disputed_at, t.resolved_at, t.ledger_tx_id, b.display_name AS buyer_name, s.display_name AS seller_name,
-       o.payment_methods_ciphertext, o.payment_methods_nonce, o.payment_methods_key_id
-FROM c2c_trades t
-JOIN c2c_orders o ON o.id = t.order_id
-JOIN accounts b ON b.id = t.buyer_id
-JOIN accounts s ON s.id = t.seller_id
-WHERE ($1::text = '' OR t.status = $1::text)
-  AND (NOT $2::bool OR (t.created_at, t.id) < ($3::timestamptz, $4::uuid))
-ORDER BY t.created_at DESC, t.id DESC
-LIMIT $5
-`
-
-type ListAdminTradesParams struct {
-	Status    string
-	HasCursor bool
-	AfterTime time.Time
-	AfterID   string
-	RowLimit  int32
-}
-
-type ListAdminTradesRow struct {
-	C2cTrade                 C2cTrade
-	BuyerName                string
-	SellerName               string
-	PaymentMethodsCiphertext []byte
-	PaymentMethodsNonce      []byte
-	PaymentMethodsKeyID      string
-}
-
-func (q *Queries) ListAdminTrades(ctx context.Context, arg ListAdminTradesParams) ([]ListAdminTradesRow, error) {
-	rows, err := q.db.Query(ctx, listAdminTrades,
-		arg.Status,
-		arg.HasCursor,
-		arg.AfterTime,
-		arg.AfterID,
-		arg.RowLimit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListAdminTradesRow
-	for rows.Next() {
-		var i ListAdminTradesRow
-		if err := rows.Scan(
-			&i.C2cTrade.ID,
-			&i.C2cTrade.OrderID,
-			&i.C2cTrade.BuyerID,
-			&i.C2cTrade.SellerID,
-			&i.C2cTrade.AmountNano,
-			&i.C2cTrade.UnitPriceFen,
-			&i.C2cTrade.TotalFen,
-			&i.C2cTrade.Status,
-			&i.C2cTrade.PaymentDeadline,
-			&i.C2cTrade.BuyerNote,
-			&i.C2cTrade.DisputeOpenedBy,
-			&i.C2cTrade.BuyerStatement,
-			&i.C2cTrade.SellerStatement,
-			&i.C2cTrade.ResolutionReason,
-			&i.C2cTrade.ResolvedBy,
-			&i.C2cTrade.CreatedAt,
-			&i.C2cTrade.PaidAt,
-			&i.C2cTrade.ReleasedAt,
-			&i.C2cTrade.CancelledAt,
-			&i.C2cTrade.DisputedAt,
-			&i.C2cTrade.ResolvedAt,
-			&i.C2cTrade.LedgerTxID,
-			&i.BuyerName,
-			&i.SellerName,
-			&i.PaymentMethodsCiphertext,
-			&i.PaymentMethodsNonce,
-			&i.PaymentMethodsKeyID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listDisputedTrades = `-- name: ListDisputedTrades :many
@@ -678,10 +551,9 @@ WHERE (CASE $1::text
   AND (NOT $4::bool
        OR (t.buyer_id = $2 AND t.status = 'awaiting_payment')
        OR (t.seller_id = $2 AND t.status = 'paid'))
-  AND (NOT $5::bool OR t.status IN ('awaiting_payment', 'paid', 'disputed'))
-  AND (NOT $6::bool OR (t.created_at, t.id) < ($7::timestamptz, $8::uuid))
+  AND (NOT $5::bool OR (t.created_at, t.id) < ($6::timestamptz, $7::uuid))
 ORDER BY t.created_at DESC, t.id DESC
-LIMIT $9
+LIMIT $8
 `
 
 type ListUserTradesParams struct {
@@ -689,7 +561,6 @@ type ListUserTradesParams struct {
 	UserID    string
 	Status    string
 	Pending   bool
-	Active    bool
 	HasCursor bool
 	AfterTime time.Time
 	AfterID   string
@@ -711,7 +582,6 @@ func (q *Queries) ListUserTrades(ctx context.Context, arg ListUserTradesParams) 
 		arg.UserID,
 		arg.Status,
 		arg.Pending,
-		arg.Active,
 		arg.HasCursor,
 		arg.AfterTime,
 		arg.AfterID,

@@ -6,8 +6,7 @@ import { FormatTags, routingModeLabels } from '../calls'
 import { formatMultiplier } from '../money/format'
 import { formatTypicalPrice } from '../typical/format'
 import { RoutingMetrics } from './RoutingMetrics'
-import { Badge, Disclosure, Icon, IconButton, Segmented } from '../ui'
-import { InheritedField } from '../ui/InheritedField'
+import { Badge, Disclosure, Icon, Segmented, TextField } from '../ui'
 import {
   advancedChanged,
   changeMode,
@@ -133,7 +132,6 @@ export function RoutingEditor({
                     {channel.is_mine && <Badge tone="accent">我的 · 免手续费</Badge>}
                     <Badge tone={state.tone}>{state.label}</Badge>
                   </span>
-                  {manual && <span className="routing-move"><IconButton label={`上移 ${channel.name}`} icon={<Icon name="arrow-up" />} disabled={index === 0} onClick={() => { const order = moveChannel(draft.order, channel.id, -1); onChange({ ...draft, order }); setAnnouncement(`${channel.name} 移到第 ${order.indexOf(channel.id) + 1} 位`) }} /><IconButton label={`下移 ${channel.name}`} icon={<Icon name="arrow-down" />} disabled={index === rows.length - 1} onClick={() => { const order = moveChannel(draft.order, channel.id, 1); onChange({ ...draft, order }); setAnnouncement(`${channel.name} 移到第 ${order.indexOf(channel.id) + 1} 位`) }} /></span>}
                   <FormatTags formats={channel.formats} />
                 </div>
                 <dl className="routing-metrics">
@@ -162,22 +160,22 @@ export function RoutingEditor({
       <Disclosure changed={advancedChanged(draft)} title="高级">
         <p className="muted-copy">超时留空使用平台默认；渠道明确设置时优先使用渠道值。</p>
         <div className="field-row">
-          <InheritedField
+          <TextField
+            hint="留空使用平台默认"
             inputMode="numeric"
             label="最多尝试几个渠道"
-            inherited={defaults ? `${defaults.default_max_attempts} 个渠道` : pending}
-            onRestore={() => onChange({ ...draft, max_attempts: null })}
+            placeholder={defaults ? String(defaults.default_max_attempts) : pending}
             min={1}
             onChange={(event) => onChange({ ...draft, max_attempts: parseOptionalInt(event.target.value) })}
             type="number"
-            value={draft.max_attempts}
+            value={draft.max_attempts ?? ''}
           />
           {([
             ['ttft_timeout_ms', '首字超时（毫秒）', '流式：等待响应体首字节', 600000],
             ['idle_timeout_ms', '空闲超时（毫秒）', '流式：两次数据之间的最长间隔', 3600000],
             ['request_timeout_ms', '请求超时（毫秒）', '非流式：从请求到读完整个响应', 3600000],
           ] as const).map(([key, label, hint, max]) => (
-            <InheritedField
+            <TextField
               hint={hint}
               inputMode="numeric"
               key={key}
@@ -185,10 +183,9 @@ export function RoutingEditor({
               min={1000}
               max={max}
               onChange={(event) => onChange({ ...draft, [key]: parseOptionalInt(event.target.value) })}
-              inherited={defaults ? `${defaults[`default_${key}`]} 毫秒` : pending}
-              onRestore={() => onChange({ ...draft, [key]: null })}
+              placeholder="平台默认"
               type="number"
-              value={draft[key]}
+              value={draft[key] ?? ''}
             />
           ))}
         </div>

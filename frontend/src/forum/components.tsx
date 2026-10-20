@@ -1,7 +1,14 @@
+import { NavLink } from 'react-router-dom'
 import { Badge, Button, Icon } from '../ui'
 import { attachmentSize, ticketLabels, type Attachment, type Topic } from './model'
 import './forum.css'
 
+export function ForumTabs() {
+  return <nav className="forum-tabs" aria-label="论坛分区">
+    <NavLink to="/forum" end>交流</NavLink>
+    <NavLink to="/forum/tickets">工单</NavLink>
+  </nav>
+}
 export function TicketBadge({ status }: { status: Topic['status'] }) {
   return status && <Badge tone={status === 'resolved' ? 'success' : status === 'in_progress' ? 'accent' : 'neutral'}>{ticketLabels[status]}</Badge>
 }

@@ -433,13 +433,12 @@ func (q *Queries) ListArtifacts(ctx context.Context, taskID string) ([]Detection
 
 const listTasks = `-- name: ListTasks :many
 SELECT t.id, t.owner_id, t.state, t.complete, t.metadata_schema, t.metadata, t.created_at, t.updated_at,b.credential_scope FROM detection_tasks t JOIN market_report_bindings b ON b.id=t.id
-WHERE (t.owner_id=$1 OR $2::boolean) AND ($3::text = '' OR t.metadata->'target'->>'draft_id' = $3::text) AND ($4::timestamptz IS NULL OR (t.created_at,t.id)<($4::timestamptz,$5::uuid)) ORDER BY t.created_at DESC,t.id DESC LIMIT $6
+WHERE (t.owner_id=$1 OR $2::boolean) AND ($3::timestamptz IS NULL OR (t.created_at,t.id)<($3::timestamptz,$4::uuid)) ORDER BY t.created_at DESC,t.id DESC LIMIT $5
 `
 
 type ListTasksParams struct {
 	OwnerID   string
 	IsAdmin   bool
-	DraftID   string
 	AfterAt   *time.Time
 	AfterID   *string
 	PageLimit int32
@@ -461,7 +460,6 @@ func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTas
 	rows, err := q.db.Query(ctx, listTasks,
 		arg.OwnerID,
 		arg.IsAdmin,
-		arg.DraftID,
 		arg.AfterAt,
 		arg.AfterID,
 		arg.PageLimit,

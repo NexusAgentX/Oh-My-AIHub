@@ -1627,26 +1627,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/inbox": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 本人待办与治理提醒
-         * @description 本人来源始终限于当前账户，即使当前账户是管理员。治理来源仅管理员可见。 提醒分为 action、anomaly、progress；首页仅突出带截止时间的行动与 blocker。 complete 来源的 counts 是完整扫描后的提醒条数，不是首屏数量；治理概况每条聚合提醒算一条，不把尝试次数当作对象数。 unavailable 或 limited 来源保留已读条目但 counts 为 null，客户端必须显示数量未知并提供来源入口。 每进程最多 2 个聚合请求，每请求最多 4 个读取器并行，总超时 6 秒；分页来源最多扫描 1000 个对象，超过后返回 limited。 不返回密钥、支付信息、陈述正文、原始上游错误或其他账户的私有对象。
-         */
-        get: operations["getInbox"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/home": {
         parameters: {
             query?: never;
@@ -1971,32 +1951,14 @@ export interface paths {
         };
         /**
          * 卖单市场
-         * @description 开放卖单按单价从低到高，使用游标分页。
+         * @description 开放卖单按单价从低到高。
+         *
+         *     由 Feature C 实现；当前处理器返回 501 not_implemented。
          */
         get: operations["listC2COrders"];
         put?: never;
         /** 挂卖单 */
         post: operations["createC2COrder"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/c2c/orders/{orderID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * 查看公开卖单
-         * @description 与卖单市场相同的可见范围，不返回收款账号。卖单关闭、可买量为零或属于自己时返回 404。
-         */
-        get: operations["getC2CMarketOrder"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2187,8 +2149,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 查看账户 */
-        get: operations["getAdminAccount"];
+        get?: never;
         put?: never;
         post?: never;
         delete?: never;
@@ -2336,23 +2297,6 @@ export interface paths {
         };
         /** 申诉列表 */
         get: operations["listAdminDisputes"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/c2c/trades": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 管理员浏览全部状态的 C2C 交易 */
-        get: operations["listAdminC2CTrades"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4232,41 +4176,6 @@ export interface components {
             name: string;
             prefix: string;
         };
-        InboxItem: {
-            id: string;
-            /** @enum {string} */
-            category: "action" | "anomaly" | "progress";
-            title: string;
-            message: string;
-            href: string;
-            blocker: boolean;
-            /** Format: date-time */
-            deadline: string | null;
-            /** Format: date-time */
-            updated_at: string;
-        };
-        InboxCounts: {
-            action: number;
-            anomaly: number;
-            progress: number;
-        };
-        InboxSource: {
-            /** @enum {string} */
-            id: "trades" | "channels" | "keys" | "points" | "contributions" | "detection" | "reviews" | "governance";
-            label: string;
-            /** @enum {string} */
-            workspace: "member" | "admin";
-            href: string;
-            /** @enum {string} */
-            state: "complete" | "unavailable" | "limited";
-            counts: components["schemas"]["InboxCounts"] | null;
-            items: components["schemas"]["InboxItem"][];
-        };
-        InboxResponse: {
-            /** Format: date-time */
-            generated_at: string;
-            sources: components["schemas"]["InboxSource"][];
-        };
         HomeResponse: {
             points: components["schemas"]["PointsSummary"];
             today: {
@@ -5037,9 +4946,6 @@ export interface components {
             items: components["schemas"]["C2CMyOrder"][];
             /** @description 下一页游标；为 null 表示没有更多。 */
             next_cursor: string | null;
-        };
-        C2COrderEnvelope: {
-            order: components["schemas"]["C2COrder"];
         };
         C2CMyOrderEnvelope: {
             order: components["schemas"]["C2CMyOrder"];
@@ -9724,8 +9630,6 @@ export interface operations {
     listDetectionJobs: {
         parameters: {
             query?: {
-                /** @description Filter tasks belonging to this contribution draft without changing access scope. */
-                draft_id?: string;
                 cursor?: string;
                 limit?: number;
             };
@@ -10826,37 +10730,6 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
-    getInbox: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 各来源独立报告完整性 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InboxResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            /** @description 聚合读取预算已满 */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
     getHome: {
         parameters: {
             query?: never;
@@ -11646,33 +11519,6 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
-    getC2CMarketOrder: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description C2C 卖单 ID。 */
-                orderID: components["parameters"]["orderID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["C2COrderEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
     listMyC2COrders: {
         parameters: {
             query?: {
@@ -11776,8 +11622,6 @@ export interface operations {
                 status?: components["parameters"]["tradeStatus"];
                 /** @description 为 true 时只返回待我处理的交易：我是买家且待付款，或我是卖家且已付款待放行。 */
                 pending?: components["parameters"]["tradePending"];
-                /** @description 只返回尚未结束的交易（待付款、已付款、申诉中） */
-                active?: boolean;
                 /** @description 上一页返回的 next_cursor。 */
                 cursor?: components["parameters"]["cursor"];
                 /** @description 每页条数，1～100，默认 20。 */
@@ -12010,32 +11854,6 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
-        };
-    };
-    getAdminAccount: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 账户 ID。 */
-                accountID: components["parameters"]["accountID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminAccountEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
         };
     };
     updateAdminAccount: {
@@ -12305,36 +12123,6 @@ export interface operations {
         };
     };
     listAdminDisputes: {
-        parameters: {
-            query?: {
-                /** @description 交易状态。 */
-                status?: components["parameters"]["tradeStatus"];
-                /** @description 上一页返回的 next_cursor。 */
-                cursor?: components["parameters"]["cursor"];
-                /** @description 每页条数，1～100，默认 20。 */
-                limit?: components["parameters"]["limit"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["C2CTradePage"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    listAdminC2CTrades: {
         parameters: {
             query?: {
                 /** @description 交易状态。 */
