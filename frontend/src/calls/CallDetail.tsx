@@ -6,7 +6,7 @@ import type { CallDetail } from '../api/types'
 import { formatMs, formatPoints, formatTokens } from '../money/format'
 import { MultiplierText } from '../money/MultiplierText'
 import { formatDateTime } from '../money/time'
-import { ButtonLink, CopyButton, Drawer, QueryBoundary } from '../ui'
+import { CopyButton, Drawer, QueryBoundary } from '../ui'
 import { AttemptTimeline } from './AttemptTimeline'
 import { formatLabels, routingModeLabels } from './labels'
 import { OutcomeBadge } from './OutcomeBadge'
@@ -163,11 +163,8 @@ export function CallDetailDrawer({
   onClose: () => void
   query: QueryLike<CallDetail>
 }) {
-  const location = useLocation()
-  const base = location.pathname.startsWith('/admin/') ? '/admin/calls' : '/calls'
   return (
     <Drawer onClose={onClose} open={open} title="调用详情">
-      {query.data && <ButtonLink variant="quiet" to={`${base}/${query.data.id}`} state={{ from: { to: `${location.pathname}${location.search}`, label: location.pathname === '/home' ? '首页' : '调用列表' } }}>打开完整页面</ButtonLink>}
       <QueryBoundary errorFallback="调用详情加载失败" query={query}>
         {(call) => <CallDetailView call={call} onRefresh={query.refetch} />}
       </QueryBoundary>

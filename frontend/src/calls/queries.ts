@@ -1,4 +1,4 @@
-import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { apiGet, pathSegment, request, withQuery, type QueryParams } from '../api/client'
 import type { CallDetail, UsageReport } from '../api/types'
 
@@ -62,14 +62,12 @@ export function useCallPages<Page extends CursorPage<unknown>>(
 ) {
   return useInfiniteQuery({
     queryKey: [...callKeys.list(path, params), limit],
-    queryFn: ({ pageParam, signal }) =>
-      request<Page>(withQuery(path, { ...params, limit, cursor: pageParam || undefined }), { signal }),
+    queryFn: ({ pageParam }) =>
+      request<Page>(withQuery(path, { ...params, limit, cursor: pageParam || undefined })),
     initialPageParam: '',
     getNextPageParam: (last: Page) => last.next_cursor ?? undefined,
     enabled,
     refetchInterval,
-    placeholderData: keepPreviousData,
-    refetchOnWindowFocus: true,
   })
 }
 
@@ -77,10 +75,9 @@ export function useCallPages<Page extends CursorPage<unknown>>(
 export function useCall(id: string | null, detailPath = userCallsPath) {
   return useQuery({
     queryKey: callKeys.detail(detailPath, id ?? ''),
-    queryFn: async ({ signal }) =>
-      (await request<{ call: CallDetail }>(`${detailPath}/${pathSegment(id ?? '')}`, { signal })).call,
+    queryFn: async () =>
+      (await request<{ call: CallDetail }>(`${detailPath}/${pathSegment(id ?? '')}`)).call,
     enabled: Boolean(id),
-    refetchInterval: query => query.state.data?.outcome === 'in_progress' ? 5000 : false,
   })
 }
 

@@ -623,11 +623,14 @@
   }
 }
 
+.mobile-analysis-toggle { display: none; }
 .analysis-comparison-row .comparison-label { display: none; }
 .analysis-comparison[data-count-metric='true'] :is(.analysis-comparison-head, .analysis-comparison-row) { grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1fr); }
 .analysis-trend button[aria-pressed='true'] { outline: 2px solid var(--focus); outline-offset: -2px; }
 .analysis-reading { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
 @media (max-width: 767px) {
+  .mobile-analysis-toggle { display: block; }
+  .usage-analysis-collapsed { display: none; }
   .call-explorer-bar > .call-filters > * { flex: 1 1 120px; }
   .call-explorer-bar > .call-filters > .segmented-scroll { flex-basis: 100%; }
   .call-explorer-bar > .live-toggle { flex: 0 0 auto; }
@@ -635,11 +638,3 @@
   .analysis-comparison[data-count-metric='true'] .analysis-comparison-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .analysis-comparison-row > strong { grid-column: 1 / -1; }
 }
-
-.section-nav { display: flex; gap: var(--space-2); overflow-x: auto; margin-bottom: var(--space-4); padding: var(--space-1); }
-.section-nav-link { flex: 0 0 auto; display: inline-flex; align-items: center; min-height: var(--control-height); padding: var(--space-2) var(--space-4); border: 2px solid transparent; border-radius: var(--radius-pill); color: var(--body); font-weight: 600; text-decoration: none; }
-.section-nav-link:hover { background: var(--hover); }
-.section-nav-link.is-active { border-color: var(--line); background: var(--mustard); color: var(--on-color); box-shadow: var(--shadow-xs); }
-.query-updating { opacity: .65; }
-.filter-pending { color: var(--warning); font-size: var(--text-xs); }
-@media (prefers-reduced-motion: reduce) { .call-row-new { animation: none; background: var(--mustard-tint); } }

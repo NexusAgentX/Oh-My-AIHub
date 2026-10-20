@@ -62,19 +62,3 @@ const endReasonLabels: Record<string, string> = {
 export function endReasonLabel(reason: string) {
   return endReasonLabels[reason] ?? reason
 }
-
-export const analysisDimensions: Record<string, string> = {
-  model: '模型',
-  channel: '最终渠道',
-  format: '协议',
-  stream: '响应方式',
-  key: 'Key',
-  tag: '标签',
-  account: '账户',
-  outcome: '调用结果',
-  error: '最后尝试原因',
-  error_code: '最后上游错误码',
-  status: '最后上游状态',
-  stop: '模型结束原因',
-  service_tier: '服务档位',
-}

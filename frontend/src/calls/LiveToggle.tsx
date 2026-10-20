@@ -7,18 +7,15 @@ export function LiveToggle({
   onChange,
   status,
   onRetry,
-  disabledReason,
 }: {
   enabled: boolean
   onChange: (enabled: boolean) => void
   status: StreamStatus
   onRetry: () => void
-  disabledReason?: string
 }) {
   return (
     <span className="live-toggle">
-      <Switch checked={enabled} label="实时" onChange={onChange} disabled={Boolean(disabledReason)} />
-      {disabledReason && <span className="muted" title={disabledReason}>{disabledReason}</span>}
+      <Switch checked={enabled} label="实时" onChange={onChange} />
       {enabled && status === 'open' && <span className="live-dot" role="status">已连接</span>}
       {enabled && status === 'connecting' && <span className="muted" role="status">连接中</span>}
       {enabled && status === 'error' && (
