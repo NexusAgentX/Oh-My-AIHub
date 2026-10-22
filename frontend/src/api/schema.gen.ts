@@ -134,7 +134,7 @@ export interface paths {
         put?: never;
         /**
          * images.generations
-         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         * @description 原生协议透明代理：凭平台 API Key 认证，网关换用所选渠道的上游 Key，只替换顶层 model 字节。网关不登记服务端资源，也无资源读取、列表或删除入口；请求与响应正文不落库。
          */
         post: operations["proxyImagesGenerations"];
         delete?: never;
@@ -154,7 +154,7 @@ export interface paths {
         put?: never;
         /**
          * images.edits
-         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         * @description 原生协议透明代理：凭平台 API Key 认证，网关换用所选渠道的上游 Key，只替换顶层 model 字节。网关不登记服务端资源，也无资源读取、列表或删除入口；请求与响应正文不落库。
          */
         post: operations["proxyImagesEdits"];
         delete?: never;
@@ -174,7 +174,7 @@ export interface paths {
         put?: never;
         /**
          * images.variations
-         * @description 原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。
+         * @description 原生协议透明代理：凭平台 API Key 认证，网关换用所选渠道的上游 Key，只替换顶层 model 字节。网关不登记服务端资源，也无资源读取、列表或删除入口；请求与响应正文不落库。
          */
         post: operations["proxyImagesVariations"];
         delete?: never;
@@ -1707,6 +1707,8 @@ export interface paths {
         /**
          * OpenAI Chat Completions
          * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
+         *
+         *     无状态边界：顶层 store 为真（含大小写变体、重复键与非布尔真值）时整组剥离，其余字节不动；previous_response_id 或 conversation 在转发前返回 400 stateful_request_unsupported，文案点名被拒字段。网关不保存续接状态，客户端必须自带完整上下文。
          */
         post: operations["proxyOpenAIChat"];
         delete?: never;
@@ -1727,6 +1729,8 @@ export interface paths {
         /**
          * OpenAI Responses
          * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
+         *
+         *     无状态边界：顶层 store 为真时整组剥离；previous_response_id 或 conversation 返回 400 stateful_request_unsupported；background 为真返回 400 background_unsupported，不降级为同步，也不占用在途名额。读取、取消与流恢复入口已退役，回答 404 unsupported_endpoint。
          */
         post: operations["proxyOpenAIResponses"];
         delete?: never;
@@ -1768,6 +1772,8 @@ export interface paths {
         /**
          * Gemini generateContent / streamGenerateContent
          * @description 外部模型 API 入口：请求与响应按原生格式透传（只换鉴权、可选换 User-Agent 与请求头、替换顶层 model），本规范不描述正文，也不生成前端类型。不走会话 Cookie，也不做同源校验。
+         *
+         *     无状态边界：顶层 cachedContent 返回 400 stateful_request_unsupported，客户端必须自带完整上下文；网关不保存显式缓存、会话或后台任务，也无 cachedContents 管理入口。
          */
         post: operations["proxyGemini"];
         delete?: never;
@@ -2427,47 +2433,6 @@ export interface components {
             unit_prices: components["schemas"]["MarketUnitPrice"][];
             /** Format: date-time */
             readonly created_at: string;
-        };
-        MarketCapability: {
-            id: string;
-            /** @enum {string} */
-            layer: "upstream_protocol" | "gateway_proxy" | "official_cli";
-            /** @enum {string} */
-            state: "supported" | "unsupported" | "unknown" | "unobserved" | "invalidated";
-            reason: string;
-            /** Format: uuid */
-            report_id: string;
-        };
-        MarketEvidenceBinding: {
-            /** @enum {string} */
-            target_kind: "group" | "group_model";
-            /** Format: uuid */
-            target_id: string;
-            target_revision: number;
-            capability_digest: string;
-            manifest_version: string;
-            code_version: string;
-            parameter_version: string;
-        };
-        /** @description F0 目标参数契约，尚无后台入口；上下文和最大输出分别配置。low < high <= hard_maximum，precision 必须有限且为正，relative 模式不得大于 1。任务开始固定全部参数及版本，不跟随在途修改；不是全测累计预算。 */
-        GatewayCapacitySearch: {
-            readonly version: string;
-            /**
-             * @default binary
-             * @enum {string}
-             */
-            method: "binary" | "ternary";
-            /** Format: int64 */
-            low: number;
-            /** Format: int64 */
-            high: number;
-            /** Format: int64 */
-            hard_maximum: number;
-            /** @enum {string} */
-            precision_mode: "absolute" | "relative";
-            precision: number;
-            rounds: number;
-            rechecks: number;
         };
         ForumAuthor: {
             /** Format: uuid */

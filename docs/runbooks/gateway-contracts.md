@@ -1,60 +1,45 @@
-# 网关契约与隔离原型
+# 网关契约与请求边界
 
-本手册用于 F0 的可重复协议/权限机制验证。正式端点由 F7/F8 交付，供应商真实检测由 F4/F8 交付；原型不连接真实上游、不操作数据库，也不产生平台账本或供应商能力通过记录。目标端点与场景清单只维护在 `backend/api/openapi.yaml` 的 `x-aihub-gateway-contract`，架构边界见 [ARCHITECTURE](../../ARCHITECTURE.md#f0-发现阶段边界)。
+本手册说明 `x-aihub-gateway-contract` 的作用、如何验证它，以及网关不保存服务端状态后各入口的请求边界。结构边界见 [ARCHITECTURE](../../ARCHITECTURE.md#无状态请求边界)。
 
-## 契约与权限回归
+## 契约包含什么
 
-在任务 worktree 中执行：
+契约是 `backend/api/openapi.yaml` 根级的扩展字段，位于 `paths` 之外，不登记正式路由，只描述已交付入口的来源与策略：
 
-```sh
-mise exec -- go -C backend test ./internal/gatewaycontract ./internal/api
-```
+- 端点只声明 8 条推理/图片入口（OpenAI Chat、Responses、Anthropic Messages、Gemini `generateContent`/`streamGenerateContent`、图片生成/编辑/变体）以及 OpenAI、Anthropic、Gemini 三种风格的模型列表与单模型元数据。`/v1`、`/v1beta`、`/backend-api` 上的其他路径回答 404 `unsupported_endpoint`。
+- `sources` 只保留与保留入口相关的官方文档或 SDK 来源；`suites` 记录上游协议来源编号与断言分组；`exclusions` 记录移出范围的来源编号及原因（含已退役能力），表示“不验证”，不表示“上游不支持”。
+- `adjustments` 记录来源编号的合并/拆分与请求边界结论。
+- 来源编号是外部可追溯基线，不是请求次数或完整性分母。新增或删除入口必须同时修改契约与真实路由；契约里的条目不会自动变成可用入口。
 
-契约检查覆盖原始四协议 279 个 ID 和 Codex RL01–RL26 的完整追溯（含移出项），并验证端点/来源/负责 Feature 的关联。ID 数量不是请求次数或当前完整性分母。原型通过本地 HTTP fixture 验证不透明内容与 SSE 字节保留、单次 multipart 图片、引用越权及跨渠道候选；这些结论只属于平台机制。
-
-`pagination_test.go` 验证多页共享列表先过滤再返回、空页继续、原生游标加密认证及换账号/Key/凭据/父级/过滤条件的拒绝。`state_test.go` 验证同实际上游 Key 跨渠道碰撞的隔离；未知上下文首读不能自动获得归属。`transport_test.go` 验证同组按所选地址顺序回退、凭据轮换/渠道删除后的新资源请求不可改换归属、不确定写入不能重放。正式创建登记必须是原子持久操作，fixture 的元数据不是生产索引。
-
-运行既有后台引擎的快照回归：
+## 验证
 
 ```sh
-mise exec -- go -C backend test ./internal/gateway -run TestRegisteredBackgroundSurvivesRevocationWithOriginalCredentialAndQuote
+mise exec -- go -C backend test ./internal/gatewaycontract ./internal/api ./internal/gateway
+mise run generate   # 重新生成 frontend/src/api/schema.gen.ts，提交前确认无残差
 ```
 
-它在普通渠道/目录存储缺席、平台 Key 撤销及密钥环轮换后，验证已登记任务依旧使用原凭据、原报价收敛结算，新读取/取消则被拒绝。它不是新分组结构已经接入的证明。
+覆盖范围：
 
-## 固定官方 CLI 接入原型
+- `TestManifestTraceabilityAndScope` 要求四个协议的来源编号完整（Chat 51、Responses 80、Messages 68、GenerateContent 80），并拒绝文件、上传、向量库、容器类资源路径重新进入端点表。
+- `TestManifestRejectsBrokenHandoffs` 要求缺失端点、重复 ID、缺失来源、错误 Feature、聚合环等破坏都无法通过校验。
+- `TestGatewayF7EveryNativeEndpointUsesRealEntryAndScope` 逐个 F7 推理/图片端点走真实入口：平台 Key 换渠道上游 Key、图片 multipart 只替换模型字段、Gemini 路径解析 `{model}:{operation}`、未实现的 operation 回答 `unsupported_endpoint`。
+- `TestRetiredGatewayEndpointsAnswerNotFound` 与 `TestGatewayForwardsWithoutServerSideState` 固定退役路径与请求边界；`TestBackgroundResponseIsRejected` 固定后台请求的拒绝。
+- `internal/gateway` 的 `stateless` 用例固定 `store` 剥离、`previous_response_id`/`conversation`/`cachedContent` 识别与零复制路径。
 
-需要 Node、OpenSSL 及官方 `@openai/codex@0.163.0`。把该版本安装到任务专用临时目录，传入其可执行文件绝对路径：
+契约失败时的排查顺序：先看 `paths` 与路由表是否一致，再看端点引用的 `source` 是否存在、`suite` 的 `endpoints` 是否都还在端点表里。删除入口时要把对应来源编号移入 `exclusions` 并写明原因，而不是留下悬空引用。
 
-```sh
-AIHUB_CLI_LAB="$(mktemp -d)"
-npm install --prefix "$AIHUB_CLI_LAB" --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org @openai/codex@0.163.0
-node backend/internal/gatewaycontract/testdata/codex-bootstrap.mjs "$AIHUB_CLI_LAB/node_modules/.bin/codex"
-rm -rf "$AIHUB_CLI_LAB"
-```
+## 请求边界
 
-脚本拒绝其他客户端版本。它为每组配置创建独立的子进程配置目录与合成工作区，使用临时 CA 和非 CA 叶证书建立回环 HTTPS 后端；TLS 校验保持开启。子进程仅获得必要环境，Git 的宿主配置/凭据辅助读取关闭，插件、应用和 shell 工具关闭，外部代理指向本地 fixture；不加载宿主登录。运行结束或取消时清理进程组和临时目录。输出仅包含版本、认证类别、方法/路径、布尔断言与输入类型，不保存完整 HTTP、认证内容、stdout/stderr、推理或笔记正文。
-
-凭据对照及原生图片工具闭环：
-
-| 配置 | 合成 auth.json 字段 | 预期机制结果 |
+| 请求内容 | 行为 | 不变量 |
 | --- | --- | --- |
-| 普通 API Key | `OPENAI_API_KEY` | 推理完成，notes 扩展未启用 |
-| 平台身份兼容原型 | `personal_access_token` | 本地 whoami/accounts 返回合成平台身份及未知套餐 `aihub`，CLI 分类为 ChatGPT；调用 notes thread_hint 后推理完成 |
-| 平台身份兼容＋生图工具 | `personal_access_token` | 合成 SSE 下发 image_gen.imagegen，CLI 实际调用原生 images/generations，以图像模型请求并把工具结果回填推理 |
+| Chat/Responses 顶层 `store` 为真 | 整组删除该成员（任一重复键为真则全部删；大小写、字符串与数字写法都算真） | 其余字节不动；全为假值或不携带时零复制 |
+| `previous_response_id`、`conversation` | 转发前返回 400 `stateful_request_unsupported`，文案点名被拒字段 | 显式 `null` 或空串视为未请求状态，原样转发 |
+| Gemini 顶层 `cachedContent` | 同上，400 `stateful_request_unsupported` | 显式缓存管理入口已退役，引用已失效缓存也无法兑现 |
+| `background` 为真 | 开调用记录之前返回 400 `background_unsupported` | 不降级为同步调用，不占用账号/渠道在途名额 |
+| 会话、响应、条目、缓存、后台任务的读取/列表/取消/删除 | 404 `unsupported_endpoint` | 网关没有服务端资源，也没有对应归属索引 |
 
-可以在命令末尾附加 `api-key`、`synthetic-platform-pat` 或 `synthetic-platform-imagegen`，只复现一个配置。生图用本地固定 PNG，不访问真实图片服务；它证明固定客户端与原生入口的闭环，不证明供应商生图支持。Codex JSON edits 字段与通用 multipart edits 是两个原生契约，分别验证，不相互转换。
+## 证据边界
 
-共同设置是内置 `openai` provider、指向本地 HTTPS 的 `openai_base_url`（`/backend-api/codex`）/`chatgpt_base_url`（`/backend-api/`）、本地 `CODEX_AUTHAPI_BASE_URL`，并启用 token budget 与 history/notes。具体开关以可执行脚本为准。身份辅助接口按维护者决定由平台本地回答，正式实现不能将共享供应商 whoami/accounts 直接转给消费者。
+平台机制验证（本地 fixture、合成上游）只证明网关自身的转发、鉴权与边界，不能作为供应商真实支持证据，也不能代替真实付费验证。真实上游验证只使用明确提供的测试 Key，由用户在上游自行限制消费。
 
-这一步证明固定客户端的启用和合成生图工具闭环，不证明真实 notes 写读/历史恢复、跨供应商兼容、正式平台端点、模型目录、zstd 或真实上游生图已通过。fixture 会拒绝未实现路径，目录失败后使用客户端内置目录；它没有伪造一份已通过的供应商目录。客户端可能先尝试 WebSocket 再回退到 HTTP/SSE，不能把回退记录为 WebSocket 支持。`responses_websockets` 系列在该版本已经移除，不将这些无效开关作为禁用 WS 的证据。
-
-合成后端返回空 thread_hint 只证明调用发生，不单独证明首次归属。维护者已确认对会话编号作账号/平台 Key 命名空间隔离：`TestCodexNamespaceIsolatesOwnersAndPreservesNativeContents` 验证同一原始编号在不同账号/Key 下分离，重启保持稳定，猜测他人内部编号不能逃逸；原始正文、密文和普通 item ID 保留。正式 F7/F8 仍需验证保护密钥持久化及实际平台代理入口，不能把原型当供应商支持证据。
-
-后台 V2 压缩需要独立配置：固定版本要求启用 `features.async_compaction`、关闭 token budget，且 provider 的远程压缩能力为 V2；它与上述 notes 配置互斥。精确配置及十个 history/notes 操作的字段/必要头只维护在 OpenAPI 扩展，不能将此启用实验解释成后台压缩或全部辅助操作通过。
-
-## 证据及后续验证
-
-PR/Issue 分别记录真实直接上游、正式平台代理和固定客户端证据。此脚本的类别是 `official_cli_with_synthetic_backend`：它可以证明启用/传输机制，不能单独给真实供应商写 `official_cli` 能力通过。真实付费验证仅使用明确提供的测试 Key，由用户在上游限制消费；平台不设全测累计费用/次数/token/总时长门禁。
-
-开发期间不运行端到端性能 A/B。本原型未接入 server、快照或账本，没有生产转发的新增 SQL、锁、连接或逐帧工作；后续 Feature 接入时分别核对热路径成本，最终集成候选在发版前按[性能基线手册](gateway-baseline.md)集中验证。
+网关不保存请求或响应正文、也不保存凭据到日志；契约与用例都不得为此登记持久字段。开发期不运行端到端性能 A/B，发版前按[网关性能基线](gateway-baseline.md)集中覆盖请求扫描、`store` 剥离、旁路解析与结算。

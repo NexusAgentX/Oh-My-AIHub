@@ -45,11 +45,10 @@ ADR 记录难以撤销、会长期约束系统的技术决定及其取舍：系�
 
 - [ADR-0042：取消供应商域名永久禁用](0042-remove-permanent-provider-host-ban.md)
 
-- [ADR-0043：持久跟踪后台 Responses，按可靠推理分量结算](0043-track-background-responses-and-component-billing.md)
+- [ADR-0043：持久跟踪后台 Responses，按可靠推理分量结算](0043-track-background-responses-and-component-billing.md)（后台跟踪与后台结算点已作废：后台响应退役；可靠推理分量选档仍有效）
 
 - [ADR-0044：分组市场采用稳定对象、不可变报价与能力证据绑定](0044-group-market-contract.md)
 
-- [ADR-0045：检测证据按层留存，审核引用不可变报告](0045-detection-evidence-and-report-snapshots.md)
 
 - [ADR-0046：固定候选报价并在账本锁前认领调用内执行收据](0046-group-quote-settlement-and-execution-receipts.md)
 
@@ -76,3 +75,4 @@ ADR 记录难以撤销、会长期约束系统的技术决定及其取舍：系�
 | [0024 迁移压缩为单一基线](archive/0024-squash-migrations-to-single-baseline.md) | 阶段性决定已结束；迁移规则见 `AGENTS.md` |
 | [0026 产品重写时原地重写基线](archive/0026-rewrite-baseline-migration-in-place.md) | 阶段性决定已结束；迁移规则见 `AGENTS.md` |
 | [0027 网关透明转发、事后记账与按用户按模型路由](archive/0027-adopt-transparent-gateway-with-post-hoc-billing.md) | 由 ADR-0035 取代 |
+| [0045 检测证据按层留存，审核引用不可变报告](archive/0045-detection-evidence-and-report-snapshots.md) | 已废弃：检测、能力证据与公开报告已删除 |
