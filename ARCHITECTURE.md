@@ -90,7 +90,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 
 ### 无状态请求边界
 
-网关只代理 8 条无状态推理/图片入口（OpenAI Chat、Responses、Anthropic Messages、Gemini `generateContent`/`streamGenerateContent`、图片生成/编辑/变体）与四类模型列表/单模型元数据；`/v1`、`/v1beta`、`/backend-api` 上的其他路径回答 404 `unsupported_endpoint`，不做协议转换，也不按上游返回的 URL 开放下载反代。
+网关只代理 8 条无状态推理/图片入口（OpenAI Chat、Responses、Anthropic Messages、Gemini `generateContent`/`streamGenerateContent`、图片生成/编辑/变体）与 `/v1/models`、`/v1/models/{model}`、`/v1beta/models`、`/v1beta/models/{model}` 的模型目录读取；`/v1`、`/v1beta`、`/backend-api` 上的其他路径回答 404 `unsupported_endpoint`，不做协议转换，也不按上游返回的 URL 开放下载反代。
 
 `backend/api/openapi.yaml` 的 `x-aihub-gateway-contract` 保存版本化的端点来源、认证/模型上下文/状态/重放与计费归属，只声明上述入口。它位于 `paths` 之外，不登记正式路由；路由与 OpenAPI 一致性门禁保持。模型别名只解析一次，再检查权限；模型 ID 精确匹配，原生命名空间在路径中按段编码。
 
