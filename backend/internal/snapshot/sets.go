@@ -37,7 +37,6 @@ type candidateKey struct {
 // formats they are served in).
 type fleetSet struct {
 	modelLists map[channel.Format][]gateway.CandidateRecord
-	auxiliary  map[channel.Format][]gateway.CandidateRecord
 	candidates map[candidateKey][]gateway.Candidate
 	online     []gateway.OnlineModel
 }
@@ -48,7 +47,6 @@ type fleetSet struct {
 func buildFleet(records []gateway.CandidateRecord) fleetSet {
 	fleet := fleetSet{
 		modelLists: make(map[channel.Format][]gateway.CandidateRecord),
-		auxiliary:  make(map[channel.Format][]gateway.CandidateRecord),
 		candidates: make(map[candidateKey][]gateway.Candidate),
 		online:     []gateway.OnlineModel{},
 	}
@@ -56,9 +54,6 @@ func buildFleet(records []gateway.CandidateRecord) fleetSet {
 	for _, record := range records {
 		for _, format := range record.Formats {
 			fleet.modelLists[format] = append(fleet.modelLists[format], record)
-			if record.Candidate.GroupID != "" {
-				fleet.auxiliary[format] = append(fleet.auxiliary[format], record)
-			}
 			key := candidateKey{model: record.ModelID, format: format}
 			fleet.candidates[key] = append(fleet.candidates[key], record.Candidate)
 		}

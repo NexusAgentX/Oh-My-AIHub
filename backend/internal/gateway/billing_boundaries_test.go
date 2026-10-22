@@ -75,9 +75,6 @@ func TestSubmodelsNeverBecomeAdmissionRules(t *testing.T) {
 			if routes.reached != (mainModel == "gpt-test") {
 				t.Fatal("submodel pricing failure blocked admission, or main model restriction was bypassed")
 			}
-			if mainModel == "gpt-test" && len(f.engine.jobs) != 0 {
-				t.Fatal("ordinary request registered a background job")
-			}
 		}
 	}
 }

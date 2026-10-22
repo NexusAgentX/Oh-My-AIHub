@@ -35,7 +35,7 @@ func migrationPreflight(ctx context.Context, db *sql.DB, options MigrationOption
 	if version >= legacyCleanupVersion {
 		return nil
 	}
-	for _, table := range []string{"calls", "gateway_background_jobs"} {
+	for _, table := range []string{"calls"} {
 		var exists bool
 		if err := db.QueryRowContext(ctx, "SELECT to_regclass($1) IS NOT NULL", table).Scan(&exists); err != nil {
 			return err
@@ -43,12 +43,8 @@ func migrationPreflight(ctx context.Context, db *sql.DB, options MigrationOption
 		if !exists {
 			continue
 		}
-		condition := "outcome='in_progress'"
-		if table == "gateway_background_jobs" {
-			condition = "settled_at IS NULL"
-		}
 		var pending bool
-		if err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM "+table+" WHERE "+condition+")").Scan(&pending); err != nil {
+		if err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM "+table+" WHERE outcome='in_progress')").Scan(&pending); err != nil {
 			return err
 		}
 		if pending {

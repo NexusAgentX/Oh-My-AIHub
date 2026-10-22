@@ -3,26 +3,3 @@
 //   sqlc v1.31.1
 
 package resourcepg
-
-import (
-	"time"
-)
-
-type GatewayResource struct {
-	IdentityHash      []byte
-	Kind              string
-	RemoteID          string
-	ParentID          string
-	GroupID           string
-	CredentialScope   string
-	AccountID         string
-	KeyID             string
-	ChannelID         string
-	CredentialVersion string
-	CreationID        string
-	ModelID           string
-	Quarantined       bool
-	Deleted           bool
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
-}

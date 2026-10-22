@@ -89,11 +89,6 @@ func (s Store) Inspect(ctx context.Context, before *cutover.Manifest) (cutover.M
 			return out, cutover.ErrIncomplete
 		}
 	}
-	if _, ok := existing(tables, "gateway_background_jobs"); ok {
-		if tx.QueryRowContext(ctx, `SELECT count(*) FROM gateway_background_jobs WHERE settled_at IS NULL`).Scan(&out.Pending.Background) != nil {
-			return out, cutover.ErrIncomplete
-		}
-	}
 	if err = out.Pending.Check(); err != nil {
 		return out, err
 	}

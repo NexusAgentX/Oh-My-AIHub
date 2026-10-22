@@ -101,8 +101,7 @@ UPDATE calls SET ledger_tx_id = $2 WHERE id = $1;
 
 -- name: SweepStaleCalls :execrows
 UPDATE calls SET outcome = 'interrupted', completed_at = now()
-WHERE outcome = 'in_progress' AND created_at < $1
-AND NOT EXISTS (SELECT 1 FROM gateway_background_jobs j WHERE j.call_id=calls.id AND j.settled_at IS NULL);
+WHERE outcome = 'in_progress' AND created_at < $1;
 
 -- name: HomeToday :one
 SELECT coalesce(sum(cost_nano + fee_nano), 0)::bigint AS spend_nano,
@@ -163,32 +162,6 @@ UPDATE calls SET diagnostics = jsonb_set(
   COALESCE(sqlc.arg(locations)::jsonb -> (item #>> '{node,ip}'), item #> '{node,location}', 'null'::jsonb)) ORDER BY ord)
  FROM jsonb_array_elements(diagnostics #> '{network,attempts}') WITH ORDINALITY AS a(item, ord)), '[]'::jsonb))
 WHERE id = $1 AND diagnostics #> '{network,client}' IS NOT NULL;
-
--- name: SaveBackground :exec
-INSERT INTO gateway_background_jobs (call_id, account_id, key_id, channel_id, response_id, metadata, deadline_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7)
-ON CONFLICT (call_id) DO NOTHING;
-
--- name: LookupBackground :one
-SELECT * FROM gateway_background_jobs WHERE account_id=$1 AND key_id=$2 AND response_id=$3;
-
--- name: PendingBackground :many
-SELECT * FROM gateway_background_jobs WHERE settled_at IS NULL ORDER BY call_id LIMIT 257;
-
--- name: ClaimBackground :many
-WITH due AS (
- SELECT call_id FROM gateway_background_jobs
- WHERE settled_at IS NULL AND next_poll_at <= sqlc.arg(now)::timestamptz
- ORDER BY next_poll_at,call_id LIMIT 16 FOR UPDATE SKIP LOCKED
-)
-UPDATE gateway_background_jobs j SET next_poll_at=sqlc.arg(now)::timestamptz + interval '30 seconds'
-FROM due WHERE j.call_id=due.call_id RETURNING j.*;
-
--- name: RetryBackground :exec
-UPDATE gateway_background_jobs SET next_poll_at=$2 WHERE call_id=$1 AND settled_at IS NULL;
-
--- name: SettleBackground :exec
-UPDATE gateway_background_jobs SET settled_at=now() WHERE call_id=$1 AND settled_at IS NULL;
 
 -- name: InsertChannelEvent :exec
 INSERT INTO channel_events (channel_id,kind,reason) VALUES ($1,$2,$3);

@@ -61,14 +61,3 @@ func TestServeCompressedResponsesKeepsOpaqueBytes(t *testing.T) {
 		t.Fatalf("status=%d upstream=%d finishes=%d body=%s", w.Code, seen, len(store.finished), w.Body.String())
 	}
 }
-
-func TestZstdRequirementIsEndpointSpecific(t *testing.T) {
-	// The transport evidence label stays with the Responses entrance while
-	// request transport rewriting is still owned by a later Epic task.
-	if got := nativeZstdRequirement("/v1/responses").ID; got != "codex-special.RL14/public_zstd_request" {
-		t.Fatalf("responses zstd label = %q", got)
-	}
-	if nativeZstdRequirement("/v1/messages") == nativeZstdRequirement("/v1/responses") {
-		t.Fatal("unmeasured endpoint borrowed Responses transport evidence")
-	}
-}

@@ -947,552 +947,6 @@ paths:
         }
       }
     }
-  /v1/chat/completions/{completionID}:
-    {
-      "get": {
-        "operationId": "proxyChatGet",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "chat.get",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": [
-          {
-            "name": "completionID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          }
-        ]
-      },
-      "post": {
-        "operationId": "proxyChatUpdate",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "chat.update",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": "原生请求正文。"
-              }
-            }
-          }
-        },
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": [
-          {
-            "name": "completionID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          }
-        ]
-      },
-      "delete": {
-        "operationId": "proxyChatDelete",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "chat.delete",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": [
-          {
-            "name": "completionID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          }
-        ]
-      }
-    }
-  /v1/chat/completions/{completionID}/messages:
-    {
-      "get": {
-        "operationId": "proxyChatMessages",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "chat.messages",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": [
-          {
-            "name": "completionID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          }
-        ]
-      }
-    }
-  /v1/responses/{responseID}/input_items:
-    {
-      "get": {
-        "operationId": "proxyResponsesItems",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "responses.items",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": [
-          {
-            "name": "responseID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          }
-        ]
-      }
-    }
-  /v1/responses/input_tokens:
-    {
-      "post": {
-        "operationId": "proxyResponsesCount",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "responses.count",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": "原生请求正文。"
-              }
-            }
-          }
-        },
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": []
-      }
-    }
-  /v1/responses/compact:
-    {
-      "post": {
-        "operationId": "proxyResponsesCompact",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "responses.compact",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": "原生请求正文。"
-              }
-            }
-          }
-        },
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": []
-      }
-    }
-  /v1/conversations:
-    {
-      "post": {
-        "operationId": "proxyConversationsCreate",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "conversations.create",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": "原生请求正文。"
-              }
-            }
-          }
-        },
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": []
-      }
-    }
-  /v1/conversations/{conversationID}:
-    {
-      "get": {
-        "operationId": "proxyConversationsGet",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "conversations.get",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": [
-          {
-            "name": "conversationID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          }
-        ]
-      },
-      "post": {
-        "operationId": "proxyConversationsUpdate",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "conversations.update",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": "原生请求正文。"
-              }
-            }
-          }
-        },
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": [
-          {
-            "name": "conversationID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          }
-        ]
-      },
-      "delete": {
-        "operationId": "proxyConversationsDelete",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "conversations.delete",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": [
-          {
-            "name": "conversationID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          }
-        ]
-      }
-    }
-  /v1/conversations/{conversationID}/items:
-    {
-      "post": {
-        "operationId": "proxyConversationsItemsCreate",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "conversations.items.create",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": "原生请求正文。"
-              }
-            }
-          }
-        },
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": [
-          {
-            "name": "conversationID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          }
-        ]
-      },
-      "get": {
-        "operationId": "proxyConversationsItemsList",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "conversations.items.list",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": [
-          {
-            "name": "conversationID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          }
-        ]
-      }
-    }
-  /v1/conversations/{conversationID}/items/{itemID}:
-    {
-      "get": {
-        "operationId": "proxyConversationsItemsGet",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "conversations.items.get",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": [
-          {
-            "name": "conversationID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          },
-          {
-            "name": "itemID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          }
-        ]
-      },
-      "delete": {
-        "operationId": "proxyConversationsItemsDelete",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "conversations.items.delete",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": [
-          {
-            "name": "conversationID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          },
-          {
-            "name": "itemID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          }
-        ]
-      }
-    }
   /v1/images/generations:
     {
       "post": {
@@ -1617,204 +1071,6 @@ paths:
           }
         },
         "parameters": []
-      }
-    }
-  /v1/messages/count_tokens:
-    {
-      "post": {
-        "operationId": "proxyMessagesCount",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "messages.count",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": "原生请求正文。"
-              }
-            }
-          }
-        },
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": []
-      }
-    }
-  /v1beta/cachedContents:
-    {
-      "post": {
-        "operationId": "proxyCacheCreate",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "cache.create",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": "原生请求正文。"
-              }
-            }
-          }
-        },
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": []
-      },
-      "get": {
-        "operationId": "proxyCacheList",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "cache.list",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": []
-      }
-    }
-  /v1beta/cachedContents/{cacheID}:
-    {
-      "get": {
-        "operationId": "proxyCacheGet",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "cache.get",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": [
-          {
-            "name": "cacheID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          }
-        ]
-      },
-      "patch": {
-        "operationId": "proxyCacheUpdate",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "cache.update",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": "原生请求正文。"
-              }
-            }
-          }
-        },
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": [
-          {
-            "name": "cacheID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          }
-        ]
-      },
-      "delete": {
-        "operationId": "proxyCacheDelete",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "cache.delete",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": [
-          {
-            "name": "cacheID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          }
-        ]
       }
     }
   /api/group-channels/{channelID}/events:
@@ -5807,28 +5063,6 @@ paths:
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
   /v1/chat/completions:
-    get:
-      {
-        "operationId": "proxyChatList",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "chat.list",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": []
-      }
     post:
       operationId: proxyOpenAIChat
       tags: [gateway]
@@ -5860,77 +5094,6 @@ paths:
         content:
           application/json:
             schema: {type: object, description: 原生请求正文。}
-      responses:
-        default: {description: 原生响应（含流式）与原生错误。}
-  /v1/responses/{responseID}:
-    delete:
-      {
-        "operationId": "proxyResponsesDelete",
-        "tags": [
-          "gateway"
-        ],
-        "summary": "responses.delete",
-        "description": "原生协议透明代理；持久资源核验当前账号、平台 Key、原渠道及实际凭据范围。共享列表在服务端过滤并使用受保护游标，不保存正文。",
-        "x-access": "gateway_key",
-        "x-feature": "495",
-        "security": [
-          {
-            "bearerKey": []
-          }
-        ],
-        "responses": {
-          "default": {
-            "description": "原生响应（含流式）与原生错误。"
-          }
-        },
-        "parameters": [
-          {
-            "name": "responseID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "maxLength": 2048
-            }
-          }
-        ]
-      }
-    get:
-      operationId: retrieveOpenAIResponse
-      tags: [gateway]
-      summary: 查询后台响应或恢复流
-      description: 原生透传；仅创建后台任务的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
-      x-access: gateway_key
-      x-feature: B
-      security:
-      - {bearerKey: []}
-      parameters:
-      - name: responseID
-        in: path
-        required: true
-        schema: {type: string, maxLength: 256}
-      responses:
-        default: {description: 原生响应（含流式）与原生错误。}
-  /v1/responses/{responseID}/cancel:
-    post:
-      operationId: cancelOpenAIResponse
-      tags: [gateway]
-      summary: 取消后台响应
-      description: 原生透传；仅创建后台任务的原 API Key 可访问，绑定原渠道与凭据；读取和取消不重复计费。
-      x-access: gateway_key
-      x-feature: B
-      security:
-      - {bearerKey: []}
-      parameters:
-      - name: responseID
-        in: path
-        required: true
-        schema: {type: string, maxLength: 256}
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema: {type: object}
       responses:
         default: {description: 原生响应（含流式）与原生错误。}
   /v1/messages:
@@ -12692,7 +11855,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "read",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "chat.get",
@@ -12705,7 +11869,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "read",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "chat.update",
@@ -12718,7 +11883,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "write",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "chat.delete",
@@ -12731,7 +11897,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "write",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "chat.messages",
@@ -12744,7 +11911,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "read",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "responses.create",
@@ -12770,7 +11938,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "read",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "responses.delete",
@@ -12783,7 +11952,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "write",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "responses.cancel",
@@ -12796,7 +11966,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "write",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "responses.items",
@@ -12809,7 +11980,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "read",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "responses.count",
@@ -12822,7 +11994,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "read",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "responses.compact",
@@ -12835,7 +12008,8 @@ x-aihub-gateway-contract:
         "billing": "reliable_operation",
         "replay": "inference",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "conversations.create",
@@ -12848,7 +12022,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "write",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "conversations.get",
@@ -12861,7 +12036,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "read",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "conversations.update",
@@ -12874,7 +12050,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "write",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "conversations.delete",
@@ -12887,7 +12064,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "write",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "conversations.items.create",
@@ -12900,7 +12078,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "write",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "conversations.items.list",
@@ -12913,7 +12092,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "read",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "conversations.items.get",
@@ -12926,7 +12106,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "read",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "conversations.items.delete",
@@ -12939,7 +12120,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "write",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "images.generations",
@@ -13010,7 +12192,8 @@ x-aihub-gateway-contract:
         "auth": "platform_key",
         "headers": [
           "anthropic-version:2023-06-01"
-        ]
+        ],
+        "retired": true
       },
       {
         "id": "gemini.generateContent",
@@ -13049,7 +12232,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "read",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "cache.create",
@@ -13062,7 +12246,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "write",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "cache.list",
@@ -13075,7 +12260,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "read",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "cache.get",
@@ -13088,7 +12274,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "read",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "cache.update",
@@ -13101,7 +12288,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "write",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "cache.delete",
@@ -13114,7 +12302,8 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "write",
         "feature": "F7",
-        "auth": "platform_key"
+        "auth": "platform_key",
+        "retired": true
       },
       {
         "id": "models.openai.list",
@@ -15236,6 +14425,6 @@ x-aihub-gateway-contract:
       "native-generate-content/audio-video": "音视频限当前已约定的 GenerateContent v1beta 原生形态，输入使用 inline WAV/MP4，视频另测合法固定 URL。音频输出使用该协议的 AUDIO/speechConfig profile；不因文档新增 Interactions 或 voices 资源而扩张本轮端点/资源管理范围。",
       "images/native-products": "图像模型独立取目标 model_id；所有启用的计价选择器分别取得产物证据，只有计价单位不同的相同请求可共用实际调用。主组合补 JSON/SSE、edits 的 inline/固定 URL/multipart、多图及 mask，避免笛卡尔积。固定 PNG 输出实际解码核对尺寸/产物数，mask 用合成双色图核验修改区与保护区；质量和实际 service_tier 无回显不冒充确认。仅存尺寸/格式/透明度/计量与断言元数据，不保存图片、URL 或 revised_prompt，也不抓取任意返回 URL。Variations 官方已退役，按本轮明确保留的原生 multipart 接口检测供应商兼容，不转换成 edits、不静默删除。Responses/Images 的可靠用量缺失则明确保留未定价 token，不从图片数量推算 token。图像 SSE 单事件允许至单响应上限，仍受同一 32MiB 响应及后台工作槽位约束。",
       "messages/native-compaction": "Messages A-M08 固定检测当前原生按需压缩 beta compact-2026-09-04 / compaction:{type:summarize}，返回带 content/signature 的 compaction block，完整放在后续 messages 开头并移除已被汇总的明文历史，不新增专用资源接口。不触发旧阈值模式所需的大段额外输入，也不把不同机制混作通过。计数、实际压缩和完整压缩回放分别投影；调用内 usage.iterations 与根 usage 分开求和，缺失/非法不猜。",
-      "gemini/G-C08": "continuationToken 独立场景，不能由显式缓存通过代证。复用真实 JSON 控制长度请求，在原生候选返回 MAX_TOKENS/CONTINUATION 与 token 时保持原 contents 不变、完整携带 opaque token 并单调增加总输出上限，验证一次真实后续 hop/逐次 usage；不追加先前输出，不把 SDK 自动累计再相加。未出现 token 记无法确认，不假造 token、不换成文档示例模型，也不为触发每 hop 32K/64K 阈值另开耐久/吞吐长跑。只保存断言/数值及真实尝试元数据，不保存 token 或正文。",
+      "gemini/G-C08": "continuationToken 独立场景，不能由显式缓存通过代证。复用真实 JSON 控制长度请求，在原生候选返回 MAX_TOKENS/CONTINUATION 与 token 时保持原 contents 不变、完整携带 opaque token 并单调增加总输出上限，验证一次真实后续 hop/逐次 usage；不追加先前输出，不把 SDK 自动累计再相加。未出现 token 记无法确认，不假造 token、不换成文档示例模型，也不为触发每 hop 32K/64K 阈值另开耐久/吞吐长跑。只保存断言/数值及真实尝试元数据，不保存 token 或正文。"
     }
   }

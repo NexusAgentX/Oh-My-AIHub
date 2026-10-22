@@ -39,15 +39,14 @@ type Digest struct {
 	SHA256 string `json:"sha256"`
 }
 type Pending struct {
-	Calls      int64 `json:"calls"`
-	Background int64 `json:"background"`
+	Calls int64 `json:"calls"`
 }
 
 func (p Pending) Check() error {
-	if p.Calls < 0 || p.Background < 0 {
+	if p.Calls < 0 {
 		return ErrInvalid
 	}
-	if p.Calls != 0 || p.Background != 0 {
+	if p.Calls != 0 {
 		return ErrNotDrained
 	}
 	return nil

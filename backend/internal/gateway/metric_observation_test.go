@@ -27,7 +27,6 @@ func TestReliableOutputTPSRequiresMeasuredVisibleIntervalAndDisjointCounts(t *te
 		{"multi", func(_ *callState, o *Observation) { o.MultipleOutputs = true }, false},
 		{"media", func(_ *callState, o *Observation) { o.MediaOutput = true }, false},
 		{"nonstream", func(c *callState, _ *Observation) { c.stream = false }, false},
-		{"polling", func(c *callState, _ *Observation) { c.polling = true }, false},
 		{"iterations", func(_ *callState, o *Observation) {
 			o.Usage.Detail = &ledger.UsageDetail{Iterations: []ledger.UsageIteration{{Type: "message"}}}
 		}, false},

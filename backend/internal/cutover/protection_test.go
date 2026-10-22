@@ -117,7 +117,7 @@ func TestPerAccountDigestDetectsZeroSumBalanceMovesAndContentChanges(t *testing.
 	}
 }
 func TestIncompleteStreamsAndPendingWorkCannotProduceCompleteEvidence(t *testing.T) {
-	for _, p := range []Pending{{Calls: 1}, {Background: 1}, {Calls: -1}} {
+	for _, p := range []Pending{{Calls: 1}, {Calls: -1}} {
 		if p.Check() == nil {
 			t.Fatal("pending or invalid work allowed", p)
 		}

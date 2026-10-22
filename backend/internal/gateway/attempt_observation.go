@@ -96,7 +96,7 @@ func (o *Observer) observeMetricCounts(raw []byte) {
 }
 
 func observedOutputTPS(call *callState, o Observation) (*int, *float64) {
-	if !call.stream || call.polling || call.format == channel.FormatOpenAIImages || !o.Found || o.MultipleOutputs || o.MediaOutput || o.FirstVisibleOutputAt.IsZero() || !o.OutputEndAt.After(o.FirstVisibleOutputAt) {
+	if !call.stream || call.format == channel.FormatOpenAIImages || !o.Found || o.MultipleOutputs || o.MediaOutput || o.FirstVisibleOutputAt.IsZero() || !o.OutputEndAt.After(o.FirstVisibleOutputAt) {
 		return nil, nil
 	}
 	if o.Usage.Detail != nil && len(o.Usage.Detail.Iterations) > 0 {
@@ -132,9 +132,6 @@ func populateAttemptMetrics(call *callState, record *Attempt, o Observation, sta
 	record.ActualServiceTier = "unknown"
 	if o.Usage.Detail != nil {
 		record.ActualServiceTier = actualMetricTier(call.format, o.Usage.Detail.ServiceTier)
-	}
-	if call.polling {
-		return
 	}
 	record.OutputKind = o.OutputKind
 	if !o.FirstOutputAt.IsZero() && !o.FirstOutputAt.Before(started) {
