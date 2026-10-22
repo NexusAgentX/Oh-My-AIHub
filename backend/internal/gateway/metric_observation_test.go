@@ -7,7 +7,6 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 )
 
 func TestReliableOutputTPSRequiresMeasuredVisibleIntervalAndDisjointCounts(t *testing.T) {
@@ -86,39 +85,6 @@ func TestAttemptMetricsIncludeAddressFallbackButNotEarlierChannelsOrDowngradedTi
 		if requestedMetricTier(call.format, value) != "unknown" {
 			t.Fatal("unbounded tier label admitted")
 		}
-	}
-}
-
-func TestEngineRankingUsesOnlyMatchingModelProtocolStreamAndTier(t *testing.T) {
-	now := time.Now()
-	e := NewEngine(Dependencies{Now: func() time.Time { return now }})
-	for _, c := range []struct {
-		channel, model string
-		format         channel.Format
-		tier           string
-		stream         bool
-		latency        int
-		tps            float64
-	}{
-		{"a", "one", channel.FormatOpenAIResponses, "", true, 100, 10},
-		{"b", "one", channel.FormatOpenAIResponses, "", true, 300, 80},
-		{"a", "two", channel.FormatOpenAIResponses, "", true, 900, 1},
-		{"a", "one", channel.FormatAnthropic, "", true, 900, 1},
-		{"a", "one", channel.FormatOpenAIResponses, "openai:priority", true, 900, 1},
-		{"a", "one", channel.FormatOpenAIResponses, "", false, 900, 1},
-	} {
-		for range 20 {
-			e.modelMetrics.record(modelMetricKey{channel: c.channel, model: c.model, format: c.format, tier: c.tier, stream: c.stream}, modelMetricSample{end: EndCompleted, firstOutputMS: &c.latency, outputTPS: &c.tps}, now)
-		}
-	}
-	e.RefreshStats()
-	stats := e.ModelStats("one", channel.FormatOpenAIResponses, "", true)
-	pool := []Candidate{candidate("a", "x", 1), candidate("b", "x", 1)}
-	if ids(Rank(RankInput{Candidates: pool, Mode: routing.ModeFastest, Stats: stats})) != "ab" || ids(Rank(RankInput{Candidates: pool, Mode: routing.ModeSpeed, Stats: stats})) != "ba" {
-		t.Fatal("other scope contaminated ranking", stats)
-	}
-	if len(e.ModelStats("never-measured", channel.FormatOpenAIResponses, "", true)) != 0 {
-		t.Fatal("whole channel history was spread to an unmeasured model")
 	}
 }
 

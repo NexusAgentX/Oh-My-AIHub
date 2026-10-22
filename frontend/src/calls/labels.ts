@@ -15,7 +15,6 @@ export const routingModeLabels: Record<RoutingMode, string> = {
   cheapest: '价格优先',
   reliable: '稳定优先',
   fastest: '延迟优先',
-  speed: '速率优先',
   manual: '手动',
 }
 

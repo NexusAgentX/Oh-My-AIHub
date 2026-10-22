@@ -26,7 +26,7 @@ func fixture() (market.Directory, Data) {
 func TestDynamicInheritanceSelectionAndImmutableQuotes(t *testing.T) {
 	d, data := fixture()
 	data.Choices = []Choice{{ChannelID: "channel", GroupModelID: "offering", DiscountNano: 0}}
-	records, views, err := Build(d, data, nil)
+	records, views, err := Build(d, data)
 	if err != nil || len(records) != 1 {
 		t.Fatal(err, records)
 	}
@@ -46,7 +46,7 @@ func TestDynamicInheritanceSelectionAndImmutableQuotes(t *testing.T) {
 	d.Groups[0].Revision++
 	d.Groups[0].ConnectionVersion++
 	d.Quotes[0].Prices.Input = 3 * money.Amount(money.Scale)
-	records, _, err = Build(d, data, nil)
+	records, _, err = Build(d, data)
 	if err != nil || len(records) != 1 || *records[0].Candidate.Advanced.RPMLimit != 75 {
 		t.Fatal("default update did not reach channel", err)
 	}
@@ -59,7 +59,7 @@ func TestDynamicInheritanceSelectionAndImmutableQuotes(t *testing.T) {
 	override := int32(9)
 	data.Channels[0].Overrides.RPMLimit = &override
 	data.Channels[0].Overrides.HeaderRules = &market.HeaderRules{}
-	records, views, err = Build(d, data, nil)
+	records, views, err = Build(d, data)
 	if err != nil || len(records) != 0 || views["channel"].Models[0].ProbeState != "pending" {
 		t.Fatal("changed headers reused key evidence")
 	}
@@ -81,7 +81,7 @@ func TestExclusionsNewModelsDeletedEntrancesAndLateEvidence(t *testing.T) {
 		}
 	}
 	data.Choices = []Choice{{ChannelID: r.ID, GroupModelID: m.ID, Excluded: true, DiscountNano: ledger.UnitRate}}
-	records, views, err := Build(d, data, nil)
+	records, views, err := Build(d, data)
 	if err != nil || len(records) != 0 || !views[r.ID].Models[0].Excluded {
 		t.Fatal("probe overrode exclusion", err)
 	}
@@ -98,7 +98,7 @@ func TestExclusionsNewModelsDeletedEntrancesAndLateEvidence(t *testing.T) {
 	}
 	data.Choices = nil
 	d.GroupAddresses = nil
-	records, views, err = Build(d, data, nil)
+	records, views, err = Build(d, data)
 	if err != nil || len(records) != 0 || views[r.ID].Available || views[r.ID].Reason != "no_selected_address" {
 		t.Fatal("removed selection still routed", err)
 	}
@@ -119,28 +119,5 @@ func TestHeadersAndTimeoutInheritanceKeepsNullDistinct(t *testing.T) {
 	}
 	if !CompatibleHeaders(market.Defaults{}, d.Groups[0].Defaults) {
 		t.Fatal("inherited headers rejected")
-	}
-}
-
-func TestSnapshotKeepsKeyProbeEntranceSeparateFromProtocolSupport(t *testing.T) {
-	d, data := fixture()
-	data.Probes[0].Tests = map[channel.Format]channel.FormatTest{
-		channel.FormatOpenAIResponses: {OK: true, EndpointID: "codex.responses"},
-		channel.FormatOpenAIImages:    {OK: false, EndpointID: "codex.images"},
-	}
-	records, views, err := Build(d, data, nil)
-	if err != nil || len(records) != 1 {
-		t.Fatal("native-only probe did not create candidate", err)
-	}
-	c := records[0].Candidate
-	if c.KeyProbeEndpoints[channel.FormatOpenAIResponses] != "codex.responses" || len(c.KeyProbeEndpoints) != 1 || len(c.Evidence) != 0 {
-		t.Fatal("key entrance lost or promoted into capability evidence", c.KeyProbeEndpoints)
-	}
-	if views["channel"].Models[0].FormatTests[channel.FormatOpenAIResponses].EndpointID != "codex.responses" {
-		t.Fatal("probe entrance missing from owner diagnostics")
-	}
-	delete(data.Probes[0].Tests, channel.FormatOpenAIResponses)
-	if c.KeyProbeEndpoints[channel.FormatOpenAIResponses] != "codex.responses" {
-		t.Fatal("published candidate map reused mutable probe storage")
 	}
 }

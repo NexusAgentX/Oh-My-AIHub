@@ -6,12 +6,9 @@ import (
 	"errors"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 )
@@ -27,9 +24,9 @@ func TestMarketRoutingPreferencesCannotRestoreRetiredGlobalModels(t *testing.T) 
 	member, _ := p.member(t, "routing-market-only")
 	key := member.expect(t, 201, "POST", "/api/keys", map[string]any{"name": "routing-only"})["key"].(map[string]any)["id"].(string)
 	for _, prefix := range []string{"/api/routing/", "/api/keys/" + key + "/routing/"} {
-		member.expect(t, 200, "PUT", prefix+"approved-model", map[string]any{"mode": "speed"})
-		member.expect(t, 404, "PUT", prefix+"retired-model", map[string]any{"mode": "speed"})
-		member.expect(t, 404, "PUT", prefix+"unknown-model", map[string]any{"mode": "speed"})
+		member.expect(t, 200, "PUT", prefix+"approved-model", map[string]any{"mode": "fastest"})
+		member.expect(t, 404, "PUT", prefix+"retired-model", map[string]any{"mode": "fastest"})
+		member.expect(t, 404, "PUT", prefix+"unknown-model", map[string]any{"mode": "fastest"})
 	}
 	if count := len(p.store.models); count != 1 {
 		t.Fatal("fixture must retain one historical global model", count)
@@ -62,15 +59,10 @@ func TestMarketBrowseUsesApprovedIDsScopesCursorAndPublicationBarrier(t *testing
 	repo.data.Channels = []groupchannel.Record{row}
 	repo.data.Probes = []groupchannel.Probe{{ChannelID: row.ID, GroupModelID: d.Models[0].ID, Binding: groupchannel.ProbeBinding(row, d.Groups[0], d.Models[0]), Tests: map[channel.Format]channel.FormatTest{channel.FormatOpenAIResponses: {OK: true}}}}
 	d.Quotes = append(d.Quotes, market.Quote{ID: otherQuoteID, GroupModelID: "00000000-0000-4000-8000-000000000085", Version: 1, Currency: "CNY", BillingUnit: "per_million_tokens"})
-	reportID := "approved-report"
-	search := gatewaycontract.SearchSettings{Version: "v1", Method: "binary", Low: 1, High: 1024, HardMaximum: 1024, Precision: 1, PrecisionMode: "absolute", Rounds: 4}
-	repo.data.Reports = []detection.Job{{ReportID: &reportID, State: "finished", Complete: true, UpdatedAt: time.Now(), Target: detection.Target{GroupID: "group", Binding: market.EvidenceBinding{TargetKind: "group", TargetID: "group"}}, Parameters: detection.Parameters{Context: search, MaxOutput: search}}}
 	if err := runtime.Install(context.Background(), d); err != nil {
 		t.Fatal(err)
 	}
 	member.expect(t, 401, "GET", "/api/market/models", nil, withoutCookie)
-	member.expect(t, 200, "GET", "/api/market/reports/approved-report", nil)
-	member.expect(t, 404, "GET", "/api/market/reports/unpublished-report", nil)
 	hall := member.expect(t, 200, "GET", "/api/market/channels?only_online=true", nil)
 	if hall["total"] != float64(1) {
 		t.Fatal(hall)
@@ -94,7 +86,7 @@ func TestMarketBrowseUsesApprovedIDsScopesCursorAndPublicationBarrier(t *testing
 	if detail["model"].(map[string]any)["id"] != "same/model:v1" {
 		t.Fatal(detail)
 	}
-	member.expect(t, 200, "PUT", "/api/routing/same%2Fmodel:v1", map[string]any{"mode": "speed", "order": []string{}, "excluded": []string{}})
+	member.expect(t, 200, "PUT", "/api/routing/same%2Fmodel:v1", map[string]any{"mode": "fastest", "order": []string{}, "excluded": []string{}})
 	for _, path := range []string{"/api/market/models", "/api/market/suppliers", "/api/market/groups/group", "/api/market/models/same%2Fmodel:v1", "/api/market/channels", "/api/market/channels/channel"} {
 		encoded, _ := json.Marshal(member.expect(t, 200, "GET", path, nil))
 		if strings.Contains(string(encoded), "PRIVATE-") {
@@ -106,35 +98,11 @@ func TestMarketBrowseUsesApprovedIDsScopesCursorAndPublicationBarrier(t *testing
 		t.Fatal(err)
 	}
 	member.expect(t, 404, "GET", "/api/market/models/same%2Fmodel:v1", nil)
-	member.expect(t, 404, "PUT", "/api/routing/same%2Fmodel:v1", map[string]any{"mode": "speed", "order": []string{}, "excluded": []string{}})
+	member.expect(t, 404, "PUT", "/api/routing/same%2Fmodel:v1", map[string]any{"mode": "fastest", "order": []string{}, "excluded": []string{}})
 	member.expect(t, 409, "GET", "/api/market/models?limit=1&cursor="+first["next_cursor"].(string), nil)
 	runtime.Ready = func() error { return errors.New("PRIVATE-publication-detail") }
-	member.expect(t, 503, "PUT", "/api/routing/same%2Fmodel:v1", map[string]any{"mode": "speed", "order": []string{}, "excluded": []string{}})
-	for _, path := range []string{"/api/market/models", "/api/market/suppliers", "/api/market/groups/group", "/api/market/reports/unpublished"} {
+	member.expect(t, 503, "PUT", "/api/routing/same%2Fmodel:v1", map[string]any{"mode": "fastest", "order": []string{}, "excluded": []string{}})
+	for _, path := range []string{"/api/market/models", "/api/market/suppliers", "/api/market/groups/group"} {
 		member.expect(t, 503, "GET", path, nil)
-	}
-}
-
-func TestMarketPublicReportOmitsExecutionIdentityAddressAndQuota(t *testing.T) {
-	id := "approved-report"
-	scenario := "openai-responses.base@upstream_protocol"
-	req := "openai-responses.base"
-	assertion := req + "/a1"
-	j := detection.Job{ID: "PRIVATE-task", OwnerID: "PRIVATE-owner", ReportID: &id, State: "finished", Complete: true, UpdatedAt: time.Now(), Target: detection.Target{DraftID: "PRIVATE-draft", GroupID: "group", Model: "PRIVATE-upstream", Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: "offer", CredentialScope: "PRIVATE-credential"}}, PendingCleanup: []detection.Artifact{{NativeID: "PRIVATE-resource"}}, Plan: detection.Plan{ManifestVersion: "manifest-v1", Items: []detection.Planned{{ID: scenario, Layer: "upstream_protocol", Requirements: []string{req}, AssertionLabels: map[string]string{assertion: "accepted_native_message_shapes"}}}}, Results: []detection.Result{{ScenarioID: scenario, Layer: "upstream_protocol", State: "unsupported", Reason: "unsupported", Assertions: []detection.Assertion{{ID: assertion, State: "unsupported", Reason: "unsupported"}}, Attempts: []detection.Attempt{{EntryURL: "https://PRIVATE-origin.example", Path: "PRIVATE-path"}}, Quotas: []detection.QuotaEvidence{{Header: "PRIVATE-quota"}}}}}
-	search := gatewaycontract.SearchSettings{Version: "v1", Method: "binary", Low: 1, High: 1024, HardMaximum: 1024, Precision: 1, PrecisionMode: "absolute", Rounds: 4}
-	j.Parameters = detection.Parameters{Context: search, MaxOutput: search}
-	m, err := gatewaycontract.Load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	out := publicReport(j, detection.Projection{Valid: true, Capabilities: []market.Capability{{ID: req + "/accepted_native_message_shapes", Layer: "upstream_protocol", State: "unsupported"}}}, m, nil)
-	encoded, _ := json.Marshal(out)
-	if strings.Contains(string(encoded), "PRIVATE-") || out.Validity != "current" || out.Scenarios[0].Assertions[0].State != "unsupported" {
-		t.Fatal("redaction changed result or leaked private fields", string(encoded))
-	}
-	loadOpenAPI(t).assertSchema(t, "MarketPublicReport", encoded)
-	out = publicReport(j, detection.Projection{}, m, nil)
-	if out.Validity != "stale" || out.Scenarios[0].Current {
-		t.Fatal("stale report advertised current", out)
 	}
 }

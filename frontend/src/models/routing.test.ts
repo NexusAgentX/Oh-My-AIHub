@@ -18,7 +18,6 @@ const channel = (id: string): ModelRoutingChannel => ({
   is_mine: false,
   formats: ['openai_chat'],
   multiplier: '1',
-  routing_metrics: [],
   typical_price: null,
   state: 'available',
   cooldown_remaining_seconds: null,

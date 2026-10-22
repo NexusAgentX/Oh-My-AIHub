@@ -22,7 +22,6 @@ func (a *app) registerMarketBrowseRoutes(r *router) {
 	r.implement("499", "GET /api/market/models/{modelID}", accessReady, a.getMarketModel)
 	r.implement("499", "GET /api/market/suppliers", accessReady, a.listMarketSuppliers)
 	r.implement("499", "GET /api/market/groups/{groupID}", accessReady, a.getMarketGroup)
-	r.implement("499", "GET /api/market/reports/{reportID}", accessReady, a.getMarketReport)
 	r.implement("499", "GET /api/market/channels", accessReady, a.listMarketChannels)
 	r.implement("499", "GET /api/market/channels/{channelID}", accessReady, a.getMarketChannel)
 }
@@ -142,15 +141,14 @@ func (a *app) listMarketModels(w http.ResponseWriter, r *http.Request) {
 }
 
 type marketRoutingChannel struct {
-	TypicalPrice             *marketbrowse.Price       `json:"typical_price"`
-	ID                       string                    `json:"id"`
-	Name                     string                    `json:"name"`
-	IsMine                   bool                      `json:"is_mine"`
-	Formats                  []channel.Format          `json:"formats"`
-	Multiplier               string                    `json:"multiplier"`
-	State                    string                    `json:"state"`
-	CooldownRemainingSeconds *int64                    `json:"cooldown_remaining_seconds"`
-	RoutingMetrics           []gateway.ModelMetricView `json:"routing_metrics"`
+	TypicalPrice             *marketbrowse.Price `json:"typical_price"`
+	ID                       string              `json:"id"`
+	Name                     string              `json:"name"`
+	IsMine                   bool                `json:"is_mine"`
+	Formats                  []channel.Format    `json:"formats"`
+	Multiplier               string              `json:"multiplier"`
+	State                    string              `json:"state"`
+	CooldownRemainingSeconds *int64              `json:"cooldown_remaining_seconds"`
 }
 type marketModelDetail struct {
 	Model           marketbrowse.Model           `json:"model"`
@@ -221,7 +219,7 @@ func (a *app) getMarketModel(w http.ResponseWriter, r *http.Request) {
 			detail.Channels = append(detail.Channels, c)
 			v := channels[id]
 			if v == nil {
-				v = &marketRoutingChannel{TypicalPrice: c.Price, ID: id, Name: c.Name, IsMine: state.Views[id].Owner.ID == actor, Multiplier: c.Discount, Formats: []channel.Format{}, State: "available", RoutingMetrics: []gateway.ModelMetricView{}}
+				v = &marketRoutingChannel{TypicalPrice: c.Price, ID: id, Name: c.Name, IsMine: state.Views[id].Owner.ID == actor, Multiplier: c.Discount, Formats: []channel.Format{}, State: "available"}
 				channels[id] = v
 			}
 			if !slices.Contains(v.Formats, offer.Format) {
@@ -229,9 +227,7 @@ func (a *app) getMarketModel(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	metrics := map[string][]gateway.ModelMetricView{}
 	if a.gateway != nil {
-		metrics = a.gateway.ModelMetrics(q.ModelID)
 		defaults, err := a.settings.Get(r.Context())
 		if err != nil {
 			writeDomainError(w, err)
@@ -252,7 +248,6 @@ func (a *app) getMarketModel(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	for _, v := range channels {
-		v.RoutingMetrics = append(v.RoutingMetrics, metrics[v.ID]...)
 		slices.Sort(v.Formats)
 		detail.RoutingChannels = append(detail.RoutingChannels, *v)
 	}
@@ -277,7 +272,7 @@ func (a *app) listMarketSuppliers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"items": items, "groups": groups})
 }
 func (a *app) getMarketGroup(w http.ResponseWriter, r *http.Request) {
-	s, state, ok := a.marketSnapshot(w, r)
+	s, _, ok := a.marketSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -286,14 +281,5 @@ func (a *app) getMarketGroup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 404, "group_not_found", "分组不存在或已停用")
 		return
 	}
-	reports := []string{}
-	for _, j := range state.Data.Reports {
-		_, visibleModel := s.Models[j.Target.Binding.TargetID]
-		if j.ReportID != nil && (j.Target.Binding.TargetKind == "group" && j.Target.Binding.TargetID == g.ID || j.Target.Binding.TargetKind == "group_model" && j.Target.GroupID == g.ID && visibleModel) {
-			reports = append(reports, *j.ReportID)
-		}
-	}
-	slices.Sort(reports)
-	reports = slices.Compact(reports)
-	writeJSON(w, 200, map[string]any{"group": g, "supplier": s.Suppliers[g.SupplierID], "reports": reports})
+	writeJSON(w, 200, map[string]any{"group": g, "supplier": s.Suppliers[g.SupplierID]})
 }

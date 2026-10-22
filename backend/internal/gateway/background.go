@@ -399,14 +399,7 @@ func (e *Engine) serveResponseJob(w http.ResponseWriter, r *http.Request, key Ke
 			WriteError(w, DialectOf(r), 404, "resource_unavailable", "资源不存在、归属冲突或已不可用", "")
 			return
 		}
-		endpoint := "responses.get"
-		if cancel {
-			endpoint = "responses.cancel"
-		}
-		if !supportsAll(metadata.Candidate, endpointRequirement(endpoint)) {
-			WriteError(w, DialectOf(r), 503, "required_capability_evidence_missing", "原任务缺少所需操作的支持证据", "")
-			return
-		}
+		_ = cancel
 	}
 	if len(key.AllowedModels) > 0 && !containsString(key.AllowedModels, metadata.ModelID) {
 		WriteError(w, DialectOf(r), 403, "model_not_allowed", "该 API Key 不允许使用此模型", "")

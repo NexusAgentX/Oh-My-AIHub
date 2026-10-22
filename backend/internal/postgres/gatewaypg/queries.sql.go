@@ -306,6 +306,10 @@ type InsertCallParams struct {
 	Outcome         string
 }
 
+// One bounded startup read, never a background scan or request-path query.
+// Only v2 attempt facts populate model/protocol/tier/stream scopes. At most
+// 20k recently completed calls and caller-limited aggregate rows are examined;
+// missing older observations remain unknown rather than using legacy TTFT.
 func (q *Queries) InsertCall(ctx context.Context, arg InsertCallParams) (string, error) {
 	row := q.db.QueryRow(ctx, insertCall,
 		arg.AccountID,
@@ -627,112 +631,6 @@ func (q *Queries) LookupKey(ctx context.Context, keyHash []byte) (LookupKeyRow, 
 		&i.AccountStatus,
 	)
 	return i, err
-}
-
-const modelAttemptHistory = `-- name: ModelAttemptHistory :many
-WITH limited AS (
- SELECT model_id,format,stream,created_at,completed_at,attempts
- FROM calls
- WHERE completed_at >= $2::timestamptz
-   AND attempts @> '[{"metrics_version":2}]'::jsonb
- ORDER BY completed_at DESC,id DESC LIMIT 20001
-), recent AS (
- SELECT limited.model_id, limited.format, limited.stream, limited.created_at, limited.completed_at, limited.attempts,(count(*) OVER ()>20000) AS history_truncated FROM limited
-), observed AS (
- SELECT (att->'channel'->>'id')::uuid AS channel_id,
-   c.model_id, c.format, c.stream,
-   coalesce(att->>'metric_tier','') AS tier,
-   floor(extract(epoch FROM c.completed_at)/300)::bigint AS bucket,
-   CASE WHEN att->>'end_reason'='completed' AND att->>'selection_output_ms' IS NOT NULL
-     THEN CASE WHEN (att->>'selection_output_ms')::float8=0 THEN 0 ELSE greatest(0,least(191,floor(log(2::numeric,(att->>'selection_output_ms')::numeric)*8)+1))::int END ELSE -1 END AS latency_bin,
-   CASE WHEN att->>'end_reason'='completed' AND (att->>'output_tps')::float8>0
-     THEN greatest(0,least(191,floor((log(2::numeric,(att->>'output_tps')::numeric)+16)*4)))::int ELSE -1 END AS speed_bin,
-   att->>'end_reason' AS end_reason, c.created_at,c.history_truncated,att->>'metric_protocol' AS protocol
- FROM recent c CROSS JOIN LATERAL jsonb_array_elements(c.attempts) AS att
- WHERE att->>'metrics_version'='2' AND c.model_id IS NOT NULL
-   AND att->>'metric_protocol' IN ('openai-chat-completions','openai-responses','native-messages','native-generate-content','openai-images','codex-special')
-   AND jsonb_typeof(att->'channel')='object'
-   AND att->>'selection_final' IS DISTINCT FROM 'false'
-)
-SELECT a.channel_id,a.model_id::text AS model_id,a.format::text AS format,a.stream,a.tier::text AS tier,a.bucket,
- a.latency_bin::int AS latency_bin,a.speed_bin::int AS speed_bin,
- a.protocol::text AS protocol,
- bool_or(a.history_truncated)::boolean AS history_truncated,
- count(*) FILTER (WHERE end_reason NOT IN ('client_error','client_disconnected'))::bigint AS counted,
- count(*) FILTER (WHERE end_reason='completed')::bigint AS successes,
- count(*) FILTER (WHERE end_reason IN ('client_error','client_disconnected'))::bigint AS excluded,
- count(*) FILTER (WHERE end_reason='client_error')::bigint AS client_errors,
- count(*) FILTER (WHERE end_reason<>'client_disconnected' AND a.created_at<ch.updated_at)::bigint AS before_edit_attempts,
- count(*) FILTER (WHERE end_reason='client_error' AND a.created_at<ch.updated_at)::bigint AS before_edit_client_errors
-FROM observed a LEFT JOIN channels ch ON ch.id=a.channel_id
-GROUP BY 1,2,3,4,5,6,7,8,9
-ORDER BY a.bucket DESC,a.channel_id,a.model_id,a.format,a.protocol,a.stream,a.tier,a.latency_bin,a.speed_bin
-LIMIT $1::int
-`
-
-type ModelAttemptHistoryParams struct {
-	RowLimit int32
-	Since    time.Time
-}
-
-type ModelAttemptHistoryRow struct {
-	ChannelID              string
-	ModelID                string
-	Format                 string
-	Stream                 bool
-	Tier                   string
-	Bucket                 int64
-	LatencyBin             int32
-	SpeedBin               int32
-	Protocol               string
-	HistoryTruncated       bool
-	Counted                int64
-	Successes              int64
-	Excluded               int64
-	ClientErrors           int64
-	BeforeEditAttempts     int64
-	BeforeEditClientErrors int64
-}
-
-// One bounded startup read, never a background scan or request-path query.
-// Only v2 attempt facts populate model/protocol/tier/stream scopes. At most
-// 20k recently completed calls and caller-limited aggregate rows are examined;
-// missing older observations remain unknown rather than using legacy TTFT.
-func (q *Queries) ModelAttemptHistory(ctx context.Context, arg ModelAttemptHistoryParams) ([]ModelAttemptHistoryRow, error) {
-	rows, err := q.db.Query(ctx, modelAttemptHistory, arg.RowLimit, arg.Since)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ModelAttemptHistoryRow
-	for rows.Next() {
-		var i ModelAttemptHistoryRow
-		if err := rows.Scan(
-			&i.ChannelID,
-			&i.ModelID,
-			&i.Format,
-			&i.Stream,
-			&i.Tier,
-			&i.Bucket,
-			&i.LatencyBin,
-			&i.SpeedBin,
-			&i.Protocol,
-			&i.HistoryTruncated,
-			&i.Counted,
-			&i.Successes,
-			&i.Excluded,
-			&i.ClientErrors,
-			&i.BeforeEditAttempts,
-			&i.BeforeEditClientErrors,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const pendingBackground = `-- name: PendingBackground :many

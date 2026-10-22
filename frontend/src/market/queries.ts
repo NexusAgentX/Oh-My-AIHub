@@ -18,9 +18,6 @@ export function useMarketSuppliers() {
 export function useMarketGroup(id: string) {
   return useQuery({ queryKey: ['market', 'group', id], queryFn: () => apiGet<'getMarketGroup'>(`/api/market/groups/${pathSegment(id)}`), enabled: Boolean(id) })
 }
-export function useMarketReport(id: string) {
-  return useQuery({ queryKey: ['market', 'report', id], queryFn: () => apiGet<'getMarketPublicReport'>(`/api/market/reports/${pathSegment(id)}`), enabled: Boolean(id) })
-}
 export function useMarketHall(params:URLSearchParams){
   const search=params.toString()
   return useQuery({queryKey:['market','hall',search],queryFn:()=>apiGet<'listMarketChannels'>(`/api/market/channels?${search}`)})

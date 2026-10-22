@@ -45,9 +45,7 @@ func securityHeaders(next http.Handler) http.Handler {
 
 func (a *app) requireSameOrigin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// The fixed MCP callback has its own task-scoped random Bearer token;
-		// it accepts neither browser sessions nor platform API Keys.
-		if isExternalGatewayPath(r.URL.Path) || r.Method == http.MethodPost && r.URL.Path == "/api/detection/mcp" {
+		if isExternalGatewayPath(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}

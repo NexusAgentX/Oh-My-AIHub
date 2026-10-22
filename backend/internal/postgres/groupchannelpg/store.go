@@ -6,7 +6,6 @@ import (
 	"errors"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
@@ -267,18 +266,6 @@ func (s *Store) Snapshot(ctx context.Context) (out groupchannel.Data, err error)
 			return out, err
 		}
 		out.Probes = append(out.Probes, v)
-	}
-	reports, err := q.ApprovedReports(ctx)
-	if err != nil {
-		return out, err
-	}
-	for _, r := range reports {
-		var j detection.Job
-		if err = market.Decode(r.Metadata, &j); err != nil {
-			return out, err
-		}
-		j.Target.Binding.CredentialScope = r.CredentialScope
-		out.Reports = append(out.Reports, j)
 	}
 	return out, tx.Commit(ctx)
 }

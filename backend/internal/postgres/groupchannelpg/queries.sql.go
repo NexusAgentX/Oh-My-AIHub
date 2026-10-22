@@ -10,41 +10,6 @@ import (
 	"time"
 )
 
-const approvedReports = `-- name: ApprovedReports :many
-SELECT DISTINCT ON (b.target_id) r.metadata,b.credential_scope
-FROM detection_reports r JOIN market_report_bindings b ON b.id=r.id
-WHERE EXISTS(SELECT 1 FROM market_capability_evidence e WHERE e.report_id=r.id)
- AND ((b.target_kind='group' AND EXISTS(SELECT 1 FROM market_groups g WHERE g.id=b.target_id AND g.deleted_at IS NULL))
- OR (b.target_kind='group_model' AND EXISTS(SELECT 1 FROM market_group_models m JOIN market_groups g ON g.id=m.group_id WHERE m.id=b.target_id AND m.deleted_at IS NULL AND g.deleted_at IS NULL)))
-ORDER BY b.target_id,b.created_at DESC,b.id DESC
-`
-
-type ApprovedReportsRow struct {
-	Metadata        []byte
-	CredentialScope string
-}
-
-// Only immutable reports that were approved with a publication are eligible.
-func (q *Queries) ApprovedReports(ctx context.Context) ([]ApprovedReportsRow, error) {
-	rows, err := q.db.Query(ctx, approvedReports)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ApprovedReportsRow
-	for rows.Next() {
-		var i ApprovedReportsRow
-		if err := rows.Scan(&i.Metadata, &i.CredentialScope); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const bumpProbeEpoch = `-- name: BumpProbeEpoch :execrows
 UPDATE market_channels SET probe_epoch=probe_epoch+1,revision=revision+1 WHERE channel_id=$1 AND revision=$2
 `
@@ -389,6 +354,7 @@ type LockGroupRow struct {
 	DeletedAt        *time.Time
 }
 
+// Only immutable reports that were approved with a publication are eligible.
 func (q *Queries) LockGroup(ctx context.Context, id string) (LockGroupRow, error) {
 	row := q.db.QueryRow(ctx, lockGroup, id)
 	var i LockGroupRow

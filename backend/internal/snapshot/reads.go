@@ -3,7 +3,6 @@ package snapshot
 import (
 	"context"
 	"strings"
-	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
@@ -26,13 +25,6 @@ func (c *Cache) Gateway(raw gateway.Store) gateway.Store { return gatewayStore{S
 type gatewayStore struct {
 	gateway.Store
 	c *Cache
-}
-
-func (s gatewayStore) ModelAttemptHistory(ctx context.Context, since time.Time, limit int32) ([]gateway.ModelAttemptHistoryRow, error) {
-	if source, ok := s.Store.(gateway.ModelMetricHistory); ok {
-		return source.ModelAttemptHistory(ctx, since, limit)
-	}
-	return nil, nil
 }
 
 func (s gatewayStore) LookupKey(ctx context.Context, hash []byte) (gateway.KeyAuth, error) {

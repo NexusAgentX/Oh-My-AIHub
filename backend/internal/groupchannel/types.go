@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 )
 
@@ -55,7 +54,6 @@ type Data struct {
 	Channels []Record
 	Choices  []Choice
 	Probes   []Probe
-	Reports  []detection.Job
 }
 type CreateInput struct {
 	GroupID                    string

@@ -20,7 +20,6 @@ export const adminNavigation: AdminNavItem[] = [
   { label: '申诉', to: '/admin/disputes', icon: 'scale' },
   { label: '设置', to: '/admin/settings', icon: 'settings' },
  {label:'典型费用',to:'/admin/typical-costs',icon:'chart'},
- {label:'检测参数',to:'/admin/detection-search',icon:'flask'},
  {label:'贡献审核',to:'/admin/contributions',icon:'contribute'},
 ]
 

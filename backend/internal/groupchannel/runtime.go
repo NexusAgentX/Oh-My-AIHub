@@ -8,7 +8,6 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ids"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -18,9 +17,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/typical"
 )
 
-type Planner interface {
-	Plan(detection.Target) (detection.Plan, error)
-}
 type State struct {
 	Directory market.Directory
 	Data      Data
@@ -28,7 +24,6 @@ type State struct {
 	// Private immutable inputs for account-scoped catalog projections. These
 	// records contain credentials and must never be serialized as an API DTO.
 	Candidates []gateway.CandidateRecord
-	Reports    map[string]detection.Projection
 	Version    string
 }
 
@@ -61,7 +56,6 @@ func (s *State) ModelState(id string) (known, enabled bool) {
 
 type Runtime struct {
 	Repository      Repository
-	Planner         Planner
 	CredentialScope func(Record) (string, error)
 	Removed         func(string)
 	Edited          func(string)
@@ -128,8 +122,7 @@ func (l *loader) LoadCandidates(ctx context.Context) ([]gateway.CandidateRecord,
 	if err != nil {
 		return nil, err
 	}
-	facts := projectReports(*d, data, l.r.Planner)
-	records, views, err := build(*d, data, facts)
+	records, views, err := build(*d, data)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +178,7 @@ func (l *loader) LoadCandidates(ctx context.Context) ([]gateway.CandidateRecord,
 		}
 		return records[i].Candidate.ChannelID < records[j].Candidate.ChannelID
 	})
-	l.r.state.Store(&State{Directory: *d, Data: data, Views: views, Candidates: records, Reports: facts, Version: version})
+	l.r.state.Store(&State{Directory: *d, Data: data, Views: views, Candidates: records, Version: version})
 	return records, nil
 }
 func (l *loader) LoadModels(ctx context.Context) ([]catalog.Model, error) {
@@ -281,39 +274,10 @@ func selected(d market.Directory, r Record) []gateway.Entrance {
 	}
 	return out
 }
-func projection(d market.Directory, j detection.Job, p Planner) detection.Projection {
-	if p == nil {
-		return detection.Projection{}
-	}
-	resolved, err := detection.ResolveDirectory(d, detection.Target{Binding: market.EvidenceBinding{TargetKind: j.Target.Binding.TargetKind, TargetID: j.Target.Binding.TargetID}})
-	if err != nil {
-		return detection.Projection{}
-	}
-	plan, err := p.Plan(resolved.Target)
-	if err != nil {
-		return detection.Projection{}
-	}
-	current := resolved.Target.Binding
-	current.ManifestVersion = plan.ManifestVersion
-	current.CodeVersion = plan.RegistryVersion
-	current.ParameterVersion = j.Target.Binding.ParameterVersion
-	current.CredentialScope = j.Target.Binding.CredentialScope
-	if !detection.CompatibleProfile(j.Target.Profile, resolved.Target.Profile) {
-		return detection.Projection{}
-	}
-	return detection.ProjectForPlan(j, current, plan)
+func Build(d market.Directory, data Data) ([]gateway.CandidateRecord, map[string]View, error) {
+	return build(d, data)
 }
-func Build(d market.Directory, data Data, planner Planner) ([]gateway.CandidateRecord, map[string]View, error) {
-	return build(d, data, projectReports(d, data, planner))
-}
-func projectReports(d market.Directory, data Data, planner Planner) map[string]detection.Projection {
-	facts := map[string]detection.Projection{}
-	for _, j := range data.Reports {
-		facts[j.Target.Binding.TargetID] = projection(d, j, planner)
-	}
-	return facts
-}
-func build(d market.Directory, data Data, facts map[string]detection.Projection) ([]gateway.CandidateRecord, map[string]View, error) {
+func build(d market.Directory, data Data) ([]gateway.CandidateRecord, map[string]View, error) {
 	pricingVersions, err := typical.PricingVersions(d)
 	if err != nil {
 		return nil, nil, err
@@ -412,39 +376,7 @@ func build(d market.Directory, data Data, facts map[string]detection.Projection)
 			if _, ok := frozen.Offers[m.ModelID]; !ok {
 				continue
 			}
-			evidence := map[string]bool{}
-			capacity := map[string]int64{}
-			if CompatibleHeaders(r.Overrides, g.Defaults) {
-				for _, target := range []string{g.ID, m.ID} {
-					p := facts[target]
-					if !p.Valid {
-						continue
-					}
-					for _, cap := range p.Capabilities {
-						if cap.State == "pass" {
-							evidence[cap.Layer+"/"+cap.ID] = true
-						}
-					}
-					for _, c := range p.Capacity {
-						capacity[c.ScenarioID+"/"+c.Kind] = c.VerifiedLower
-					}
-					for _, setting := range p.Settings {
-						if capability := scopedSettingCapability(setting); capability != "" {
-							evidence["upstream_protocol/"+capability] = true
-						}
-					}
-				}
-			}
-			var probeEndpoints map[channel.Format]string
-			for format, test := range mv.FormatTests {
-				if test.OK && test.EndpointID != "" {
-					if probeEndpoints == nil {
-						probeEndpoints = map[channel.Format]string{}
-					}
-					probeEndpoints[format] = test.EndpointID
-				}
-			}
-			records = append(records, gateway.CandidateRecord{ModelID: m.ModelID, Formats: mv.Formats, Candidate: gateway.Candidate{GroupID: g.ID, GroupModelID: m.ID, ModelType: m.ModelType, PricingVersion: pricingVersions[g.ID], ConfigRevision: r.Revision, CredentialRevision: r.CredentialRevision, Entrances: entries, Quotes: frozen, ChannelID: r.ID, OwnerID: r.Owner.ID, Name: r.Name, BaseURL: entries[0].BaseURL, UpstreamModel: m.UpstreamModel, MultiplierNano: c.DiscountNano, Advanced: Advanced(effective), Credential: r.Credential, Evidence: evidence, VerifiedCapacity: capacity, KeyProbeEndpoints: probeEndpoints}})
+			records = append(records, gateway.CandidateRecord{ModelID: m.ModelID, Formats: mv.Formats, Candidate: gateway.Candidate{GroupID: g.ID, GroupModelID: m.ID, ModelType: m.ModelType, PricingVersion: pricingVersions[g.ID], ConfigRevision: r.Revision, CredentialRevision: r.CredentialRevision, Entrances: entries, Quotes: frozen, ChannelID: r.ID, OwnerID: r.Owner.ID, Name: r.Name, BaseURL: entries[0].BaseURL, UpstreamModel: m.UpstreamModel, MultiplierNano: c.DiscountNano, Advanced: Advanced(effective), Credential: r.Credential}})
 		}
 		sort.Slice(v.Models, func(i, j int) bool { return v.Models[i].ModelID < v.Models[j].ModelID })
 		if v.Available && !slices.ContainsFunc(v.Models, func(m ModelView) bool {

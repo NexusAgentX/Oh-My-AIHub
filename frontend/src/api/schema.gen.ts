@@ -123,15 +123,304 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/market/reports/{reportID}": {
+    "/backend-api/codex/responses": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** getMarketPublicReport */
-        get: operations["getMarketPublicReport"];
+        get?: never;
+        put?: never;
+        /** codex.responses */
+        post: operations["proxyCodexResponses"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/responses/compact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.compact */
+        post: operations["proxyCodexCompact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.search */
+        post: operations["proxyCodexSearch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/images/generations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.images */
+        post: operations["proxyCodexImages"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/images/edits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.images.edit */
+        post: operations["proxyCodexImagesEdit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** codex.models */
+        get: operations["proxyCodexModels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/notes/v2/thread_hint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.notes.thread_hint */
+        post: operations["proxyCodexNotesThread_Hint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/notes/v2/write_file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.notes.write_file */
+        post: operations["proxyCodexNotesWrite_File"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/notes/v2/read_file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.notes.read_file */
+        post: operations["proxyCodexNotesRead_File"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/notes/v2/list_files_by_prefix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.notes.list_files_by_prefix */
+        post: operations["proxyCodexNotesList_Files_By_Prefix"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/notes/v2/search_contents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.notes.search_contents */
+        post: operations["proxyCodexNotesSearch_Contents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/notes/v2/append_to_file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.notes.append_to_file */
+        post: operations["proxyCodexNotesAppend_To_File"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/history/v2/list_windows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.history.list_windows */
+        post: operations["proxyCodexHistoryList_Windows"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/history/v2/list_items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.history.list_items */
+        post: operations["proxyCodexHistoryList_Items"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/history/v2/read_item": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.history.read_item */
+        post: operations["proxyCodexHistoryRead_Item"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/codex/alpha/history/v2/search_contents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** codex.history.search_contents */
+        post: operations["proxyCodexHistorySearch_Contents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/user-auth-credential/whoami": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** identity.whoami */
+        get: operations["proxyIdentityWhoami"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backend-api/wham/accounts/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** identity.accounts */
+        get: operations["proxyIdentityAccounts"];
         put?: never;
         post?: never;
         delete?: never;
@@ -798,194 +1087,6 @@ export interface paths {
         put?: never;
         /** fetchContributionIcon */
         post: operations["fetchContributionIcon"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/detection/jobs/{taskID}/reports": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 读取不可变历史报告 */
-        get: operations["listDetectionReports"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/detection/reports/{reportID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 读取不可变历史报告 */
-        get: operations["getDetectionReport"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/detection/jobs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 查看自己的检测任务；管理员可治理全部任务 */
-        get: operations["listDetectionJobs"];
-        put?: never;
-        /** 为已授权目标创建完整检测计划，缺套件明确待实现 */
-        post: operations["startDetectionJob"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/detection/jobs/{taskID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 查看任务、独立断言、版本与用量 */
-        get: operations["getDetectionJob"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/detection/jobs/{taskID}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 取消检测并保留已发生消耗与清理记录 */
-        post: operations["cancelDetectionJob"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/detection/jobs/{taskID}/resume": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 重填同范围凭据恢复中断任务 */
-        post: operations["resumeDetectionJob"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/detection/jobs/{taskID}/retest": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 选择场景复测并保留独立有效证据 */
-        post: operations["retestDetectionJob"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/detection/jobs/{taskID}/attempts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 分页查看脱敏请求执行元数据 */
-        get: operations["listDetectionAttempts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/detection/jobs/{taskID}/artifacts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 查看本任务尚待清理的资源归属元数据 */
-        get: operations["listDetectionArtifacts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/detection/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 查看上下文及最大输出搜索参数 */
-        get: operations["getDetectionParameters"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/detection/search/{target}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** 版本化修改搜索参数并记录审计 */
-        put: operations["updateDetectionSearch"];
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2345,26 +2446,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/detection/mcp": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * 检测任务专用合成 MCP 回调
-         * @description 只接受活跃检测任务的随机临时 Bearer 令牌；提供固定只读合成工具及 Streamable HTTP JSON-RPC 初始化/列表/调用。不接受平台 Key、会话 Cookie、资源 URL、文件或任意工具；未配置或无有效令牌返回404。无正文持久化。
-         */
-        post: operations["detectionMCPFixture"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/typical-costs": {
         parameters: {
             query?: never;
@@ -2421,12 +2502,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        MarketReportEndpoint: {
-            id: string;
-            method: string;
-            path: string;
-            proxy_supported: boolean;
-        };
         NativeModelMetadata: ({
             id?: string;
             name?: string;
@@ -2543,7 +2618,6 @@ export interface components {
             is_mine: boolean;
             formats: components["schemas"]["GroupChannelFormat"][];
             cooldown_remaining_seconds: number | null;
-            routing_metrics: components["schemas"]["ModelRoutingMetric"][];
             typical_price: components["schemas"]["MarketBrowsePrice"] | null;
         };
         MarketBrowseDetail: {
@@ -2562,60 +2636,37 @@ export interface components {
         MarketBrowseGroupDetail: {
             group: components["schemas"]["MarketBrowseGroup"];
             supplier: components["schemas"]["MarketBrowseSupplier"];
-            reports: string[];
         };
-        MarketReportAssertion: {
-            id: string;
-            label: string;
-            state: string;
-            reason: string;
+        CodexNativeCatalog: {
+            models: ({
+                slug: string;
+                display_name: string;
+            } & {
+                [key: string]: unknown;
+            })[];
         };
-        MarketReportSource: {
-            id: string;
-            url: string;
-            version: string;
+        CodexNativeJSON: unknown;
+        CodexPlatformIdentity: {
+            email: null;
+            chatgpt_user_id: string;
+            chatgpt_account_id: string;
+            /** @constant */
+            chatgpt_plan_type: "aihub";
+            /** @constant */
+            chatgpt_account_is_fedramp: false;
         };
-        MarketReportExclusion: {
-            protocol: string;
-            source_ids: string[];
-            reason: string;
-        };
-        MarketReportScenario: {
-            id: string;
-            layer: string;
-            state: string;
-            reason: string;
-            scope_version: string;
-            code_version: string;
-            current: boolean;
-            aggregate: boolean;
-            source_ids: string[];
-            assertions: components["schemas"]["MarketReportAssertion"][];
-            estimated_http: number | null;
-            usage: components["schemas"]["DetectionUsage"];
-            capacity: components["schemas"]["DetectionCapacityReport"][] | null;
-            settings: components["schemas"]["DetectionSettingEvidence"][] | null;
-            images: components["schemas"]["DetectionImageEvidence"][] | null;
-            fingerprint: components["schemas"]["DetectionFingerprintReport"] | null;
-            endpoints: components["schemas"]["MarketReportEndpoint"][];
-        };
-        MarketPublicReport: {
-            id: string;
-            target_kind: string;
-            target_id: string;
-            group_id: string;
-            state: string;
-            validity: string;
-            manifest_version: string;
-            registry_version: string;
-            complete: boolean;
-            /** Format: date-time */
-            updated_at: string;
-            parameters: components["schemas"]["DetectionParameters"];
-            usage: components["schemas"]["DetectionUsage"];
-            scenarios: components["schemas"]["MarketReportScenario"][];
-            sources: components["schemas"]["MarketReportSource"][];
-            exclusions: components["schemas"]["MarketReportExclusion"][];
+        CodexPlatformAccounts: {
+            accounts: {
+                id: string;
+                plan_type: null;
+                /** @constant */
+                workspace_backend_origin: "NO_CONSTRAINT";
+                /** @constant */
+                account_routing_override: "NO_CONSTRAINT";
+                /** @constant */
+                structure: "personal";
+            }[];
+            account_ordering: string[];
         };
         ContributionReuseAddress: {
             revision: number;
@@ -2891,390 +2942,6 @@ export interface components {
             error: "publication_pending" | "publication_unknown";
             message: string;
             draft: components["schemas"]["ContributionDraft"];
-        };
-        DetectionReportsPage: {
-            items: components["schemas"]["DetectionReportSummary"][];
-            next_cursor: string | null;
-        };
-        DetectionReportSummary: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            task_id: string;
-            state: string;
-            complete: boolean;
-            /** Format: date-time */
-            created_at: string;
-        };
-        DetectionSearchSettings: {
-            version: string;
-            /** @enum {string} */
-            method: "binary" | "ternary";
-            low: number;
-            high: number;
-            hard_maximum: number;
-            /** @enum {string} */
-            precision_mode: "absolute" | "relative";
-            precision: number;
-            rounds: number;
-            rechecks: number;
-        };
-        DetectionParameters: {
-            context: components["schemas"]["DetectionSearchSettings"];
-            max_output: components["schemas"]["DetectionSearchSettings"];
-        };
-        DetectionImageVariant: {
-            /** @enum {string} */
-            unit: "" | "request" | "successful_image";
-            size: string;
-            quality: string;
-            background: string;
-            service_tier: string;
-        };
-        DetectionTestProfile: {
-            service_tiers: string[] | null;
-            images: components["schemas"]["DetectionImageVariant"][] | null;
-        };
-        DetectionImageProperties: {
-            width: number;
-            height: number;
-            /** @enum {string} */
-            format: "png" | "jpeg";
-            transparent: boolean;
-        };
-        DetectionImageEvidence: {
-            variant: components["schemas"]["DetectionImageVariant"];
-            /** @enum {string} */
-            transport: "json" | "json_url" | "multipart" | "sse";
-            /** @enum {string} */
-            state: "pass" | "partial" | "fail" | "unsupported" | "inconclusive" | "unobserved";
-            /** @enum {string} */
-            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
-            /** @constant */
-            requested: 1;
-            returned: number;
-            verified: number;
-            products: components["schemas"]["DetectionImageProperties"][];
-            options_confirmed: boolean;
-            mask_preserved: boolean;
-            usage_reliable: boolean;
-            unpriced_tokens: boolean;
-            attempt_ids: string[];
-        };
-        DetectionSettingEvidence: {
-            /** @enum {string} */
-            kind: "cache" | "service_tier";
-            configured: string;
-            wire: string;
-            actual: string;
-            /** @enum {string} */
-            state: "pass" | "partial" | "fail" | "unsupported" | "inconclusive";
-            /** @enum {string} */
-            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
-            accepted: boolean;
-            usage_reliable: boolean;
-            /** Format: int64 */
-            cache_write_tokens: number;
-            /** Format: int64 */
-            cache_read_tokens: number;
-            attempt_ids: string[];
-        };
-        DetectionCapacityProbe: {
-            accepted: boolean;
-            semantic: boolean;
-            actual: number | null;
-            input_overhead: number | null;
-            length_error: boolean;
-            failure_upper: number | null;
-            approximate: boolean;
-            /** @enum {string} */
-            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
-            attempt_ids: string[];
-            requested_approximate: boolean;
-        };
-        DetectionCapacityStep: {
-            /** Format: int64 */
-            requested: number;
-            round: number;
-            recheck: number;
-            accepted: boolean;
-            semantic: boolean;
-            actual: number | null;
-            input_overhead: number | null;
-            length_error: boolean;
-            failure_upper: number | null;
-            approximate: boolean;
-            /** @enum {string} */
-            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
-            attempt_ids: string[];
-            requested_approximate: boolean;
-        };
-        DetectionCapacityReport: {
-            /** @enum {string} */
-            kind: "context" | "max_output";
-            /** @enum {string} */
-            unit: "tokens";
-            declared: number | null;
-            settings: components["schemas"]["DetectionSearchSettings"];
-            parameter_accepted_lower: number | null;
-            parameter_rejected_upper: number | null;
-            verified_lower: number | null;
-            proven_failure_upper: number | null;
-            completed: boolean;
-            /** @enum {string} */
-            stop: "rounds" | "precision" | "cancelled" | "non_monotonic" | "configured_bound" | "unconfirmed";
-            steps: components["schemas"]["DetectionCapacityStep"][];
-        };
-        DetectionFingerprintDiagnostic: {
-            index: number;
-            /** Format: int64 */
-            parsed_numbers: number;
-            /** Format: int64 */
-            minimum_numbers: number;
-            accepted: boolean;
-            /** Format: int64 */
-            raw_out_of_range_count: number;
-        };
-        DetectionFingerprintRanking: {
-            model: string;
-            display_name: string;
-            family: string;
-            family_name: string;
-            score: number;
-            probability: number | null;
-        };
-        DetectionFingerprintReport: {
-            version: string;
-            commit: string;
-            detector_sha256: string;
-            reference_sha256: string;
-            base_sha256: string;
-            reference_built_at: string;
-            calibration_sha256: string;
-            /** @enum {string} */
-            decision: "unscorable" | "ranked";
-            used_outputs: number;
-            diagnostics: components["schemas"]["DetectionFingerprintDiagnostic"][];
-            /** @enum {string} */
-            probability_scope: "unavailable" | "reference-closed-set";
-            results: components["schemas"]["DetectionFingerprintRanking"][];
-        };
-        DetectionTarget: {
-            /** Format: uuid */
-            group_id: string;
-            binding: components["schemas"]["MarketEvidenceBinding"];
-            /** @enum {string} */
-            model_type: "" | "text" | "image";
-            model: string;
-            service_tier: string;
-            /**
-             * Format: uuid
-             * @description 私有草稿检测时必须指定，防止同一生效对象的不同草稿混用配置
-             */
-            draft_id?: string;
-            /** Format: int64 */
-            context_window?: number;
-            /** Format: int64 */
-            max_output_tokens?: number;
-            profile: components["schemas"]["DetectionTestProfile"];
-        };
-        DetectionUsage: {
-            http: number;
-            generate: number;
-            count: number;
-            query: number;
-            cleanup: number;
-            input_tokens: number;
-            output_tokens: number;
-            images: number;
-            tools: number;
-        };
-        DetectionAttempt: {
-            /** Format: uuid */
-            id: string;
-            endpoint_id: string;
-            /** @enum {string} */
-            method: "GET" | "POST" | "PATCH" | "DELETE";
-            path: string;
-            status: number;
-            /** @enum {string} */
-            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
-            /** @enum {string} */
-            category: "generate" | "count" | "query" | "cleanup";
-            duration_ms: number;
-            sent: boolean;
-            response_received: boolean;
-            /** Format: date-time */
-            at: string;
-            /** @description 本次实际入口，仅执行追溯；不是能力/目录/指纹维度，不参与完整性与路由筛选 */
-            entry_url?: string;
-        };
-        DetectionAssertion: {
-            id: string;
-            /** @enum {string} */
-            state: "pass" | "partial" | "fail" | "unsupported" | "inconclusive" | "unobserved";
-            /** @enum {string} */
-            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
-            attempt_ids: string[];
-        };
-        DetectionQuotaEvidence: {
-            /** @enum {string} */
-            header: "x-ratelimit-remaining-requests" | "x-ratelimit-remaining-tokens" | "anthropic-ratelimit-requests-remaining" | "anthropic-ratelimit-input-tokens-remaining" | "anthropic-ratelimit-output-tokens-remaining" | "anthropic-ratelimit-tokens-remaining";
-            /** Format: int64 */
-            remaining: number;
-            /** Format: uuid */
-            attempt_id: string;
-        };
-        DetectionResult: {
-            /** Format: uuid */
-            source_task_id: string;
-            source_report_id: string | null;
-            /** Format: uuid */
-            id: string;
-            scenario_id: string;
-            /** @enum {string} */
-            state: "pass" | "partial" | "fail" | "unsupported" | "inconclusive";
-            /** @enum {string} */
-            reason: "ok" | "unsupported" | "assertion_failed" | "prerequisite_failed" | "external_error" | "detector_error" | "not_observed" | "client_disabled" | "platform_unavailable" | "cancelled" | "interrupted" | "invalid_response" | "body_limit" | "timeout" | "network_error" | "invalid_request" | "key_unavailable" | "inputs_changed" | "suite_pending";
-            /** @enum {string} */
-            layer: "upstream_protocol" | "gateway_proxy" | "official_cli";
-            /** @enum {string} */
-            source: "real_upstream" | "synthetic";
-            assertions: components["schemas"]["DetectionAssertion"][];
-            attempts: components["schemas"]["DetectionAttempt"][];
-            usage: components["schemas"]["DetectionUsage"];
-            /** Format: date-time */
-            started_at: string;
-            /** Format: date-time */
-            finished_at: string;
-            capacity?: components["schemas"]["DetectionCapacityReport"][];
-            fingerprint?: components["schemas"]["DetectionFingerprintReport"];
-            images?: components["schemas"]["DetectionImageEvidence"][];
-            settings?: components["schemas"]["DetectionSettingEvidence"][];
-            /** @description 仅凭据所有者/管理员诊断；不是公开分组能力或模型价格，不据此推断金额余额。 */
-            quotas?: components["schemas"]["DetectionQuotaEvidence"][];
-        };
-        DetectionPlanned: {
-            credential_dependent: boolean;
-            assertion_labels: {
-                [key: string]: string;
-            };
-            id: string;
-            suite_id: string;
-            requirements: string[];
-            assertions: string[];
-            conditional: string[];
-            dependencies: string[];
-            aggregate: boolean;
-            implemented: boolean;
-            code_version: string;
-            /** @description Fingerprint of this scenario's protocol, endpoint and assertion scope; independent of unrelated suites. */
-            scope_version: string;
-            /** @enum {string} */
-            layer: "upstream_protocol" | "gateway_proxy" | "official_cli";
-            estimated_http: number | null;
-        };
-        DetectionPlan: {
-            engine_version: string;
-            manifest_version: string;
-            registry_version: string;
-            items: components["schemas"]["DetectionPlanned"][];
-        };
-        DetectionJob: {
-            /** Format: uuid */
-            requested_by_id: string;
-            continued_from_id: string | null;
-            pending_cleanup: components["schemas"]["DetectionArtifact"][];
-            report_id: string | null;
-            execution_active: boolean;
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            owner_id: string;
-            target: components["schemas"]["DetectionTarget"];
-            parameters: components["schemas"]["DetectionParameters"];
-            plan: components["schemas"]["DetectionPlan"];
-            /** @enum {string} */
-            state: "queued" | "running" | "finished" | "cancelled" | "interrupted" | "suite_pending" | "failed" | "outdated";
-            complete: boolean;
-            results: components["schemas"]["DetectionResult"][];
-            usage: components["schemas"]["DetectionUsage"];
-            /** Format: date-time */
-            created_at: string;
-            /** Format: date-time */
-            updated_at: string;
-        };
-        DetectionSummary: {
-            execution_active: boolean;
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            owner_id: string;
-            target: components["schemas"]["DetectionTarget"];
-            /** @enum {string} */
-            state: "queued" | "running" | "finished" | "cancelled" | "interrupted" | "suite_pending" | "failed" | "outdated";
-            complete: boolean;
-            scenarios: number;
-            finished_scenarios: number;
-            usage: components["schemas"]["DetectionUsage"];
-            /** Format: date-time */
-            created_at: string;
-            /** Format: date-time */
-            updated_at: string;
-        };
-        DetectionArtifact: {
-            /** Format: uuid */
-            id: string;
-            /** @enum {string} */
-            kind: "response" | "conversation" | "cache" | "stored_chat";
-            native_id: string;
-            delete_endpoint: string;
-            delete_path: string;
-            /** Format: uuid */
-            producer_attempt_id: string;
-            removed: boolean;
-            /** @enum {string} */
-            reason: "ok" | "external_error" | "invalid_response" | "key_unavailable";
-        };
-        DetectionJobEnvelope: {
-            job: components["schemas"]["DetectionJob"];
-            draft_linked?: boolean;
-        };
-        DetectionParametersEnvelope: {
-            parameters: components["schemas"]["DetectionParameters"];
-        };
-        DetectionSearchEnvelope: {
-            settings: components["schemas"]["DetectionSearchSettings"];
-        };
-        DetectionArtifactsEnvelope: {
-            items: components["schemas"]["DetectionArtifact"][];
-        };
-        DetectionJobsPage: {
-            items: components["schemas"]["DetectionSummary"][];
-            next_cursor: string | null;
-        };
-        DetectionAttemptsPage: {
-            items: components["schemas"]["DetectionAttempt"][];
-            next_cursor: string | null;
-        };
-        DetectionCreate: {
-            /** @enum {string} */
-            target_kind: "group" | "group_model";
-            /** Format: uuid */
-            target_id: string;
-            api_key: string;
-            /**
-             * Format: uuid
-             * @description 私有草稿检测时必须指定，防止同一生效对象的不同草稿混用配置
-             */
-            draft_id?: string;
-        };
-        DetectionResume: {
-            api_key: string;
-        };
-        DetectionRetest: {
-            api_key: string;
-            scenarios: string[];
         };
         /** @description 非负价格，最多100000，9位小数；0为明确免费。 */
         MarketPrice: string;
@@ -3616,10 +3283,10 @@ export interface components {
          */
         Format: "openai_chat" | "openai_responses" | "anthropic" | "gemini" | "openai_images";
         /**
-         * @description 调用方式：价格优先（默认）、稳定优先、延迟优先、速率优先、手动排序。fastest 的历史值继续表示延迟。
+         * @description 调用方式：价格优先（默认）、稳定优先、延迟优先、手动排序。
          * @enum {string}
          */
-        RoutingMode: "cheapest" | "reliable" | "fastest" | "speed" | "manual";
+        RoutingMode: "cheapest" | "reliable" | "fastest" | "manual";
         /**
          * @description 调用结果分类。succeeded_unbilled 为成功但读不到用量（不收费）；interrupted 为已开始输出后中断。
          * @enum {string}
@@ -3829,28 +3496,6 @@ export interface components {
             pending_c2c_trades: number;
             recent_calls: components["schemas"]["CallSummary"][];
         };
-        ModelRoutingMetric: {
-            /**
-             * @description 实际入口协议。
-             * @enum {string}
-             */
-            protocol: "openai-chat-completions" | "openai-responses" | "native-messages" | "native-generate-content" | "openai-images";
-            format: components["schemas"]["Format"];
-            /** @description 请求档位；空值代表默认/auto 调用上下文。 */
-            tier: string;
-            stream: boolean;
-            attempts: number;
-            successes: number;
-            /** @description 客户端错误/主动断开，排除于可用率。 */
-            excluded: number;
-            success_rate: number | null;
-            first_output_p50_ms: number | null;
-            first_output_samples: number;
-            output_tps_p50: number | null;
-            output_samples: number;
-            /** @description 对应统计至少达到此样本数才用于自身指标排序。 */
-            min_samples: number;
-        };
         RoutingPreference: {
             model_id: string;
             /**
@@ -3885,6 +3530,11 @@ export interface components {
             total: components["schemas"]["Amount"];
         };
         ApiKey: {
+            /**
+             * @description 声明此平台 Key 使用 Codex 笔记与历史工具；开启后会话从首个相关请求起绑定渠道及凭据。更改声明后建议使用新会话，平台不迁移已有上游历史。
+             * @default false
+             */
+            codex_notes: boolean;
             /** Format: uuid */
             id: string;
             name: string;
@@ -3916,6 +3566,11 @@ export interface components {
             key: components["schemas"]["ApiKey"];
         };
         ApiKeyCreateRequest: {
+            /**
+             * @description 声明此平台 Key 使用 Codex 笔记与历史工具；开启后会话从首个相关请求起绑定渠道及凭据。更改声明后建议使用新会话，平台不迁移已有上游历史。
+             * @default false
+             */
+            codex_notes: boolean;
             name: string;
             /** @enum {string} */
             status?: "enabled" | "disabled";
@@ -3931,6 +3586,11 @@ export interface components {
             };
         };
         ApiKeyUpdateRequest: {
+            /**
+             * @description 声明此平台 Key 使用 Codex 笔记与历史工具；开启后会话从首个相关请求起绑定渠道及凭据。更改声明后建议使用新会话，平台不迁移已有上游历史。
+             * @default false
+             */
+            codex_notes: boolean;
             name?: string;
             /** @enum {string} */
             status?: "enabled" | "disabled";
@@ -3958,8 +3618,6 @@ export interface components {
             secret: string;
         };
         FormatTest: {
-            /** @description 最小可调用性实际使用的固定入口标识；省略时为原公共格式入口。 */
-            endpoint_id?: string;
             ok: boolean;
             status_code: number | null;
             error: string | null;
@@ -4118,7 +3776,7 @@ export interface components {
         };
         CallAttempt: {
             /** @enum {string} */
-            metric_protocol?: "openai-chat-completions" | "openai-responses" | "native-messages" | "native-generate-content" | "openai-images";
+            metric_protocol?: "openai-chat-completions" | "openai-responses" | "native-messages" | "native-generate-content" | "openai-images" | "codex-special";
             /**
              * @description 新观测口径；历史缺失记录不作为首有效输出或可靠 TPS 证据。
              * @constant
@@ -6020,79 +5678,1738 @@ export interface operations {
             };
         };
     };
-    getMarketPublicReport: {
+    proxyCodexResponses: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                reportID: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
         responses: {
-            /** @description Approved account-scoped projection */
+            /** @description Native inference result with reliable usage settlement. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MarketPublicReport"];
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                    "text/event-stream": string;
                 };
             };
-            /** @description Error */
+            /** @description Native protocol error. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexCompact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native inference result with reliable usage settlement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native protocol error. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexSearch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native inference result with reliable usage settlement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native protocol error. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexImages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native inference result with reliable usage settlement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native protocol error. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexImagesEdit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native inference result with reliable usage settlement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native protocol error. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized native model metadata from the selected provider. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeCatalog"];
+                };
+            };
+            /** @description Native protocol error. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexNotesThread_Hint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
+                    "application/json": components["schemas"]["CodexNativeJSON"];
                 };
             };
-            /** @description Error */
+            /** @description Native JSON response. */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
+                    "application/json": components["schemas"]["CodexNativeJSON"];
                 };
             };
-            /** @description Error */
+            /** @description Native JSON response. */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
+                    "application/json": components["schemas"]["CodexNativeJSON"];
                 };
             };
-            /** @description Error */
-            409: {
+            /** @description Native JSON response. */
+            408: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
+                    "application/json": components["schemas"]["CodexNativeJSON"];
                 };
             };
-            /** @description Error */
-            422: {
+            /** @description Native JSON response. */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
+                    "application/json": components["schemas"]["CodexNativeJSON"];
                 };
             };
-            /** @description Error */
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
             503: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
+                    "application/json": components["schemas"]["CodexNativeJSON"];
                 };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexNotesWrite_File: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexNotesRead_File: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexNotesList_Files_By_Prefix: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexNotesSearch_Contents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexNotesAppend_To_File: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexHistoryList_Windows: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexHistoryList_Items: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexHistoryRead_Item: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyCodexHistorySearch_Contents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyIdentityWhoami: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexPlatformIdentity"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyIdentityAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Native JSON response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexPlatformAccounts"];
+                };
+            };
+            /** @description Native JSON response. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON response. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodexNativeJSON"];
+                };
+            };
+            /** @description Native JSON result and protocol error; context identifiers are isolated by platform account and Key. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -7444,379 +8761,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SupplierIcon"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    listDetectionReports: {
-        parameters: {
-            query?: {
-                cursor?: string;
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                taskID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 只读历史报告，后续复测不改写此证据 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetectionReportsPage"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    getDetectionReport: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                reportID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 只读历史报告，后续复测不改写此证据 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetectionJobEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    listDetectionJobs: {
-        parameters: {
-            query?: {
-                cursor?: string;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 查看自己的检测任务；管理员可治理全部任务 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetectionJobsPage"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    startDetectionJob: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DetectionCreate"];
-            };
-        };
-        responses: {
-            /** @description 为已授权目标创建完整检测计划，缺套件明确待实现 */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetectionJobEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    getDetectionJob: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                taskID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 查看任务、独立断言、版本与用量 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetectionJobEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    cancelDetectionJob: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                taskID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 取消检测并保留已发生消耗与清理记录 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetectionJobEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    resumeDetectionJob: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                taskID: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DetectionResume"];
-            };
-        };
-        responses: {
-            /** @description 重填同范围凭据恢复中断任务 */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetectionJobEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    retestDetectionJob: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                taskID: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DetectionRetest"];
-            };
-        };
-        responses: {
-            /** @description 选择场景复测并保留独立有效证据 */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetectionJobEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    listDetectionAttempts: {
-        parameters: {
-            query?: {
-                cursor?: string;
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                taskID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 分页查看脱敏请求执行元数据 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetectionAttemptsPage"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    listDetectionArtifacts: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                taskID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 查看本任务尚待清理的资源归属元数据 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetectionArtifactsEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    getDetectionParameters: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 查看上下文及最大输出搜索参数 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetectionParametersEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["Unprocessable"];
-            429: components["responses"]["TooManyRequests"];
-            503: components["responses"]["Unavailable"];
-        };
-    };
-    updateDetectionSearch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                target: "context" | "max_output";
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DetectionSearchSettings"];
-            };
-        };
-        responses: {
-            /** @description 版本化修改搜索参数并记录审计 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetectionSearchEnvelope"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -10641,69 +11585,6 @@ export interface operations {
         responses: {
             /** @description 原生响应（含流式）与原生错误。 */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    detectionMCPFixture: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description JSON-RPC 合成响应 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description 初始化通知已接收 */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description 不属于固定合成协议 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description 无活跃探针或令牌无效 */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description 请求超过16KiB */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description 单探针回调请求保护 */
-            429: {
                 headers: {
                     [name: string]: unknown;
                 };

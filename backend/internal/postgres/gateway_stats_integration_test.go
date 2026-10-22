@@ -414,8 +414,7 @@ func TestFastestModeRanksByFirstTokenTimesCountedInMemory(t *testing.T) {
 			}
 			_, secret := e.defaultKey(consumer)
 
-			// Reach the new minimum with real model-scoped streaming observations;
-			// one legacy first-byte sample must no longer decide latency ranking.
+			// Reach the new minimum with real streaming first-token observations.
 			for _, id := range []string{slowID, fastID} {
 				setRouting(e, consumer, map[string]any{"mode": "manual", "order": []string{id}})
 				for range 20 {
@@ -426,8 +425,8 @@ func TestFastestModeRanksByFirstTokenTimesCountedInMemory(t *testing.T) {
 			}
 			setRouting(e, consumer, map[string]any{"mode": "fastest"})
 			e.engine.RefreshStats()
-			stats := e.engine.ModelStats("gpt-test", channel.FormatOpenAIChat, "", true)
-			if stats[fastID].FirstOutputSamples != 20 || stats[slowID].FirstOutputSamples != 20 || stats[fastID].FirstOutputP50MS == nil || stats[slowID].FirstOutputP50MS == nil || *stats[fastID].FirstOutputP50MS >= *stats[slowID].FirstOutputP50MS {
+			stats := e.engine.Stats()
+			if stats[fastID].TTFTP50MS == nil || stats[slowID].TTFTP50MS == nil || *stats[fastID].TTFTP50MS >= *stats[slowID].TTFTP50MS {
 				t.Fatalf("first-token medians: fast %+v slow %+v", stats[fastID], stats[slowID])
 			}
 
