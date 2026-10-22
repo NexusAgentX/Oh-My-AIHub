@@ -33,7 +33,7 @@ func GroupValue(r MarketGroup) (market.Group, error) {
 			return market.Group{}, market.ErrInvalid
 		}
 	}
-	v := market.Group{ID: r.ID, SupplierID: r.SupplierID, Name: r.Name, Description: r.Description, StatusURL: r.StatusUrl, Defaults: d, Enabled: r.Enabled, Revision: r.Revision, ConnectionVersion: r.ConnectionVersion, CapabilityDigest: r.CapabilityDigest, DeletedAt: r.DeletedAt, UpdatedAt: r.UpdatedAt}
+	v := market.Group{ID: r.ID, SupplierID: r.SupplierID, Name: r.Name, Description: r.Description, StatusURL: r.StatusUrl, Defaults: d, Enabled: r.Enabled, Revision: r.Revision, ConnectionVersion: r.ConnectionVersion, DeletedAt: r.DeletedAt, UpdatedAt: r.UpdatedAt}
 	return v, market.ValidateGroup(v)
 }
 func ModelValue(r MarketGroupModel) market.GroupModel {

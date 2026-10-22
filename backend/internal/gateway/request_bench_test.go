@@ -65,10 +65,22 @@ func BenchmarkRequestFacts(b *testing.B) {
 	}
 }
 
+// benchStoreBody is the same request with the store flag the gateway must
+// remove on the two stateless entrances.
+func benchStoreBody(size int) []byte {
+	body := benchRequestBody(size)
+	return append(body[:len(body)-1], []byte(`,"store":true}`)...)
+}
+
 func BenchmarkUpstreamBody(b *testing.B) {
 	for _, tc := range benchRequestSizes {
 		body := benchRequestBody(tc.size)
 		_, scan, err := ScanRequest(body)
+		if err != nil {
+			b.Fatal(err)
+		}
+		stored := benchStoreBody(tc.size)
+		_, storedScan, err := ScanRequest(stored)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -81,7 +93,7 @@ func BenchmarkUpstreamBody(b *testing.B) {
 		b.Run(tc.name+"/chat-stream/one-pass", func(b *testing.B) {
 			b.ReportAllocs()
 			for range b.N {
-				UpstreamBody(body, scan, "upstream-model", true)
+				UpstreamBody(body, scan, "upstream-model", true, true)
 			}
 		})
 		b.Run(tc.name+"/same-model/replace", func(b *testing.B) {
@@ -93,7 +105,21 @@ func BenchmarkUpstreamBody(b *testing.B) {
 		b.Run(tc.name+"/same-model/one-pass", func(b *testing.B) {
 			b.ReportAllocs()
 			for range b.N {
-				UpstreamBody(body, scan, "gpt-bench", false)
+				UpstreamBody(body, scan, "gpt-bench", false, false)
+			}
+		})
+		// Without a store member the stateless entrance must add no work: the
+		// numbers here are the ones above.
+		b.Run(tc.name+"/same-model/stateless-without-store", func(b *testing.B) {
+			b.ReportAllocs()
+			for range b.N {
+				UpstreamBody(body, scan, "gpt-bench", false, true)
+			}
+		})
+		b.Run(tc.name+"/same-model/stateless-strips-store", func(b *testing.B) {
+			b.ReportAllocs()
+			for range b.N {
+				UpstreamBody(stored, storedScan, "gpt-bench", false, true)
 			}
 		})
 	}

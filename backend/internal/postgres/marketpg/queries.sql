@@ -12,11 +12,11 @@ SELECT * FROM market_suppliers WHERE id=$1;
 SELECT * FROM market_suppliers WHERE deleted_at IS NULL ORDER BY id;
 
 -- name: InsertGroup :one
-INSERT INTO market_groups (id,supplier_id,name,description,status_url,user_agent,header_rules,concurrency_limit,rpm_limit,ttft_timeout_ms,request_timeout_ms,idle_timeout_ms,cooldown_failures,cooldown_seconds,enabled,revision,connection_version,capability_digest,deleted_at)
-VALUES (sqlc.arg(id),sqlc.arg(supplier_id),sqlc.arg(name),sqlc.arg(description),sqlc.arg(status_url),sqlc.narg(user_agent),sqlc.narg(header_rules),sqlc.narg(concurrency_limit),sqlc.narg(rpm_limit),sqlc.narg(ttft_timeout_ms),sqlc.narg(request_timeout_ms),sqlc.narg(idle_timeout_ms),sqlc.narg(cooldown_failures),sqlc.narg(cooldown_seconds),sqlc.arg(enabled),sqlc.arg(revision),sqlc.arg(connection_version),sqlc.arg(capability_digest),sqlc.narg(deleted_at)) RETURNING *;
+INSERT INTO market_groups (id,supplier_id,name,description,status_url,user_agent,header_rules,concurrency_limit,rpm_limit,ttft_timeout_ms,request_timeout_ms,idle_timeout_ms,cooldown_failures,cooldown_seconds,enabled,revision,connection_version,deleted_at)
+VALUES (sqlc.arg(id),sqlc.arg(supplier_id),sqlc.arg(name),sqlc.arg(description),sqlc.arg(status_url),sqlc.narg(user_agent),sqlc.narg(header_rules),sqlc.narg(concurrency_limit),sqlc.narg(rpm_limit),sqlc.narg(ttft_timeout_ms),sqlc.narg(request_timeout_ms),sqlc.narg(idle_timeout_ms),sqlc.narg(cooldown_failures),sqlc.narg(cooldown_seconds),sqlc.arg(enabled),sqlc.arg(revision),sqlc.arg(connection_version),sqlc.narg(deleted_at)) RETURNING *;
 
 -- name: UpdateGroup :one
-UPDATE market_groups SET name=sqlc.arg(name),description=sqlc.arg(description),status_url=sqlc.arg(status_url),user_agent=sqlc.narg(user_agent),header_rules=sqlc.narg(header_rules),concurrency_limit=sqlc.narg(concurrency_limit),rpm_limit=sqlc.narg(rpm_limit),ttft_timeout_ms=sqlc.narg(ttft_timeout_ms),request_timeout_ms=sqlc.narg(request_timeout_ms),idle_timeout_ms=sqlc.narg(idle_timeout_ms),cooldown_failures=sqlc.narg(cooldown_failures),cooldown_seconds=sqlc.narg(cooldown_seconds),enabled=sqlc.arg(enabled),revision=sqlc.arg(revision),connection_version=sqlc.arg(connection_version),capability_digest=sqlc.arg(capability_digest),deleted_at=sqlc.narg(deleted_at),updated_at=now() WHERE id=sqlc.arg(id) AND revision=sqlc.arg(base_revision) AND supplier_id=sqlc.arg(supplier_id) RETURNING *;
+UPDATE market_groups SET name=sqlc.arg(name),description=sqlc.arg(description),status_url=sqlc.arg(status_url),user_agent=sqlc.narg(user_agent),header_rules=sqlc.narg(header_rules),concurrency_limit=sqlc.narg(concurrency_limit),rpm_limit=sqlc.narg(rpm_limit),ttft_timeout_ms=sqlc.narg(ttft_timeout_ms),request_timeout_ms=sqlc.narg(request_timeout_ms),idle_timeout_ms=sqlc.narg(idle_timeout_ms),cooldown_failures=sqlc.narg(cooldown_failures),cooldown_seconds=sqlc.narg(cooldown_seconds),enabled=sqlc.arg(enabled),revision=sqlc.arg(revision),connection_version=sqlc.arg(connection_version),deleted_at=sqlc.narg(deleted_at),updated_at=now() WHERE id=sqlc.arg(id) AND revision=sqlc.arg(base_revision) AND supplier_id=sqlc.arg(supplier_id) RETURNING *;
 
 -- name: GetGroup :one
 SELECT * FROM market_groups WHERE id=$1;
@@ -100,10 +100,6 @@ INSERT INTO market_quote_unit_prices(quote_id,seq,unit,tool,image_size,image_qua
 -- name: BumpGroupConnection :execrows
 UPDATE market_groups SET connection_version=connection_version+1,revision=revision+1,updated_at=now() WHERE id=$1 AND deleted_at IS NULL;
 
--- name: ModelsForGroup :many
-SELECT * FROM market_group_models WHERE group_id=$1 AND deleted_at IS NULL ORDER BY id;
--- name: RefreshModelCapability :exec
-UPDATE market_group_models SET capability_digest=$2,revision=revision+1,updated_at=now() WHERE id=$1 AND capability_digest<>$2 AND deleted_at IS NULL;
 -- name: GroupsForAddress :many
 SELECT DISTINCT group_id FROM market_group_addresses WHERE address_id=$1 AND deleted_at IS NULL ORDER BY group_id;
 -- name: RetireAddressLinks :exec

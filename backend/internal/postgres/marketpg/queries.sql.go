@@ -389,8 +389,8 @@ func (q *Queries) InsertAddress(ctx context.Context, arg InsertAddressParams) (M
 }
 
 const insertGroup = `-- name: InsertGroup :one
-INSERT INTO market_groups (id,supplier_id,name,description,status_url,user_agent,header_rules,concurrency_limit,rpm_limit,ttft_timeout_ms,request_timeout_ms,idle_timeout_ms,cooldown_failures,cooldown_seconds,enabled,revision,connection_version,capability_digest,deleted_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING id, supplier_id, name, description, status_url, user_agent, header_rules, concurrency_limit, rpm_limit, ttft_timeout_ms, request_timeout_ms, idle_timeout_ms, cooldown_failures, cooldown_seconds, enabled, revision, connection_version, capability_digest, deleted_at, updated_at
+INSERT INTO market_groups (id,supplier_id,name,description,status_url,user_agent,header_rules,concurrency_limit,rpm_limit,ttft_timeout_ms,request_timeout_ms,idle_timeout_ms,cooldown_failures,cooldown_seconds,enabled,revision,connection_version,deleted_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id, supplier_id, name, description, status_url, user_agent, header_rules, concurrency_limit, rpm_limit, ttft_timeout_ms, request_timeout_ms, idle_timeout_ms, cooldown_failures, cooldown_seconds, enabled, revision, connection_version, capability_digest, deleted_at, updated_at
 `
 
 type InsertGroupParams struct {
@@ -411,7 +411,6 @@ type InsertGroupParams struct {
 	Enabled           bool       `json:"enabled"`
 	Revision          int64      `json:"revision"`
 	ConnectionVersion int64      `json:"connection_version"`
-	CapabilityDigest  string     `json:"capability_digest"`
 	DeletedAt         *time.Time `json:"deleted_at"`
 }
 
@@ -434,7 +433,6 @@ func (q *Queries) InsertGroup(ctx context.Context, arg InsertGroupParams) (Marke
 		arg.Enabled,
 		arg.Revision,
 		arg.ConnectionVersion,
-		arg.CapabilityDigest,
 		arg.DeletedAt,
 	)
 	var i MarketGroup
@@ -1068,47 +1066,6 @@ func (q *Queries) LockProtectedRoot(ctx context.Context, dollar_1 *string) error
 	return err
 }
 
-const modelsForGroup = `-- name: ModelsForGroup :many
-SELECT id, group_id, model_id, display_name, upstream_model, model_type, context_window, max_output_tokens, notes, enabled, is_reference, current_quote_id, revision, capability_digest, deleted_at, updated_at FROM market_group_models WHERE group_id=$1 AND deleted_at IS NULL ORDER BY id
-`
-
-func (q *Queries) ModelsForGroup(ctx context.Context, groupID string) ([]MarketGroupModel, error) {
-	rows, err := q.db.Query(ctx, modelsForGroup, groupID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []MarketGroupModel
-	for rows.Next() {
-		var i MarketGroupModel
-		if err := rows.Scan(
-			&i.ID,
-			&i.GroupID,
-			&i.ModelID,
-			&i.DisplayName,
-			&i.UpstreamModel,
-			&i.ModelType,
-			&i.ContextWindow,
-			&i.MaxOutputTokens,
-			&i.Notes,
-			&i.Enabled,
-			&i.IsReference,
-			&i.CurrentQuoteID,
-			&i.Revision,
-			&i.CapabilityDigest,
-			&i.DeletedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const objectVersions = `-- name: ObjectVersions :many
 SELECT target_kind, target_id, revision, row_schema, payload, created_at FROM market_object_versions WHERE target_kind=$1 AND target_id=$2 ORDER BY revision DESC LIMIT $3
 `
@@ -1155,20 +1112,6 @@ func (q *Queries) QuoteVersion(ctx context.Context, groupModelID string) (int64,
 	var version int64
 	err := row.Scan(&version)
 	return version, err
-}
-
-const refreshModelCapability = `-- name: RefreshModelCapability :exec
-UPDATE market_group_models SET capability_digest=$2,revision=revision+1,updated_at=now() WHERE id=$1 AND capability_digest<>$2 AND deleted_at IS NULL
-`
-
-type RefreshModelCapabilityParams struct {
-	ID               string `json:"id"`
-	CapabilityDigest string `json:"capability_digest"`
-}
-
-func (q *Queries) RefreshModelCapability(ctx context.Context, arg RefreshModelCapabilityParams) error {
-	_, err := q.db.Exec(ctx, refreshModelCapability, arg.ID, arg.CapabilityDigest)
-	return err
 }
 
 const retireAddressLinks = `-- name: RetireAddressLinks :exec
@@ -1266,7 +1209,7 @@ func (q *Queries) UpdateAddress(ctx context.Context, arg UpdateAddressParams) (M
 }
 
 const updateGroup = `-- name: UpdateGroup :one
-UPDATE market_groups SET name=$1,description=$2,status_url=$3,user_agent=$4,header_rules=$5,concurrency_limit=$6,rpm_limit=$7,ttft_timeout_ms=$8,request_timeout_ms=$9,idle_timeout_ms=$10,cooldown_failures=$11,cooldown_seconds=$12,enabled=$13,revision=$14,connection_version=$15,capability_digest=$16,deleted_at=$17,updated_at=now() WHERE id=$18 AND revision=$19 AND supplier_id=$20 RETURNING id, supplier_id, name, description, status_url, user_agent, header_rules, concurrency_limit, rpm_limit, ttft_timeout_ms, request_timeout_ms, idle_timeout_ms, cooldown_failures, cooldown_seconds, enabled, revision, connection_version, capability_digest, deleted_at, updated_at
+UPDATE market_groups SET name=$1,description=$2,status_url=$3,user_agent=$4,header_rules=$5,concurrency_limit=$6,rpm_limit=$7,ttft_timeout_ms=$8,request_timeout_ms=$9,idle_timeout_ms=$10,cooldown_failures=$11,cooldown_seconds=$12,enabled=$13,revision=$14,connection_version=$15,deleted_at=$16,updated_at=now() WHERE id=$17 AND revision=$18 AND supplier_id=$19 RETURNING id, supplier_id, name, description, status_url, user_agent, header_rules, concurrency_limit, rpm_limit, ttft_timeout_ms, request_timeout_ms, idle_timeout_ms, cooldown_failures, cooldown_seconds, enabled, revision, connection_version, capability_digest, deleted_at, updated_at
 `
 
 type UpdateGroupParams struct {
@@ -1285,7 +1228,6 @@ type UpdateGroupParams struct {
 	Enabled           bool       `json:"enabled"`
 	Revision          int64      `json:"revision"`
 	ConnectionVersion int64      `json:"connection_version"`
-	CapabilityDigest  string     `json:"capability_digest"`
 	DeletedAt         *time.Time `json:"deleted_at"`
 	ID                string     `json:"id"`
 	BaseRevision      int64      `json:"base_revision"`
@@ -1309,7 +1251,6 @@ func (q *Queries) UpdateGroup(ctx context.Context, arg UpdateGroupParams) (Marke
 		arg.Enabled,
 		arg.Revision,
 		arg.ConnectionVersion,
-		arg.CapabilityDigest,
 		arg.DeletedAt,
 		arg.ID,
 		arg.BaseRevision,

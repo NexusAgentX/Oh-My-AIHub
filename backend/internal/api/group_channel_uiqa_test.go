@@ -53,7 +53,6 @@ func TestGroupChannelUIHarness(t *testing.T) {
 	ua := "AIHub-Channel-QA/1"
 	rpm, concurrency, ttft := int32(120), int32(8), int32(30000)
 	g := market.Group{ID: gid, SupplierID: sid, Name: "标准分组", Description: "合成分组配置", Enabled: true, Revision: 3, ConnectionVersion: 4, Defaults: market.Defaults{UserAgent: &ua, RPMLimit: &rpm, ConcurrencyLimit: &concurrency, TTFTTimeoutMS: &ttft, HeaderRules: &market.HeaderRules{Set: []market.HeaderSet{{Name: "X-Engine", Value: "shared"}}}}}
-	g.CapabilityDigest = market.GroupCapabilityDigest(g)
 	d := market.Directory{Suppliers: []market.Supplier{{ID: sid, Name: "合成供应商", Enabled: true}}, Groups: []market.Group{g}}
 	for i, label := range []string{"CF 入口", "直连入口", "CDN 入口"} {
 		aid := uuid()
@@ -67,7 +66,7 @@ func TestGroupChannelUIHarness(t *testing.T) {
 			typ = "image"
 		}
 		m := market.GroupModel{ID: mid, GroupID: gid, ModelID: fmt.Sprintf("fixture/model-%d:2026", i+1), UpstreamModel: fmt.Sprintf("fixture/model-%d:2026", i+1), DisplayName: name, ModelType: typ, Enabled: true, Revision: 1, QuoteID: &qid}
-		m.CapabilityDigest = market.ModelCapabilityDigest(g.CapabilityDigest, m)
+		m.CapabilityDigest = market.ModelCapabilityDigest(m)
 		d.Models = append(d.Models, m)
 		d.Quotes = append(d.Quotes, market.Quote{ID: qid, GroupModelID: mid, Version: 1, Currency: "CNY", BillingUnit: "per_million_tokens", Prices: market.TokenPrices{Input: money.Amount(money.Scale), Output: 3 * money.Amount(money.Scale)}})
 	}

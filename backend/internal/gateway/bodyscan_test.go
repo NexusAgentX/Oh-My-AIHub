@@ -258,7 +258,7 @@ func TestUpstreamBodyIsReplaceModelThenEnsureIncludeUsage(t *testing.T) {
 		}
 		for _, model := range []string{"upstream", "we\"ird<>&\n", "upstream/é", "", "m"} {
 			for _, ensure := range []bool{false, true} {
-				got, gotInjected := UpstreamBody(body, scan, model, ensure)
+				got, gotInjected := UpstreamBody(body, scan, model, ensure, false)
 				want, wantInjected := legacyUpstreamBody(body, scan, model, ensure)
 				if !bytes.Equal(got, want) || gotInjected != wantInjected {
 					t.Fatalf("%s, model %q, ensure %v:\ngot  %q (%v)\nwant %q (%v)", text, model, ensure, got, gotInjected, want, wantInjected)
@@ -271,11 +271,11 @@ func TestUpstreamBodyIsReplaceModelThenEnsureIncludeUsage(t *testing.T) {
 func TestUpstreamBodyIsTheBodyItselfWhenNothingChanges(t *testing.T) {
 	body := []byte(`{"model":"upstream","stream":true,"stream_options":{"include_usage":true}}`)
 	_, scan, _ := ScanRequest(body)
-	got, injected := UpstreamBody(body, scan, "upstream", true)
+	got, injected := UpstreamBody(body, scan, "upstream", true, false)
 	if injected || len(got) != len(body) || &got[0] != &body[0] {
 		t.Fatalf("a body that needs no change was copied: %q (injected %v)", got, injected)
 	}
-	changed, injected := UpstreamBody(body, scan, "other", true)
+	changed, injected := UpstreamBody(body, scan, "other", true, false)
 	if injected || string(changed) != `{"model":"other","stream":true,"stream_options":{"include_usage":true}}` {
 		t.Fatalf("got %q (injected %v)", changed, injected)
 	}
@@ -290,7 +290,7 @@ func FuzzUpstreamBody(f *testing.F) {
 		if err != nil {
 			return
 		}
-		got, gotInjected := UpstreamBody(body, scan, model, ensure)
+		got, gotInjected := UpstreamBody(body, scan, model, ensure, false)
 		want, wantInjected := legacyUpstreamBody(body, scan, model, ensure)
 		if !bytes.Equal(got, want) || gotInjected != wantInjected {
 			t.Fatalf("%q, model %q, ensure %v:\ngot  %q (%v)\nwant %q (%v)", body, model, ensure, got, gotInjected, want, wantInjected)

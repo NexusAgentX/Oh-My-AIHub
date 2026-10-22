@@ -38,7 +38,7 @@ func TestNativeContentsRoundTripWithoutResourceRegistration(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			body, _ := gateway.UpstreamBody(input, scan, "vendor/model:v1", false)
+			body, _ := gateway.UpstreamBody(input, scan, "vendor/model:v1", false, false)
 			res, err := http.Post(upstream.URL, "application/json", bytes.NewReader(body))
 			if err != nil {
 				t.Fatal(err)

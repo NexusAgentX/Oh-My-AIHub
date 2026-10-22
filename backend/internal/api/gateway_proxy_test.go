@@ -191,6 +191,15 @@ func TestGatewayF7EveryNativeEndpointUsesRealEntryAndScope(t *testing.T) {
 				}
 			}
 			if ep.ID == "responses.create" {
+				// A continuation needs the earlier turn, which the gateway does not
+				// keep: the request is refused instead of answered from nothing.
+				follow := httptest.NewRecorder()
+				request := httptest.NewRequest("POST", path, strings.NewReader(`{"previous_response_id":"resp-own","input":"synthetic-followup","store":false}`))
+				request.Header.Set("Authorization", "Bearer sk-aih-synthetic")
+				handler.ServeHTTP(follow, request)
+				if follow.Code != 400 || !strings.Contains(follow.Body.String(), "stateful_request_unsupported") {
+					t.Fatal("a previous-response request was served", follow.Code, follow.Body.String())
+				}
 				// Self-contained state must work through a different channel
 				// without any resource lookup or source binding.
 				store.candidate.ChannelID = "channel-second"
@@ -199,7 +208,7 @@ func TestGatewayF7EveryNativeEndpointUsesRealEntryAndScope(t *testing.T) {
 					t.Fatal(e)
 				}
 				portable := `{"model":"platform/model:2026","store":false,"input":[{"type":"reasoning","id":"unregistered-internal","encrypted_content":"byte-exact-cipher"},{"type":"compaction","id":"opaque-compact","encrypted_content":"byte-exact-compact"}],"unknown":{"signature":"byte-exact-signature"}}`
-				request := httptest.NewRequest("POST", path, strings.NewReader(portable))
+				request = httptest.NewRequest("POST", path, strings.NewReader(portable))
 				request.Header.Set("Authorization", "Bearer sk-aih-synthetic")
 				cross := httptest.NewRecorder()
 				handler.ServeHTTP(cross, request)
