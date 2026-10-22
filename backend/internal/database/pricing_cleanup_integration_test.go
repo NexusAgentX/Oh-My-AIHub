@@ -1,10 +1,12 @@
 package database
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
 	"io/fs"
+	"log"
 	"net/url"
 	"os"
 	"strings"
@@ -14,7 +16,7 @@ import (
 	"github.com/pressly/goose/v3"
 )
 
-func TestPricingCleanupUpgradePreservesHistoryAndRequiresSettledJobs(t *testing.T) {
+func TestPricingCleanupAcceptsUnsettledJobsThenRetiresThem(t *testing.T) {
 	databaseURL := os.Getenv("TEST_DATABASE_URL")
 	if databaseURL == "" {
 		if os.Getenv("AIHUB_REQUIRE_TEST_DATABASE") != "" {
@@ -89,22 +91,14 @@ func TestPricingCleanupUpgradePreservesHistoryAndRequiresSettledJobs(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = provider.UpTo(ctx, 15); err == nil || !strings.Contains(err.Error(), "finish pending background responses") {
-		t.Fatalf("pending jobs did not block upgrade: %v", err)
-	}
-	var version int
-	if err = db.QueryRowContext(ctx, `SELECT max(version_id) FROM goose_db_version WHERE is_applied`).Scan(&version); err != nil || version != 14 {
-		t.Fatalf("failed migration advanced version: %d %v", version, err)
-	}
-	var retiredColumns int
-	if err = db.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_schema=current_schema() AND ((table_name='models' AND column_name='geo_multipliers') OR (table_name='model_price_tiers' AND column_name IN ('thinking_mode','geo_multipliers')))`).Scan(&retiredColumns); err != nil || retiredColumns != 3 {
-		t.Fatalf("failed migration changed schema: %d %v", retiredColumns, err)
-	}
-	if _, err = db.ExecContext(ctx, `UPDATE gateway_background_jobs SET settled_at=now(); UPDATE calls SET outcome='succeeded_unbilled',completed_at=now() WHERE id='55555555-5555-4555-8555-555555555555'`); err != nil {
-		t.Fatal(err)
-	}
-	history := func() string {
+	// 0015 must accept an unsettled retired job, and 0023 must later abandon and
+	// drop it instead of blocking the upgrade.
+	snapshot := func(withJobs bool) string {
 		t.Helper()
+		jobs := ""
+		if withJobs {
+			jobs = "'jobs',(SELECT jsonb_agg(to_jsonb(a) ORDER BY call_id) FROM gateway_background_jobs a),"
+		}
 		var value string
 		err := db.QueryRowContext(ctx, `SELECT jsonb_build_object(
    'accounts',(SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM accounts a),
@@ -112,22 +106,27 @@ func TestPricingCleanupUpgradePreservesHistoryAndRequiresSettledJobs(t *testing.
    'ledger_accounts',(SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM ledger_accounts a),
    'ledger_transactions',(SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM ledger_transactions a),
    'ledger_entries',(SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM ledger_entries a),
-   'jobs',(SELECT jsonb_agg(to_jsonb(a) ORDER BY call_id) FROM gateway_background_jobs a),
+   `+jobs+`
    'settings',(SELECT to_jsonb(a) FROM settings a))::text`).Scan(&value)
 		if err != nil {
 			t.Fatal(err)
 		}
 		return value
 	}
-	before := history()
+	before := snapshot(true)
+	var version int
 	for range 2 {
 		if _, err = provider.UpTo(ctx, 15); err != nil {
-			t.Fatal(err)
+			t.Fatalf("pending background response blocked pricing cleanup: %v", err)
 		}
-		if after := history(); after != before {
-			t.Fatal("upgrade or repeat changed historical calls, snapshots or ledger")
+		if err = db.QueryRowContext(ctx, `SELECT max(version_id) FROM goose_db_version WHERE is_applied`).Scan(&version); err != nil || version != 15 {
+			t.Fatalf("migration did not stop at 15: %d %v", version, err)
+		}
+		if after := snapshot(true); after != before {
+			t.Fatal("upgrade or repeat changed historical calls, snapshots, jobs or ledger")
 		}
 	}
+	var retiredColumns int
 	if err = db.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_schema=current_schema() AND ((table_name='models' AND column_name='geo_multipliers') OR (table_name='model_price_tiers' AND column_name IN ('thinking_mode','geo_multipliers')))`).Scan(&retiredColumns); err != nil || retiredColumns != 0 {
 		t.Fatalf("retired columns remain: %d %v", retiredColumns, err)
 	}
@@ -143,5 +142,37 @@ func TestPricingCleanupUpgradePreservesHistoryAndRequiresSettledJobs(t *testing.
 	}
 	if _, err = db.ExecContext(ctx, `UPDATE model_price_tiers SET service_tier='openai:priority' WHERE model_id='migration-model'`); err == nil {
 		t.Fatal("database accepted removed priority condition")
+	}
+	// 0015 leaves the retired job untouched; only 0023 drops it.
+	var jobs int
+	var unsettled bool
+	if err = db.QueryRowContext(ctx, `SELECT count(*),coalesce(bool_and(settled_at IS NULL),false) FROM gateway_background_jobs`).Scan(&jobs, &unsettled); err != nil || jobs != 1 || !unsettled {
+		t.Fatalf("pricing cleanup touched the retired jobs: %d/%v %v", jobs, unsettled, err)
+	}
+	// End only the synthetic call so the drain preflight can pass; the abandoned
+	// job stays unsettled on purpose.
+	if _, err = db.ExecContext(ctx, `UPDATE calls SET outcome='succeeded_unbilled',completed_at=now() WHERE id='55555555-5555-4555-8555-555555555555'`); err != nil {
+		t.Fatal(err)
+	}
+	beforeDrop := snapshot(false)
+	var migrationLog bytes.Buffer
+	log.SetOutput(&migrationLog)
+	err = MigrateWithOptions(ctx, target.String(), MigrationOptions{AllowLegacyConfigCleanup: true})
+	log.SetOutput(os.Stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(migrationLog.String(), "abandoning 1 unsettled background response") {
+		t.Fatalf("upgrade log did not report the abandoned job: %s", migrationLog.String())
+	}
+	var dropped bool
+	if err = db.QueryRowContext(ctx, `SELECT to_regclass('gateway_background_jobs') IS NULL`).Scan(&dropped); err != nil || !dropped {
+		t.Fatalf("retired background responses survived: %v", err)
+	}
+	if err = db.QueryRowContext(ctx, `SELECT max(version_id) FROM goose_db_version WHERE is_applied`).Scan(&version); err != nil || version != 23 {
+		t.Fatalf("upgrade did not reach 23: %d %v", version, err)
+	}
+	if after := snapshot(false); after != beforeDrop {
+		t.Fatal("dropping retired jobs changed calls, snapshots or ledger")
 	}
 }

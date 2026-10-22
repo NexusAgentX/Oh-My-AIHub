@@ -4,7 +4,7 @@ SET LOCAL statement_timeout = '60s';
 
 -- Exclude new writes during the final check and cleanup. Operators must stop
 -- admission and drain the old server before invoking this migration.
-LOCK TABLE calls, gateway_background_jobs, channels, route_pref_channels,
+LOCK TABLE calls, channels, route_pref_channels,
  channel_models, model_price_tiers, models, supplier_endpoints, suppliers
  IN ACCESS EXCLUSIVE MODE;
 
@@ -12,9 +12,8 @@ LOCK TABLE calls, gateway_background_jobs, channels, route_pref_channels,
 DO $$
 BEGIN
  IF EXISTS(SELECT 1 FROM calls WHERE outcome='in_progress')
-  OR EXISTS(SELECT 1 FROM gateway_background_jobs WHERE settled_at IS NULL)
  THEN
-  RAISE EXCEPTION 'finish existing calls and background responses before cutover' USING ERRCODE='55000';
+  RAISE EXCEPTION 'finish existing calls before cutover' USING ERRCODE='55000';
  END IF;
  IF (EXISTS(SELECT 1 FROM channels WHERE market_group_id IS NULL)
   OR EXISTS(SELECT 1 FROM models) OR EXISTS(SELECT 1 FROM model_price_tiers)

@@ -2,14 +2,16 @@ package database
 
 import (
 	"context"
-	"database/sql"
 	"embed"
 	"fmt"
 	"io/fs"
+	"log"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 )
 
@@ -54,10 +56,16 @@ func Migrate(ctx context.Context, databaseURL string) error {
 }
 
 func MigrateWithOptions(ctx context.Context, databaseURL string, options MigrationOptions) error {
-	db, err := sql.Open("pgx", databaseURL)
+	config, err := pgx.ParseConfig(databaseURL)
 	if err != nil {
-		return fmt.Errorf("open migration database: %w", err)
+		return fmt.Errorf("parse migration database: %w", err)
 	}
+	// Retiring a table deliberately drops data, so migrations report what they
+	// abandoned as a notice; without this handler the operator never sees it.
+	config.OnNotice = func(_ *pgconn.PgConn, notice *pgconn.Notice) {
+		log.Printf("%s: %s", notice.Severity, notice.Message)
+	}
+	db := stdlib.OpenDB(*config)
 	defer db.Close()
 	// One session retains the explicit authorization setting for Goose. A
 	// replacement connection loses it and the SQL guard fails closed.

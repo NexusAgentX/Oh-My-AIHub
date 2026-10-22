@@ -83,7 +83,7 @@ func (q *Queries) GetKeyCredential(ctx context.Context, arg GetKeyCredentialPara
 }
 
 const getOwnerKey = `-- name: GetOwnerKey :one
-SELECT id, owner_id, name, prefix, key_hash, key_ciphertext, key_nonce, key_key_id, status, expires_at, allowed_models, budget_daily_nano, budget_monthly_nano, budget_total_nano, model_aliases, last_used_at, deleted_at, created_at, updated_at, codex_notes FROM api_keys WHERE owner_id = $1 AND id = $2 AND deleted_at IS NULL
+SELECT id, owner_id, name, prefix, key_hash, key_ciphertext, key_nonce, key_key_id, status, expires_at, allowed_models, budget_daily_nano, budget_monthly_nano, budget_total_nano, model_aliases, last_used_at, deleted_at, created_at, updated_at FROM api_keys WHERE owner_id = $1 AND id = $2 AND deleted_at IS NULL
 `
 
 type GetOwnerKeyParams struct {
@@ -114,13 +114,12 @@ func (q *Queries) GetOwnerKey(ctx context.Context, arg GetOwnerKeyParams) (ApiKe
 		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.CodexNotes,
 	)
 	return i, err
 }
 
 const getOwnerKeyForUpdate = `-- name: GetOwnerKeyForUpdate :one
-SELECT id, owner_id, name, prefix, key_hash, key_ciphertext, key_nonce, key_key_id, status, expires_at, allowed_models, budget_daily_nano, budget_monthly_nano, budget_total_nano, model_aliases, last_used_at, deleted_at, created_at, updated_at, codex_notes FROM api_keys WHERE owner_id = $1 AND id = $2 AND deleted_at IS NULL FOR UPDATE
+SELECT id, owner_id, name, prefix, key_hash, key_ciphertext, key_nonce, key_key_id, status, expires_at, allowed_models, budget_daily_nano, budget_monthly_nano, budget_total_nano, model_aliases, last_used_at, deleted_at, created_at, updated_at FROM api_keys WHERE owner_id = $1 AND id = $2 AND deleted_at IS NULL FOR UPDATE
 `
 
 type GetOwnerKeyForUpdateParams struct {
@@ -151,7 +150,6 @@ func (q *Queries) GetOwnerKeyForUpdate(ctx context.Context, arg GetOwnerKeyForUp
 		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.CodexNotes,
 	)
 	return i, err
 }
@@ -406,7 +404,7 @@ func (q *Queries) ListKeyCredentials(ctx context.Context, arg ListKeyCredentials
 }
 
 const listOwnerKeys = `-- name: ListOwnerKeys :many
-SELECT id, owner_id, name, prefix, key_hash, key_ciphertext, key_nonce, key_key_id, status, expires_at, allowed_models, budget_daily_nano, budget_monthly_nano, budget_total_nano, model_aliases, last_used_at, deleted_at, created_at, updated_at, codex_notes FROM api_keys WHERE owner_id = $1 AND deleted_at IS NULL ORDER BY created_at, id
+SELECT id, owner_id, name, prefix, key_hash, key_ciphertext, key_nonce, key_key_id, status, expires_at, allowed_models, budget_daily_nano, budget_monthly_nano, budget_total_nano, model_aliases, last_used_at, deleted_at, created_at, updated_at FROM api_keys WHERE owner_id = $1 AND deleted_at IS NULL ORDER BY created_at, id
 `
 
 func (q *Queries) ListOwnerKeys(ctx context.Context, ownerID string) ([]ApiKey, error) {
@@ -438,7 +436,6 @@ func (q *Queries) ListOwnerKeys(ctx context.Context, ownerID string) ([]ApiKey, 
 			&i.DeletedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.CodexNotes,
 		); err != nil {
 			return nil, err
 		}

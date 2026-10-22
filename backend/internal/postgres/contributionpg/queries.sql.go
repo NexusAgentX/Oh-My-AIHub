@@ -11,7 +11,7 @@ import (
 )
 
 const getContribution = `-- name: GetContribution :one
-SELECT id, owner_id, kind, target_id, title, state, revision, document, base_document, report_ids, task_ids, price_blanks, pending_prices, review_reason, reviewed_by, submitted_at, published_at, created_at, updated_at FROM market_contributions WHERE id=$1
+SELECT id, owner_id, kind, target_id, title, state, revision, document, base_document, price_blanks, pending_prices, review_reason, reviewed_by, submitted_at, published_at, created_at, updated_at FROM market_contributions WHERE id=$1
 `
 
 func (q *Queries) GetContribution(ctx context.Context, id string) (MarketContribution, error) {
@@ -27,8 +27,6 @@ func (q *Queries) GetContribution(ctx context.Context, id string) (MarketContrib
 		&i.Revision,
 		&i.Document,
 		&i.BaseDocument,
-		&i.ReportIds,
-		&i.TaskIds,
 		&i.PriceBlanks,
 		&i.PendingPrices,
 		&i.ReviewReason,
@@ -164,7 +162,7 @@ func (q *Queries) ListContributions(ctx context.Context, arg ListContributionsPa
 }
 
 const lockContribution = `-- name: LockContribution :one
-SELECT id, owner_id, kind, target_id, title, state, revision, document, base_document, report_ids, task_ids, price_blanks, pending_prices, review_reason, reviewed_by, submitted_at, published_at, created_at, updated_at FROM market_contributions WHERE id=$1 FOR UPDATE
+SELECT id, owner_id, kind, target_id, title, state, revision, document, base_document, price_blanks, pending_prices, review_reason, reviewed_by, submitted_at, published_at, created_at, updated_at FROM market_contributions WHERE id=$1 FOR UPDATE
 `
 
 func (q *Queries) LockContribution(ctx context.Context, id string) (MarketContribution, error) {
@@ -180,8 +178,6 @@ func (q *Queries) LockContribution(ctx context.Context, id string) (MarketContri
 		&i.Revision,
 		&i.Document,
 		&i.BaseDocument,
-		&i.ReportIds,
-		&i.TaskIds,
 		&i.PriceBlanks,
 		&i.PendingPrices,
 		&i.ReviewReason,

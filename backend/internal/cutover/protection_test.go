@@ -116,6 +116,27 @@ func TestPerAccountDigestDetectsZeroSumBalanceMovesAndContentChanges(t *testing.
 		t.Fatal("raw row content in manifest")
 	}
 }
+func TestRetiredBackgroundJobsDigestCannotFailVerification(t *testing.T) {
+	before := manifest(t, 14, digest(t, `{"id":"a","balance":0}`))
+	retiredDigest, err := NewRowHasher().Finish(Rule{Table: "gateway_background_jobs", Scope: "all", Columns: []string{"call_id"}, PrimaryKey: []string{"call_id"}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before.Tables = append(before.Tables, retiredDigest)
+	if err = before.Validate(); err != nil {
+		t.Fatal("evidence taken before the upgrade must stay verifiable", err)
+	}
+	after := manifest(t, 23, digest(t, `{"id":"a","balance":0}`))
+	if changes, err := Compare(before, after); err != nil || len(changes) != 0 {
+		t.Fatal("retired background responses failed verification", changes, err)
+	}
+	// Any other protected table may not disappear silently.
+	moved := manifest(t, 23, digest(t, `{"id":"a","balance":0}`))
+	moved.Tables = slices.DeleteFunc(moved.Tables, func(d Digest) bool { return d.Rule.Table == "market_quotes" })
+	if changes, err := Compare(before, moved); err != nil || len(changes) != 1 || changes[0].Table != "market_quotes" || changes[0].Reason != "missing" {
+		t.Fatal("missing protected table was tolerated", changes, err)
+	}
+}
 func TestIncompleteStreamsAndPendingWorkCannotProduceCompleteEvidence(t *testing.T) {
 	for _, p := range []Pending{{Calls: 1}, {Calls: -1}} {
 		if p.Check() == nil {

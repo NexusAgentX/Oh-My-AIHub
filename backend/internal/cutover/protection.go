@@ -15,7 +15,7 @@ import (
 
 var ErrInvalid = errors.New("invalid preservation evidence")
 var ErrIncomplete = errors.New("preservation evidence incomplete")
-var ErrNotDrained = errors.New("finish existing calls and background responses before cutover")
+var ErrNotDrained = errors.New("finish existing calls before cutover")
 var ErrIntegrity = errors.New("ledger integrity checks failed")
 
 const Format = "market-preservation.v1"
@@ -148,6 +148,15 @@ func validateIntegrity(m Manifest) error {
 func LegacyConfiguration(table string) bool {
 	return slices.Contains([]string{"models", "model_price_tiers", "channel_models", "suppliers", "supplier_endpoints"}, table)
 }
+
+// retiredTables are dropped by design after this release slot. Evidence taken
+// before the upgrade still covers them, so their disappearance is expected
+// instead of a preservation failure. Nothing else may silently drop a table.
+var retiredTables = []string{"gateway_background_jobs"}
+
+// Retired reports whether a table is dropped by an upgrade in this release.
+func Retired(table string) bool { return slices.Contains(retiredTables, table) }
+
 func validIdentifier(s string) bool {
 	if len(s) == 0 || len(s) > 63 {
 		return false
@@ -360,6 +369,11 @@ func Compare(before, after Manifest) ([]Difference, error) {
 		constraints[c.Table+"/"+c.Name] = c
 	}
 	for _, c := range before.Constraints {
+		// Constraints of a retired table vanish with it; they are not evidence
+		// that protected history changed.
+		if Retired(c.Table) {
+			continue
+		}
 		if constraints[c.Table+"/"+c.Name] != c {
 			changes = append(changes, Difference{c.Table, c.Name, "constraint_changed"})
 		}
@@ -377,6 +391,9 @@ func Compare(before, after Manifest) ([]Difference, error) {
 		key := a.Rule.Table + "/" + a.Rule.Scope
 		b, ok := current[key]
 		if !ok {
+			if Retired(a.Rule.Table) {
+				continue
+			}
 			changes = append(changes, Difference{a.Rule.Table, a.Rule.Scope, "missing"})
 			continue
 		}
