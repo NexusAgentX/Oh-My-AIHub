@@ -8,7 +8,7 @@
 
 包含本轮改动的版本在发版前，对最终集成候选统一执行本手册的多轮相对比较。各 Feature 交接受影响路径、可重复场景、基线引用和预算，由发版 PR 固定基线/候选提交、合成数据、环境、命令、结果及未覆盖范围；不逐 Feature 重跑，也不单独创建性能发布 Issue。仅在同一可比较场景和环境下比较延迟、CPU、吞吐与适用的 SQL/分配/锁成本，退化分析和修复完成后再推进发版。
 
-本轮集中覆盖鉴权/Key 与会话命名空间、能力约束/五模式与报价快照、同组多入口回退、连接复用、请求及 SSE 解析/首有效输出观测、可靠图片/工具计量和原子结算，以及报告发布、统计/典型费用等后台负载。普通四协议流式/非流式与重试场景使用可比较的合成报价、用量及固定上游；新增端点若旧版本没有对应能力，应单列其组件成本和未覆盖范围，不能把旧版拒绝请求算作有效性能基线。切换后的夹具必须使用分组与候选报价，不能恢复已移除的全局模型管理入口。
+本轮集中覆盖鉴权/Key 与请求扫描、`store` 剥离、报价快照、同组多入口回退、连接复用、请求及 SSE 解析/首有效输出观测、可靠图片/工具计量和原子结算，以及贡献审核发布、统计/典型费用等后台负载。普通四协议流式/非流式与重试场景使用可比较的合成报价、用量及固定上游；新增端点若旧版本没有对应能力，应单列其组件成本和未覆盖范围，不能把旧版拒绝请求算作有效性能基线。切换后的夹具必须使用分组与候选报价，不能恢复已移除的全局模型管理入口。
 
 当前交接状态：开发阶段未执行端到端 A/B，集中验证仍待发版前完成；本段不代表性能通过或生产发布授权。
 
@@ -72,12 +72,12 @@ go -C backend test -tags perfbaseline -run TestGatewayPerfBaseline -count=1 -tim
 
 | 参数 | 默认 | 说明 |
 | --- | --- | --- |
-| `-perf.scenarios` | 全部 | `nonstream`、`stream`、`concurrent`、`saturate`、`budget`、`sticky`、`formats`、`responses`、`sweep-nonstream`、`sweep-stream`，逗号分隔；`responses` 是 `formats` 中 Responses 流式/非流式的子集，默认全矩阵已通过 `formats` 覆盖 |
+| `-perf.scenarios` | 全部 | `nonstream`、`stream`、`concurrent`、`saturate`、`budget`、`formats`、`responses`、`sweep-nonstream`、`sweep-stream`，逗号分隔；`responses` 是 `formats` 中 Responses 流式/非流式的子集，默认全矩阵已通过 `formats` 覆盖。工具仍定义 `sticky`，但它靠 `previous_response_id` 续接，在当前无状态边界下必然失败，本轮一律显式传入需要运行的场景列表以排除它 |
 | `-perf.duration` / `-perf.warmup` | 30s / 3s | 每次运行的测量窗口与预热（流式场景的预热至少是一条流时长的 1.5 倍） |
 | `-perf.repeat` | 1 | 每个场景重复次数，报告给出中位数与范围。机器上有别的负载时建议 3 |
 | `-perf.out` | 空 | 目录，写入 `report.md`、`results.json` 和 pprof 文件；设置后还会对 `nonstream` 与 `stream` 场景各做一次带 pprof 的运行（`-perf.profile`，默认 20s） |
 | `-perf.consumers` / `-perf.channels` | 100 / 3 | 消费者账号数（各有两把 Key，其中一把带预算）与同价渠道数 |
-| `-perf.qps` / `-perf.workers` | 场景自带 | 替换命名的速率驱动场景（`nonstream`、`stream`、`budget`、`sticky`）的参考速率，或闭环场景（`concurrent`、`saturate`）的 worker 数。参考速率不是越高越好：机器空闲时请求稀疏，每个请求都要唤醒沉睡的线程，网关自增延迟和单请求 CPU 都明显偏高，需要看较高负载下的数字时用 `-perf.qps=200` |
+| `-perf.qps` / `-perf.workers` | 场景自带 | 替换命名的速率驱动场景（`nonstream`、`stream`、`budget`）的参考速率，或闭环场景（`concurrent`、`saturate`）的 worker 数。参考速率不是越高越好：机器空闲时请求稀疏，每个请求都要唤醒沉睡的线程，网关自增延迟和单请求 CPU 都明显偏高，需要看较高负载下的数字时用 `-perf.qps=200` |
 | `-perf.dns` | 0 | 假 DNS 解析器的延迟。G7 之前用来看每次尝试重新解析的代价；DNS 缓存之后每个主机每 60 秒才解析一次，它只影响刷新的那一次 |
 | `-perf.synccommit` | on | 设为 `off` 时网关的数据库连接不等提交落盘，用来区分“存储慢”和“网关慢” |
 | `-perf.sweepstep` | 10s | 扫描中每一级的测量窗口 |
@@ -94,7 +94,6 @@ go -C backend test -tags perfbaseline -run TestGatewayPerfBaseline -count=1 -tim
 | `concurrent-500` | OpenAI Chat 流式，首字 100 ms，每 20 ms 一块，共 100 个 token | 500 个 worker 背靠背（闭环） |
 | `nonstream-saturated` | 同 `nonstream-small`，但 worker 数多于数据库连接 | 64 个 worker 背靠背（闭环）：看吞吐上限本身，即结算在饱和时每秒能处理多少个调用；扫描找的是满足延迟判据的最高速率，对存储的偶发停顿很敏感（同一代码两轮可以差一倍），这个数字稳定得多 |
 | `key-budget` | 同 `nonstream-small`，Key 带日、月、总预算 | 50 次/秒 |
-| `responses-sticky` | OpenAI Responses 非流式，请求带上一轮的 `previous_response_id` | 50 次/秒 |
 | `formats` | 四种格式的流式与非流式各一个场景 | 非流式 40 次/秒，流式 10 次/秒 |
 | `responses` | 仅复测 `formats` 中的 Responses 流式与非流式，场景参数相同 | 非流式 40 次/秒，流式 10 次/秒 |
 | `sweep-*` | 对 `nonstream-small`、`stream-1k` 逐级提高速率，再在最后一个成功级与第一个失败级之间二分两次 | 见报告 |
@@ -117,12 +116,12 @@ go -C backend test -tags perfbaseline -run TestGatewayPerfBaseline -count=1 -tim
 
 完整矩阵用于较低频的全路径检查与大范围网关改动，不作为每次迭代的默认动作。普通 PR 先用相关回归测试或微基准守住 SQL、分配和持锁尾部成本，再为受影响的端到端路径选择最小场景集，仍保留 3 轮相对比较。已有完整矩阵发现特定退化时，优化后的复测先只选该场景；结果显示其他问题或改动扩大时才扩展场景。对外部网络、后台任务与高负载未覆盖的部分，在 PR 明确说明。
 
-例如只复测 Responses 粘性路由，可使用：
+例如只复测 Responses 与流式路径，可使用：
 
 ```sh
 gh workflow run perf-baseline.yml \
   -f base_ref=<基线提交> -f head_ref=<任务分支> \
-  -f scenarios=sticky -f repeat=3 -f jobs=1 \
+  -f scenarios=stream,formats -f repeat=3 -f jobs=1 \
   -f 'tool_args=-perf.duration=10s -perf.warmup=1s -perf.profile=1s -perf.audit=50'
 ```
 
@@ -140,7 +139,7 @@ gh run watch    # 选择刚触发的运行；默认参数一个作业要数小�
 | 输入 | 默认 | 说明 |
 | --- | --- | --- |
 | `base_ref` / `head_ref` | `main` / `main` | A 侧与 B 侧：分支、tag 或提交（短 SHA 可用）。工作流先把它们解析成提交，所有并行作业测同一对提交 |
-| `scenarios` | `nonstream,nonstream@200,stream,concurrent,budget,sticky,sweep-nonstream,sweep-stream` | 语法同 `-perf.scenarios`；`<场景>@<速率>` 表示以 `-perf.qps=<速率>` 单独运行（`nonstream@200` 是 200 次/秒的非流式），场景限 `nonstream`、`stream`、`budget`、`sticky` |
+| `scenarios` | `nonstream,nonstream@200,stream,concurrent,budget,sticky,sweep-nonstream,sweep-stream` | 语法同 `-perf.scenarios`；`<场景>@<速率>` 表示以 `-perf.qps=<速率>` 单独运行（`nonstream@200` 是 200 次/秒的非流式），场景限 `nonstream`、`stream`、`budget`。默认值仍带 `sticky`，运行前必须显式替换为不含它的列表 |
 | `repeat` | 3 | 轮数：每轮把每个场景在两侧各测一次 |
 | `jobs` | 1 | 并行作业数，每个作业在自己的机器上完整跑一遍；用来量同一对提交在不同机器上的波动，不用来加速 |
 | `tool_args` | 空 | 传给基线工具的额外参数，只接受 `-perf.<名称>=<值>`，如 `-perf.duration=10s -perf.sweepstep=5s` |

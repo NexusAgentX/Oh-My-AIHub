@@ -17,7 +17,7 @@
 | --- | --- | --- |
 | 前端 | `frontend/` | React 单页应用；`nginx.conf` 提供静态资源并反向代理 |
 | 后端 | `backend/cmd/server` | 组装依赖、启动校验密钥环与出站配置、加载网关快照、运行后台任务 |
-| 迁移 | `backend/cmd/migrate`、`backend/internal/database/migrations/` | Goose 嵌入式编号迁移，已发布迁移只追加 |
+| 迁移 | `backend/cmd/migrate`、`backend/internal/database/migrations/` | Goose 嵌入式编号迁移，编号至 `0023`，本轮未发布集合为 `0015`–`0023`；已发布迁移只追加。后端镜像以 `io.oh-my-aihub.schema-epoch=23` 声明结构契约（`backend/Dockerfile`） |
 | API 契约 | `backend/api/openapi.yaml` | OpenAPI 3.1，前后端唯一契约（ADR-0021） |
 | 编排与工具 | `compose.yaml`、`mise.toml` | 数据库、一次性迁移、后端、前端；工具版本与常用任务 |
 | 运维 | `scripts/`、`docs/runbooks/` | 加密备份与恢复演练；部署、发布、事故处理 |
@@ -47,7 +47,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 | `market` / `postgres/marketpg` | 供应商分组、稳定地址关系、模型报价与治理的类型化持久契约 |
 | `supplier` | 贡献页官网图标的有界抓取、栅格验证与重新编码；无独立目录存储或地址识别服务 |
 | `gateway` | 透明网关（ADR-0035）：请求体扫描与 `model` 替换、旁路用量解析、候选排序、进程内渠道状态、事件总线 |
-| `gatewaycontract` | 版本化端点/套件、归属与保护游标契约；F7 注册非 Codex 入口，原型和正式适配器分别验证 |
+| `gatewaycontract` | 版本化端点与套件来源清单：F7 只注册无状态推理/图片入口，套件记录上游协议来源与断言，不表示本网关已开放该能力 |
 | `snapshot` | 网关热路径数据的进程内缓存与写路径包装：Key、目录模型、渠道候选、路由偏好的快照，写提交后同步重建，另周期性全量重建；账号余额与信用额度缓存（ADR-0040） |
 | `observe`、`metrics` | 现算观测、对账核对与补记、SSE 推送；Prometheus 指标（ADR-0029） |
 | `c2c` | 卖单市场纯状态机与服务、C2C 私密数据密钥环 |
@@ -63,8 +63,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 | `cutover` | 分组市场切换逻辑（`cmd/cutover-check` 使用） |
 | `fingerprint` | 模型指纹。保留备用，当前无调用方，不进入二进制 |
 | `channelprobe` | 渠道基础探针的纯协议校验：原生回复结构、SSE 终止与图片产物 |
-| `nativeencoding` | zstd 解码、字节替换与重新编码（Codex 请求） |
-| `codexprobe` | Codex 模型探测 |
+| `nativeencoding` | 请求传输的 zstd 解码、字节替换与重新编码，压缩前后都有容量上界 |
 | `audit`、`money`、`localtime`、`ids`、`secretguard` | 审计读取；九位定点金额；Asia/Shanghai 记账日历；UUID；凭据精确匹配与抹除（ADR-0041） |
 
 ## API 约定
@@ -89,23 +88,20 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 
 市场不再保存用途专用根密钥，也不再把上游凭据归纳成跨渠道可比较的凭据范围；两者随显式缓存与资源索引一起退役。启动时仍由 `keyringcheck` 统一校验可读的历史密文（渠道凭据、平台 Key、C2C 支付方式），只验证不重加密。选择原因见 [ADR-0044](docs/adr/0044-group-market-contract.md)。
 
-### F0 发现阶段边界
+### 无状态请求边界
 
-`backend/api/openapi.yaml` 的 `x-aihub-gateway-contract` 保存版本化的目标端点、认证/模型上下文/状态/重放与计费归属。它位于 `paths` 之外，不登记正式路由；现有路由与 OpenAPI 一致性门禁保持。
+网关只代理 8 条无状态推理/图片入口（OpenAI Chat、Responses、Anthropic Messages、Gemini `generateContent`/`streamGenerateContent`、图片生成/编辑/变体）与四类模型列表/单模型元数据；`/v1`、`/v1beta`、`/backend-api` 上的其他路径回答 404 `unsupported_endpoint`，不做协议转换，也不按上游返回的 URL 开放下载反代。
 
-网关不保存任何上游资源状态：会话、响应、条目、缓存与后台任务都不登记归属，相关入口已退役并回答 `unsupported_endpoint`。请求体里引用上游会话或缓存的顶层成员（`previous_response_id`、`conversation`、Gemini `cachedContent`）在转发前返回 400 `stateful_request_unsupported`，空值或不携带时原样转发。Codex history/notes 的账号/Key 访问隔离与路由绑定分开；用户显式开启平台 Key 的 codex_notes 时才建立独立会话路由绑定，自包含 encrypted reasoning、签名和完整压缩窗口不进入远端资源归属索引。模型别名只解析一次，再检查权限；模型 ID 精确匹配，原生命名空间在路径中按段编码。原型不放宽当前线上目录的校验。
+`backend/api/openapi.yaml` 的 `x-aihub-gateway-contract` 保存版本化的端点来源、认证/模型上下文/状态/重放与计费归属，只声明上述入口。它位于 `paths` 之外，不登记正式路由；路由与 OpenAPI 一致性门禁保持。模型别名只解析一次，再检查权限；模型 ID 精确匹配，原生命名空间在路径中按段编码。
 
-OpenAI 的 `store: true`、`previous_response_id` 与 `conversation` 不再建立远端归属：网关不读取也不登记上游资源。Codex 会话编号按维护者确认做账号/平台 Key 命名空间隔离，作为有限转发例外；不存正文来补隔离；来源粘性只由用户的 codex_notes 声明启用。原型中的 lookup fixture 不能直接作为生产存储；客户端启用 notes 的证据也不代替隔离验收。受保护会话编号的精确字段与根密钥生命周期以 OpenAPI 契约扩展为准；新会话在命名空间隔离后初始化，不从共享上游先读再认领。
+不变量：网关不保存任何上游资源状态。会话、响应、条目、显式缓存与后台任务都不登记归属，也没有读取、列表、取消或删除入口；请求与响应正文不落库，因此续接只能由客户端自带完整上下文。
 
-Codex 请求识别不依赖可省略的 `originator`。会话命名空间在认证后、模型/引用解析前应用；渠道 Header 配置不能再覆盖已隔离的上下文。客户端的平台身份头不作为供应商身份转发，供应商自身的 Header 只能来自渠道配置。普通未压缩请求复用已有扫描，不建立会话映射表或增加 SQL。zstd 解码、字节替换和重新编码在有限容量内完成；本地编码容量/取消失败直接返回，不重试供应商或污染其健康统计。
+- `store`：Chat 与 Responses 的顶层 `store` 为真时整组删除，含大小写变体、重复键与字符串/数字写法（任一重复键为真即全部删除）；全为假值或不携带时不做任何字节修改，其余字节原样转发。
+- 续接引用：`previous_response_id` 与 `conversation` 在转发前返回 400 `stateful_request_unsupported`，文案点名被拒字段；显式 `null`/空串或不携带视为未请求状态，原样转发。
+- Gemini 缓存：顶层 `cachedContent` 按同一规则返回 400 `stateful_request_unsupported`。
+- 后台响应：`background` 为真时在开调用记录之前返回 400 `background_unsupported`，不降级为同步调用，也不占用账号/渠道在途名额。`gateway_background_jobs` 随 `0023_retire_remnants.sql` 删除：未结算任务放弃并在迁移日志报告条数，已结算的后台调用仍在 `calls` 与账本中按原快照展示，不重算费用。
 
-固定 CLI 的 `prompt_cache_key` 同时是其 Responses 会话头的来源；在已识别的 Codex 上下文请求中按同一账号/平台 Key 命名空间映射，避免会话的两份编号失配。仅携带缓存提示的普通 Responses 请求不因此启用会话隔离，本身也不产生来源粘性。固定 CLI 的传输窗口元数据使用 `thread-UUID:counter`，其 UUID 前缀与会话使用同一命名空间，计数保留；对应 Header 和 JSON 字段一致且受 Header 覆盖保护。`context_window_id`、history 请求的窗口/条目引用、消息内 opaque ID 不属于这个派生传输标识，保持原样。单请求的标识映射缓存最多 16 项，编号映射本身不建立来源绑定；显式声明笔记工具的会话另使用下述路由索引，精确字段仍以 OpenAPI 契约扩展为准。
-
-用户显式开启平台 Key 的 `codex_notes` 后，首个带真实会话标识的 Responses 推理或 notes/history 辅助请求，在出站前通过 `codex_session_routes` 主键 UPSERT 原子认领落点；冲突返回已存在的绑定，绝不更新来源。索引只含账号/平台 Key、隔离后的会话编号、分组/渠道和凭据版本/受保护等值标签，不含模型正文、路径或密文，也不从 `prompt_cache_key` 合并不同真实会话。绑定后仍检查当前模型权限、能力、治理、排除与手动选择；不相容或原渠道/凭据不可用时明确失败，不切供应商寻找状态。同组地址按既定顺序回退，绑定不随报价、排序或入口变更而变化。关闭声明绕过该索引，重新开启同一编号仍保留旧绑定；上游历史不迁移，用户更改声明后应使用新会话。
-
-会话路由 SQL 使用现有独立两连接元数据池，单操作最长 5 秒；进程内最多 32 个未命中查询/认领操作，超过立即拒绝，不创建额外等待队列或后台任务；只在明确启用且有会话的请求上查询。进程缓存最多 4096 个不可变正向绑定，FIFO 淘汰只移除缓存，持久绑定保留，活跃命中不访问数据库；未找到的结果不缓存，避免并发首次绑定后的陈旧否定。请求声明关闭、普通缓存提示和流式帧均不增加该 SQL；缓存互斥锁不跨数据库或网络。
-
-辅助写操作区分未发送、明确未执行和执行结果未知，不能仅因没有客户端输出重放不确定写入。原生幂等能力须独立证明；普通推理继续沿用原来的重试和首字节边界。原型命令、证据类型和环境隔离见[契约原型手册](docs/runbooks/gateway-contracts.md)。
+辅助写操作区分未发送、明确未执行和执行结果未知，不能仅因没有客户端输出重放不确定写入。原生幂等能力须独立证明；普通推理继续沿用原来的重试和首字节边界。契约字段与来源清单见[网关契约手册](docs/runbooks/gateway-contracts.md)。
 
 ### 当前已实现的转发流程
 
@@ -139,7 +135,7 @@ Key、目录模型、渠道候选索引、路由偏好来自进程内快照（`i
 
 路由统计按渠道×模型×协议×有限请求档位×流式区分，使用五分钟稀疏桶的 24h 窗口。最多 4096 个序列、8192 个桶，饱和丢弃新增观测并保留计数；后台刷新回收过期空间。同渠道地址回退只计一次选取。固定直方图统计首有效输出和可靠 TPS，常规桶中点误差分别约 4.6% 和 9.5%，零延迟与未知分开。请求只读不可变快照，结束时有界累加；不查统计 SQL，不在每帧建立 map 或队列。显式档位必须获得实际档位确认才提供该档位的计时证据。
 
-启动新增一次十秒上限的聚合读，只接受 `metrics_version=2` 且实际入口协议明确的记录，最多 20001 个近期完成调用和 8193 行用于判断饱和；超过 20000 调用或 8192 行时冷启动并告警，不使用可能漏掉失败的截断可用率。Codex 原生与公共 Responses/Images 分层，不能因为调用格式相同互借速度或延迟；缺入口标记不补造来源。旧首字节、整个渠道统计仍供既有渠道观测，不能传播到新模型序列，历史调用保持原记录。报价估算在后台按当前有效报价集合生成版本，一次路由共用同一估算索引；版本、折扣或汇率不符即未知，不在请求上哈希报价、联表或排队。4xx 降级与编辑重置在匹配的路由统计层内判定。
+启动新增一次十秒上限的聚合读，只接受 `metrics_version=2` 且实际入口协议明确的记录，最多 20001 个近期完成调用和 8193 行用于判断饱和；超过 20000 调用或 8192 行时冷启动并告警，不使用可能漏掉失败的截断可用率。不同入口协议（Chat、Responses、Messages、Gemini）与图片分层，不能因为调用格式相同互借速度或延迟；缺入口标记不补造来源。旧首字节、整个渠道统计仍供既有渠道观测，不能传播到新模型序列，历史调用保持原记录。报价估算在后台按当前有效报价集合生成版本，一次路由共用同一估算索引；版本、折扣或汇率不符即未知，不在请求上哈希报价、联表或排队。4xx 降级与编辑重置在匹配的路由统计层内判定。
 
 ### 渠道上游 Key 明文缓存
 
@@ -148,10 +144,6 @@ Key、目录模型、渠道候选索引、路由偏好来自进程内快照（`i
 ### 冷却
 
 连续失败达到阈值后冷却，时长取渠道设置或平台默认；上游 429 带 `Retry-After` 或 `retry-after-ms` 时不等阈值直接冷却（`gateway.RateLimitCooldown`），冷却作用于整个渠道。产品规则见 PRODUCT.md。
-
-### 后台响应已退役
-
-`background: true` 不再登记任务：请求在开门记录前以 400 `background_unsupported` 拒绝，不降级为同步调用，也不占用账号/渠道在途名额。`gateway_background_jobs` 随 `0023_retire_remnants.sql` 删除：未结算任务放弃并在迁移日志报告条数（F6），已结算的后台调用仍在 `calls` 与账本中按原快照展示，不重算费用。网关进程内不再有后台轮询、租约、重启恢复或凭据复核路径。
 
 ### 身份与账户
 

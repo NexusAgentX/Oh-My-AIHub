@@ -1,6 +1,6 @@
 # ADR-0043：持久跟踪后台 Responses，按可靠推理分量结算
 
-- 状态：已通过
+- 状态：已通过（后台任务部分已作废，见「替代关系」）
 - 日期：2026-10-16
 
 ## 背景
@@ -21,4 +21,6 @@
 
 细化 ADR-0035 的事后结算：普通调用仍以转发结束为结算点，已登记后台调用延后到任务终态。ADR-0012 的首命中选档仍有效，选择单位为每次可靠推理。ADR-0039 的单实例约束、ADR-0040 的普通请求快照读取与 ADR-0036 的固定出站边界保持有效。
 
-2026-10-17：产品计价条件的适用范围已调整（[#485](https://github.com/NexusAgentX/Oh-My-AIHub/issues/485)），现行范围见 [PRODUCT.md](../../PRODUCT.md#模型细分定价边界)。本文保留当时的理由；后台归属、冻结价格及分量原子结算仍有效。
+2026-10-17：产品计价条件的适用范围已调整（[#485](https://github.com/NexusAgentX/Oh-My-AIHub/issues/485)），现行范围见 [PRODUCT.md](../../PRODUCT.md#模型细分定价边界)。
+
+2026-10-22：后台 Responses 整体退役（#552、#556）。持久任务、重启恢复、读取/取消与 `gateway_background_jobs` 不再存在，`background` 为真直接返回 400 `background_unsupported`；本文的后台跟踪与后台结算点随之作废。可靠推理分量的选档与合并取整规则仍有效，现行边界见 [ARCHITECTURE.md](../../ARCHITECTURE.md#无状态请求边界)。

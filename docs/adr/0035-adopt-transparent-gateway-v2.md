@@ -141,3 +141,5 @@ ADR-0027 确立了网关的形态：透明转发、不预扣、请求结束后�
 规则 4、6 的“上游错误原样返回”已由 [ADR-0041](0041-redact-channel-key-in-upstream-errors.md) 部分取代：上游错误响应的响应体与响应头值里出现的渠道上游 Key 会被替换为 `[redacted]`，其余仍原样返回；成功响应不受影响。
 
 [ADR-0043](0043-track-background-responses-and-component-billing.md) 细化后台 Responses 的结算点与规则 9 的崩溃兜底：已经登记的后台任务恢复跟踪后在终态关闭，普通调用的规则不变。
+
+2026-10-22：服务端状态整体退出网关（#552）。会话、响应资源、条目、显式缓存、后台响应与 token 计数入口已退役；Chat/Responses 的 `store` 自动剥离，`previous_response_id`、`conversation` 与 Gemini `cachedContent` 返回 400 `stateful_request_unsupported`，`background` 返回 400 `background_unsupported`。除上述边界外，本文的透明转发、事后记账与路由规则仍有效；现行边界见 [ARCHITECTURE.md](../../ARCHITECTURE.md#无状态请求边界)。
