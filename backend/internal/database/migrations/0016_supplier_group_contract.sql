@@ -38,7 +38,6 @@ CREATE TABLE market_groups (
  enabled boolean NOT NULL DEFAULT true,
  revision bigint NOT NULL CHECK (revision>0),
  connection_version bigint NOT NULL CHECK (connection_version>0),
- capability_digest text NOT NULL CHECK (capability_digest ~ '^[a-f0-9]{64}$'),
  deleted_at timestamptz,
  updated_at timestamptz NOT NULL DEFAULT now(),
  UNIQUE (id,supplier_id)
