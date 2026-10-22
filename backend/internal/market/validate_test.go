@@ -34,33 +34,31 @@ func TestDefaultsPreserveInheritanceAndExplicitEmptyRules(t *testing.T) {
 	}
 }
 
-func TestCapabilityDependenciesExcludePriceAddressAndLabels(t *testing.T) {
-	g := Group{SupplierID: "supplier", Name: "g"}
-	before := GroupCapabilityDigest(g)
-	g.Name = "renamed"
-	g.ConnectionVersion = 9
-	if GroupCapabilityDigest(g) != before {
-		t.Fatal("labels/connection version invalidated engine evidence")
-	}
-	ua := "changed-UA"
-	g.Defaults.UserAgent = &ua
-	if GroupCapabilityDigest(g) == before {
-		t.Fatal("UA change retained stale evidence")
-	}
+func TestCapabilityDigestCoversOnlyWhatAProbeAnswersFor(t *testing.T) {
 	m := GroupModel{GroupID: "g", ModelID: "vendor/model:v1", DisplayName: "m", UpstreamModel: "vendor/model:v1", ModelType: "text"}
 	if ValidateGroupModel(m) != nil {
 		t.Fatal("native model namespace rejected")
 	}
-	old := ModelCapabilityDigest(before, m)
+	old := ModelCapabilityDigest(m)
 	m.DisplayName = "label"
 	quote := "new-price-version"
 	m.QuoteID = &quote
-	if ModelCapabilityDigest(before, m) != old {
-		t.Fatal("price/display change invalidated capability")
+	m.Revision = 4
+	if ModelCapabilityDigest(m) != old {
+		t.Fatal("price/display/revision change invalidated a probe")
 	}
-	m.UpstreamModel = "different/model"
-	if ModelCapabilityDigest(before, m) == old {
-		t.Fatal("upstream mapping change retained capability")
+	for _, change := range []func(*GroupModel){
+		func(v *GroupModel) { v.UpstreamModel = "different/model" },
+		func(v *GroupModel) { v.ModelType = "image" },
+		func(v *GroupModel) { v.ModelID = "vendor/other:v1" },
+		func(v *GroupModel) { window := int64(1 << 20); v.ContextWindow = &window },
+		func(v *GroupModel) { output := int64(4096); v.MaxOutputTokens = &output },
+	} {
+		changed := m
+		change(&changed)
+		if ModelCapabilityDigest(changed) == old {
+			t.Fatalf("model change retained stale evidence: %+v", changed)
+		}
 	}
 }
 

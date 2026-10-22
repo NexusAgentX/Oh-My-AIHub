@@ -101,7 +101,8 @@ func TestMarketTypedPublicationAndImmutableQuotes(t *testing.T) {
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM market_quotes WHERE group_model_id=$1`, q.GroupModelID).Scan(&count); err != nil || count != 2 {
 		t.Fatalf("quote history %d: %v", count, err)
 	}
-	// Header inheritance changes capability dependencies; labels/address order do not.
+	// Model fields are what a probe answers for; group UA/header rules, names and
+	// addresses are not.
 	g := d.Groups[0]
 	g.Name = "新名字"
 	marketApply(t, s, admin.ID, market.Changes{Groups: []market.Change[market.Group]{{Value: g, BaseRevision: g.Revision}}})
@@ -115,8 +116,8 @@ func TestMarketTypedPublicationAndImmutableQuotes(t *testing.T) {
 	g.Defaults.HeaderRules = nil
 	marketApply(t, s, admin.ID, market.Changes{Groups: []market.Change[market.Group]{{Value: g, BaseRevision: g.Revision}}})
 	d = marketSnapshot(t, s)
-	if d.Models[0].CapabilityDigest == digest || d.Groups[0].Defaults.HeaderRules != nil {
-		t.Fatal("inherited capability change lost")
+	if d.Models[0].CapabilityDigest != digest || d.Groups[0].Defaults.HeaderRules != nil {
+		t.Fatal("group header change invalidated the model's probe inputs")
 	}
 	if err := s.Market.Apply(ctx, admin.ID, market.Changes{Groups: []market.Change[market.Group]{{Value: g, BaseRevision: g.Revision}}}); !errors.Is(err, market.ErrConflict) {
 		t.Fatalf("stale edit: %v", err)

@@ -159,19 +159,15 @@ func digest(v any) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// GroupCapabilityDigest excludes addresses, prices and administrative labels.
-// Connection or quote changes do not silently invalidate engine evidence.
-func GroupCapabilityDigest(v Group) string {
+// ModelCapabilityDigest covers only what a probe can depend on: the model a
+// group offers and the upstream model behind it. Prices, display labels,
+// addresses, timeouts, concurrency, a group's UA/headers and its ordering do
+// not change a Key's protocol evidence.
+func ModelCapabilityDigest(v GroupModel) string {
 	return digest(struct {
-		UA      *string
-		Headers *HeaderRules
-	}{v.Defaults.UserAgent, v.Defaults.HeaderRules})
-}
-func ModelCapabilityDigest(groupDigest string, v GroupModel) string {
-	return digest(struct {
-		Group, Model, Upstream, Type string
-		Context, Output              *int64
-	}{groupDigest, v.ModelID, v.UpstreamModel, v.ModelType, v.ContextWindow, v.MaxOutputTokens})
+		Model, Upstream, Type string
+		Context, Output       *int64
+	}{v.ModelID, v.UpstreamModel, v.ModelType, v.ContextWindow, v.MaxOutputTokens})
 }
 
 // Decode rejects unknown fields in revision payloads rather than treating JSON

@@ -54,7 +54,7 @@ func TestGatewayAppliesChannelHeaderRulesAndUserAgent(t *testing.T) {
 	}
 }
 
-func TestGatewayKeepsResponsesConversationsOnTheSameChannel(t *testing.T) {
+func TestGatewayRefusesResponsesContinuationsAndRoutesFromScratch(t *testing.T) {
 	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
@@ -79,11 +79,13 @@ func TestGatewayKeepsResponsesConversationsOnTheSameChannel(t *testing.T) {
 	if first.Code != http.StatusOK || len(pricey.inference()) != 1 {
 		t.Fatalf("first turn = %d, pricey hits %d", first.Code, len(pricey.inference()))
 	}
-	// Back to cheapest-first: a follow-up with previous_response_id still returns to the first channel.
+	// Back to cheapest-first: a continuation names an upstream-side
+	// conversation the gateway does not keep, so it is refused and no channel
+	// sees it. A request carrying its own context is routed from scratch.
 	e.apiJSON(consumer, http.StatusOK, http.MethodPut, "/api/routing/gpt-test", map[string]any{"mode": "cheapest"})
 	second := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test","input":"b","previous_response_id":"resp_pricey"}`), nil)
-	if second.Code != http.StatusOK || len(pricey.inference()) != 2 || len(cheap.inference()) != 0 {
-		t.Fatalf("follow-up = %d, pricey %d cheap %d", second.Code, len(pricey.inference()), len(cheap.inference()))
+	if second.Code != http.StatusBadRequest || len(pricey.inference()) != 1 || len(cheap.inference()) != 0 {
+		t.Fatalf("continuation = %d, pricey %d cheap %d", second.Code, len(pricey.inference()), len(cheap.inference()))
 	}
 	unrelated := e.call(secret, http.MethodPost, "/v1/responses", []byte(`{"model":"gpt-test","input":"c"}`), nil)
 	if unrelated.Code != http.StatusOK || len(cheap.inference()) != 1 {

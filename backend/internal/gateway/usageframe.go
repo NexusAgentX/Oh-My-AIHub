@@ -123,7 +123,7 @@ func isUsageOnlyFrame(payload []byte) bool {
 	// stream has choices, and is turned away here without being decoded or
 	// allocating anything.
 	var choices, usage span
-	if _, err := walkObject(payload, 0, func(key []byte, start, end int) {
+	if _, err := walkObject(payload, 0, func(key []byte, _, start, end int) {
 		switch string(key) {
 		case "choices":
 			choices = span{start, end, true}

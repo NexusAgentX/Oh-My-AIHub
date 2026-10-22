@@ -24,11 +24,11 @@ func TestBundlePrivateViewHasNoInventedSupplierModel(t *testing.T) {
 	if err != nil || len(directory.Models) != 1 || directory.Suppliers[0].ContributorID != "member" {
 		t.Fatalf("bundle=%+v err=%v", directory, err)
 	}
-	if draft.Changes.Groups[0].Value.CapabilityDigest != "" || draft.Changes.Models[0].Value.DisplayName != "" {
+	if draft.Changes.Models[0].Value.CapabilityDigest != "" || draft.Changes.Models[0].Value.DisplayName != "" {
 		t.Fatal("private preparation mutated the saved proposal")
 	}
 }
-func TestGroupHeaderChangesChildrenButEmergencyDisablePublishesPrivateView(t *testing.T) {
+func TestGroupHeaderChangesDoNotInvalidateModelEvidenceButEmergencyDisablePublishesPrivateView(t *testing.T) {
 	directory, err := Overlay(starterDraft(), market.Directory{})
 	if err != nil {
 		t.Fatal(err)
@@ -38,8 +38,10 @@ func TestGroupHeaderChangesChildrenButEmergencyDisablePublishesPrivateView(t *te
 	group.Defaults.UserAgent = &ua
 	change := Draft{OwnerID: "member", Changes: market.Changes{Groups: []market.Change[market.Group]{{BaseRevision: 1, Value: group}}}}
 	next, err := Overlay(change, directory)
-	if err != nil || next.Models[0].CapabilityDigest == directory.Models[0].CapabilityDigest {
-		t.Fatalf("parent dependency not reflected: %+v %v", next, err)
+	// A group channel's probe is the same probe whatever UA the group sends, so
+	// the model's evidence survives the edit.
+	if err != nil || next.Models[0].CapabilityDigest != directory.Models[0].CapabilityDigest {
+		t.Fatalf("group header edit invalidated model evidence: %+v %v", next, err)
 	}
 	group.Enabled = false
 	change.Changes.Groups[0].Value = group

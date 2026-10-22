@@ -37,7 +37,6 @@ type MarketGroup struct {
 	Enabled           bool       `json:"enabled"`
 	Revision          int64      `json:"revision"`
 	ConnectionVersion int64      `json:"connection_version"`
-	CapabilityDigest  string     `json:"capability_digest"`
 	DeletedAt         *time.Time `json:"deleted_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 }

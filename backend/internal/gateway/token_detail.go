@@ -28,7 +28,7 @@ func (o *Observer) objectOf(raw []byte) jsonObject {
 		return nil
 	}
 	first := len(o.members)
-	if _, err := walkObject(raw, 0, func(key []byte, start, end int) {
+	if _, err := walkObject(raw, 0, func(key []byte, _, start, end int) {
 		o.members = append(o.members, jsonMember{key: key, value: raw[start:end]})
 	}); err != nil {
 		o.members = o.members[:first]

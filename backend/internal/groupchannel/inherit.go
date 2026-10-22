@@ -70,18 +70,20 @@ func Advanced(d market.Defaults) channel.Advanced {
 	}
 	return a
 }
+
+// ProbeBinding identifies the inputs of one basic protocol probe: the channel,
+// the group, the model row and the Key revision it was made with. The group's
+// UA and header rules are not part of it: a probe that succeeds with one set of
+// request headers is not invalidated by changing them, the next probe simply
+// uses the new ones. The model digest covers only the model fields the probe
+// answers for, so a price or label edit leaves the evidence alone.
 func ProbeBinding(r Record, g market.Group, m market.GroupModel) string {
-	effective, _ := ResolveDefaults(r.Overrides, g.Defaults)
-	// Prices, discounts, exclusions, address ordering and unrelated timeout/
-	// concurrency edits do not change a Key's basic protocol evidence.
 	payload := struct {
 		Version                   string
 		Channel, Group, Model     string
 		CredentialRevision, Epoch int64
-		GroupDigest, ModelDigest  string
-		UA                        *string
-		Headers                   *market.HeaderRules
-	}{"group-channel-basic.v2", r.ID, g.ID, m.ID, r.CredentialRevision, r.ProbeEpoch, g.CapabilityDigest, m.CapabilityDigest, effective.UserAgent, effective.HeaderRules}
+		ModelDigest               string
+	}{"group-channel-basic.v3", r.ID, g.ID, m.ID, r.CredentialRevision, r.ProbeEpoch, m.CapabilityDigest}
 	b, _ := json.Marshal(payload)
 	hash := sha256.Sum256(b)
 	return hex.EncodeToString(hash[:])

@@ -64,10 +64,9 @@ func TestMarketUIHarness(t *testing.T) {
 		}
 		d.Suppliers = append(d.Suppliers, market.Supplier{ID: sid, Name: []string{"合成官方 API", "合成中转站", "合成订阅分类"}[i], Kind: kind, Enabled: true, Summary: "本地合成目录，无真实上游", WebsiteURL: "https://synthetic.example", Description: "## 合成验收数据\n用于核对模型聚合、报价、渠道与公开报告。"})
 		g := market.Group{ID: gid, SupplierID: sid, Name: []string{"标准分组", "共享引擎分组", "图片分组"}[i], Description: "多入口属于同一上游引擎", Enabled: true, Revision: 1, ConnectionVersion: 1}
-		g.CapabilityDigest = market.GroupCapabilityDigest(g)
 		d.Groups = append(d.Groups, g)
 		m := market.GroupModel{ID: mid, GroupID: gid, ModelID: model, DisplayName: []string{"显示名甲", "显示名乙", "合成图片模型"}[i], UpstreamModel: model, ModelType: typ, Enabled: true, Revision: 1, QuoteID: &qid}
-		m.CapabilityDigest = market.ModelCapabilityDigest(g.CapabilityDigest, m)
+		m.CapabilityDigest = market.ModelCapabilityDigest(m)
 		d.Models = append(d.Models, m)
 		d.Quotes = append(d.Quotes, market.Quote{ID: qid, GroupModelID: mid, Version: 1, Currency: []string{"CNY", "USD", "CNY"}[i], BillingUnit: "per_million_tokens", Prices: market.TokenPrices{Input: money.FromNano(int64(i) * money.Scale), Output: money.FromNano(int64(i+1) * money.Scale)}})
 		d.Addresses = append(d.Addresses, market.Address{ID: aid, SupplierID: sid, Label: "合成入口", BaseURL: "https://private.synthetic.example"})

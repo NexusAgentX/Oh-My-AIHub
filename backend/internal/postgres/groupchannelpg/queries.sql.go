@@ -345,20 +345,19 @@ func (q *Queries) LockChannel(ctx context.Context, id string) (LockChannelRow, e
 }
 
 const lockGroup = `-- name: LockGroup :one
-SELECT capability_digest,enabled,deleted_at FROM market_groups WHERE id=$1 FOR SHARE
+SELECT enabled,deleted_at FROM market_groups WHERE id=$1 FOR SHARE
 `
 
 type LockGroupRow struct {
-	CapabilityDigest string
-	Enabled          bool
-	DeletedAt        *time.Time
+	Enabled   bool
+	DeletedAt *time.Time
 }
 
 // Only immutable reports that were approved with a publication are eligible.
 func (q *Queries) LockGroup(ctx context.Context, id string) (LockGroupRow, error) {
 	row := q.db.QueryRow(ctx, lockGroup, id)
 	var i LockGroupRow
-	err := row.Scan(&i.CapabilityDigest, &i.Enabled, &i.DeletedAt)
+	err := row.Scan(&i.Enabled, &i.DeletedAt)
 	return i, err
 }
 

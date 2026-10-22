@@ -58,7 +58,7 @@ UPDATE market_channels SET probe_epoch=probe_epoch+1,revision=revision+1 WHERE c
 
 -- Only immutable reports that were approved with a publication are eligible.
 -- name: LockGroup :one
-SELECT capability_digest,enabled,deleted_at FROM market_groups WHERE id=$1 FOR SHARE;
+SELECT enabled,deleted_at FROM market_groups WHERE id=$1 FOR SHARE;
 
 -- name: LockModel :one
 SELECT group_id,capability_digest,enabled,deleted_at FROM market_group_models WHERE id=$1 FOR SHARE;

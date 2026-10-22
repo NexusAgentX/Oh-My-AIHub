@@ -6612,10 +6612,6 @@ components:
             "type": "integer",
             "minimum": 0
           },
-          "capability_digest": {
-            "type": "string",
-            "maxLength": 64
-          },
           "deleted_at": {
             "anyOf": [
               {
@@ -6642,7 +6638,6 @@ components:
           "enabled",
           "revision",
           "connection_version",
-          "capability_digest",
           "updated_at"
         ],
         "additionalProperties": false
@@ -8019,11 +8014,6 @@ components:
             "minimum": 1,
             "readOnly": true
           },
-          "capability_digest": {
-            "type": "string",
-            "maxLength": 64,
-            "readOnly": true
-          },
           "deleted_at": {
             "anyOf": [
               {
@@ -8051,7 +8041,6 @@ components:
           "enabled",
           "revision",
           "connection_version",
-          "capability_digest",
           "updated_at"
         ],
         "additionalProperties": false

@@ -84,7 +84,6 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, error) {
 			return market.Directory{}, ErrInvalid
 		}
 		v.Revision = change.BaseRevision + 1
-		v.CapabilityDigest = market.GroupCapabilityDigest(v)
 		groups[v.ID] = v
 		changedGroups[v.ID] = true
 	}
@@ -138,7 +137,7 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, error) {
 			return market.Directory{}, ErrInvalid
 		}
 		v.Revision = change.BaseRevision + 1
-		v.CapabilityDigest = market.ModelCapabilityDigest(group.CapabilityDigest, v)
+		v.CapabilityDigest = market.ModelCapabilityDigest(v)
 		models[v.ID] = v
 		changedModels[v.ID] = true
 	}
@@ -205,7 +204,7 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, error) {
 		if !ok || group.DeletedAt != nil || v.DeletedAt != nil {
 			continue
 		}
-		v.CapabilityDigest = market.ModelCapabilityDigest(group.CapabilityDigest, v)
+		v.CapabilityDigest = market.ModelCapabilityDigest(v)
 		if quote, exists := quotes[v.ID]; exists {
 			quoteID := quote.ID
 			v.QuoteID = &quoteID

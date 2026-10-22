@@ -61,7 +61,6 @@ func Apply(ctx context.Context, tx pgx.Tx, actor string, c market.Changes) error
 		return market.ErrInvalid
 	}
 	q := New(tx)
-	changedGroups := map[string]bool{}
 	audit := func(kind, id string, revision int64) error {
 		return auditpg.Record(ctx, tx, auditpg.Event{ActorID: actor, Action: "market." + kind + ".published", TargetType: kind, TargetID: id, Detail: map[string]any{"revision": revision}})
 	}
@@ -126,7 +125,6 @@ func Apply(ctx context.Context, tx pgx.Tx, actor string, c market.Changes) error
 			return err
 		}
 		v.Revision = change.BaseRevision + 1
-		v.CapabilityDigest = market.GroupCapabilityDigest(v)
 		if change.BaseRevision == 0 {
 			v.ConnectionVersion = 1
 		} else {
@@ -144,11 +142,11 @@ func Apply(ctx context.Context, tx pgx.Tx, actor string, c market.Changes) error
 			}
 		}
 		d := v.Defaults
-		p := InsertGroupParams{ID: v.ID, SupplierID: v.SupplierID, Name: v.Name, Description: v.Description, StatusUrl: v.StatusURL, UserAgent: d.UserAgent, HeaderRules: headers, ConcurrencyLimit: d.ConcurrencyLimit, RpmLimit: d.RPMLimit, TtftTimeoutMs: d.TTFTTimeoutMS, RequestTimeoutMs: d.RequestTimeoutMS, IdleTimeoutMs: d.IdleTimeoutMS, CooldownFailures: d.CooldownFailures, CooldownSeconds: d.CooldownSeconds, Enabled: v.Enabled, Revision: v.Revision, ConnectionVersion: v.ConnectionVersion, CapabilityDigest: v.CapabilityDigest, DeletedAt: v.DeletedAt}
+		p := InsertGroupParams{ID: v.ID, SupplierID: v.SupplierID, Name: v.Name, Description: v.Description, StatusUrl: v.StatusURL, UserAgent: d.UserAgent, HeaderRules: headers, ConcurrencyLimit: d.ConcurrencyLimit, RpmLimit: d.RPMLimit, TtftTimeoutMs: d.TTFTTimeoutMS, RequestTimeoutMs: d.RequestTimeoutMS, IdleTimeoutMs: d.IdleTimeoutMS, CooldownFailures: d.CooldownFailures, CooldownSeconds: d.CooldownSeconds, Enabled: v.Enabled, Revision: v.Revision, ConnectionVersion: v.ConnectionVersion, DeletedAt: v.DeletedAt}
 		if change.BaseRevision == 0 {
 			_, err = q.InsertGroup(ctx, p)
 		} else {
-			_, err = q.UpdateGroup(ctx, UpdateGroupParams{ID: p.ID, SupplierID: p.SupplierID, Name: p.Name, Description: p.Description, StatusUrl: p.StatusUrl, UserAgent: p.UserAgent, HeaderRules: p.HeaderRules, ConcurrencyLimit: p.ConcurrencyLimit, RpmLimit: p.RpmLimit, TtftTimeoutMs: p.TtftTimeoutMs, RequestTimeoutMs: p.RequestTimeoutMs, IdleTimeoutMs: p.IdleTimeoutMs, CooldownFailures: p.CooldownFailures, CooldownSeconds: p.CooldownSeconds, Enabled: p.Enabled, Revision: p.Revision, ConnectionVersion: p.ConnectionVersion, CapabilityDigest: p.CapabilityDigest, DeletedAt: p.DeletedAt, BaseRevision: change.BaseRevision})
+			_, err = q.UpdateGroup(ctx, UpdateGroupParams{ID: p.ID, SupplierID: p.SupplierID, Name: p.Name, Description: p.Description, StatusUrl: p.StatusUrl, UserAgent: p.UserAgent, HeaderRules: p.HeaderRules, ConcurrencyLimit: p.ConcurrencyLimit, RpmLimit: p.RpmLimit, TtftTimeoutMs: p.TtftTimeoutMs, RequestTimeoutMs: p.RequestTimeoutMs, IdleTimeoutMs: p.IdleTimeoutMs, CooldownFailures: p.CooldownFailures, CooldownSeconds: p.CooldownSeconds, Enabled: p.Enabled, Revision: p.Revision, ConnectionVersion: p.ConnectionVersion, DeletedAt: p.DeletedAt, BaseRevision: change.BaseRevision})
 		}
 		if err != nil {
 			return domainError(err)
@@ -156,7 +154,6 @@ func Apply(ctx context.Context, tx pgx.Tx, actor string, c market.Changes) error
 		if err = audit("group", v.ID, v.Revision); err != nil {
 			return err
 		}
-		changedGroups[v.ID] = true
 	}
 	for _, change := range c.Addresses {
 		v := change.Value
@@ -246,11 +243,7 @@ func Apply(ctx context.Context, tx pgx.Tx, actor string, c market.Changes) error
 			return err
 		}
 		v.Revision = change.BaseRevision + 1
-		group, err := q.GetGroup(ctx, v.GroupID)
-		if err != nil {
-			return domainError(err)
-		}
-		v.CapabilityDigest = market.ModelCapabilityDigest(group.CapabilityDigest, v)
+		v.CapabilityDigest = market.ModelCapabilityDigest(v)
 		p := InsertGroupModelParams{ID: v.ID, GroupID: v.GroupID, ModelID: v.ModelID, DisplayName: v.DisplayName, UpstreamModel: v.UpstreamModel, ModelType: v.ModelType, ContextWindow: v.ContextWindow, MaxOutputTokens: v.MaxOutputTokens, Notes: v.Notes, Enabled: v.Enabled, IsReference: v.IsReference, Revision: v.Revision, CapabilityDigest: v.CapabilityDigest, DeletedAt: v.DeletedAt}
 		if change.BaseRevision == 0 {
 			_, err = q.InsertGroupModel(ctx, p)
@@ -267,25 +260,6 @@ func Apply(ctx context.Context, tx pgx.Tx, actor string, c market.Changes) error
 	for _, quote := range c.Quotes {
 		if err := appendQuote(ctx, q, quote); err != nil {
 			return domainError(err)
-		}
-	}
-	// Header/UA changes affect inherited model evidence. Prices/addresses do
-	// not. Refresh after explicit child edits so one atomic bundle can update
-	// both parent and child without invalidating its own base-revision check.
-	for groupID := range changedGroups {
-		g, err := q.GetGroup(ctx, groupID)
-		if err != nil {
-			return err
-		}
-		models, err := q.ModelsForGroup(ctx, groupID)
-		if err != nil {
-			return err
-		}
-		for _, m := range models {
-			digest := market.ModelCapabilityDigest(g.CapabilityDigest, ModelValue(m))
-			if err = q.RefreshModelCapability(ctx, RefreshModelCapabilityParams{ID: m.ID, CapabilityDigest: digest}); err != nil {
-				return err
-			}
 		}
 	}
 	return nil

@@ -15,10 +15,11 @@ import (
 
 var errMalformedJSON = errors.New("malformed JSON object")
 
-// entry is one member of a JSON object: the decoded key and the byte range of
-// its value within the scanned text.
+// entry is one member of a JSON object: the decoded key and the byte ranges of
+// the key and of its value within the scanned text.
 type entry struct {
 	key        string
+	keyStart   int
 	start, end int // value range [start, end)
 }
 
@@ -119,10 +120,11 @@ type objectBounds struct {
 
 // walkObject calls visit for each member of the JSON object starting at
 // text[start] (after optional whitespace), in order, with the member's decoded
-// key and the byte range [valueStart, valueEnd) of its value. It allocates
-// nothing for keys without escapes, whose bytes are text itself: visit must
-// not keep key beyond its call, and must not change text.
-func walkObject(text []byte, start int, visit func(key []byte, valueStart, valueEnd int)) (objectBounds, error) {
+// key, the index of the opening quote of its key and the byte range
+// [valueStart, valueEnd) of its value. It allocates nothing for keys without
+// escapes, whose bytes are text itself: visit must not keep key beyond its
+// call, and must not change text.
+func walkObject(text []byte, start int, visit func(key []byte, keyStart, valueStart, valueEnd int)) (objectBounds, error) {
 	i := skipSpace(text, start)
 	if i >= len(text) || text[i] != '{' {
 		return objectBounds{}, errMalformedJSON
@@ -138,6 +140,7 @@ func walkObject(text []byte, start int, visit func(key []byte, valueStart, value
 		if i >= len(text) || text[i] != '"' {
 			return objectBounds{}, errMalformedJSON
 		}
+		keyStart := i
 		keyEnd, err := skipString(text, i)
 		if err != nil {
 			return objectBounds{}, err
@@ -159,7 +162,7 @@ func walkObject(text []byte, start int, visit func(key []byte, valueStart, value
 		if err != nil {
 			return objectBounds{}, err
 		}
-		visit(key, valueStart, valueEnd)
+		visit(key, keyStart, valueStart, valueEnd)
 		bounds.lastEnd = valueEnd
 		i = skipSpace(text, valueEnd)
 		if i >= len(text) {
@@ -181,11 +184,11 @@ func walkObject(text []byte, start int, visit func(key []byte, valueStart, value
 // (after optional whitespace).
 func scanObject(text []byte, start int) (objectScan, error) {
 	var entries []entry
-	bounds, err := walkObject(text, start, func(key []byte, valueStart, valueEnd int) {
+	bounds, err := walkObject(text, start, func(key []byte, keyStart, valueStart, valueEnd int) {
 		if entries == nil {
 			entries = make([]entry, 0, 8)
 		}
-		entries = append(entries, entry{key: string(key), start: valueStart, end: valueEnd})
+		entries = append(entries, entry{key: string(key), keyStart: keyStart, start: valueStart, end: valueEnd})
 	})
 	if err != nil {
 		return objectScan{}, err
@@ -399,18 +402,91 @@ func EnsureIncludeUsage(body []byte, scan objectScan) ([]byte, bool) {
 	return applySplices(body, splices), changed
 }
 
+// storesTruthy reports whether a value read as text asks for server-side
+// storage. A duplicate member counts when any of them does, whichever decoder
+// the upstream uses, so a JSON boolean, a number or a string all count.
+func storesTruthy(value []byte) bool {
+	if bytes.EqualFold(value, []byte("true")) || bytes.Equal(value, []byte("1")) {
+		return true
+	}
+	if len(value) > 1 && value[0] == '"' {
+		text := value[1 : len(value)-1]
+		return bytes.EqualFold(text, []byte("true")) || bytes.Equal(text, []byte("1"))
+	}
+	return false
+}
+
+// storeSplices delete every top-level "store" member whose value asks an
+// upstream to keep the request, together with the comma that joins it to its
+// neighbour, so the remaining bytes still form the same object. One duplicate
+// carrying a truthy value removes all of them, and the key is matched whatever
+// its case. A body whose store values are all falsey, or that has none, gets
+// no edits at all.
+func storeSplices(body []byte, scan objectScan) []splice {
+	// One duplicate asking for storage condemns all of them: which one an
+	// upstream reads depends on its decoder.
+	truthy := false
+	for _, member := range scan.entries {
+		if strings.EqualFold(member.key, "store") && storesTruthy(body[member.start:member.end]) {
+			truthy = true
+			break
+		}
+	}
+	if !truthy {
+		return nil
+	}
+	delete := make([]bool, len(scan.entries))
+	for index, member := range scan.entries {
+		delete[index] = strings.EqualFold(member.key, "store")
+	}
+	var splices []splice
+	for first := 0; first < len(scan.entries); first++ {
+		if !delete[first] {
+			continue
+		}
+		last := first
+		for last+1 < len(scan.entries) && delete[last+1] {
+			last++
+		}
+		// A run that follows another member takes the comma before it; a run at
+		// the front takes the comma after it instead, so the survivors keep the
+		// separators they had.
+		start, end := scan.open+1, scan.entries[last].end
+		if first > 0 {
+			start = scan.entries[first-1].end
+		} else if last+1 < len(scan.entries) {
+			end = scan.entries[last+1].keyStart
+		}
+		splices = append(splices, splice{start: start, end: end})
+		first = last
+	}
+	return splices
+}
+
+// StatelessBody returns body without the top-level members that ask an
+// upstream to keep server-side state. It is the body itself when there is
+// nothing to remove.
+func StatelessBody(body []byte, scan objectScan) []byte {
+	return applySplices(body, storeSplices(body, scan))
+}
+
 // UpstreamBody is the request body sent to a channel: the client's body with
-// the top-level model set to the channel's name for it and, for an OpenAI Chat
-// stream (ensureUsage), include_usage turned on. scan is the scan of body. The
-// edits are all found in the one scan and made in one copy, so the result is
-// the same bytes as ReplaceModel followed by EnsureIncludeUsage. When nothing
-// changes it is body itself; usageInjected reports an include_usage edit.
-func UpstreamBody(body []byte, scan objectScan, model string, ensureUsage bool) (upstream []byte, usageInjected bool) {
+// the top-level model set to the channel's name for it, for an OpenAI Chat
+// stream (ensureUsage) include_usage turned on and, on the entrances that are
+// forwarded statelessly (stripStore), every top-level "store" member removed.
+// scan is the scan of body. The edits are all found in the one scan and made
+// in one copy, so the result is the same bytes as ReplaceModel followed by
+// EnsureIncludeUsage and StatelessBody. When nothing changes it is body
+// itself; usageInjected reports an include_usage edit.
+func UpstreamBody(body []byte, scan objectScan, model string, ensureUsage, stripStore bool) (upstream []byte, usageInjected bool) {
 	splices := modelSplices(body, scan, model)
 	if ensureUsage {
 		var usage []splice
 		usage, usageInjected = includeUsageSplices(body, scan)
 		splices = append(splices, usage...)
+	}
+	if stripStore {
+		splices = append(splices, storeSplices(body, scan)...)
 	}
 	return applySplices(body, splices), usageInjected
 }

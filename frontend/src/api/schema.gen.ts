@@ -2056,7 +2056,6 @@ export interface components {
             enabled: boolean;
             revision: number;
             connection_version: number;
-            capability_digest: string;
             deleted_at?: string | null;
             /** Format: date-time */
             updated_at: string;
@@ -2336,7 +2335,6 @@ export interface components {
             enabled: boolean;
             readonly revision: number;
             readonly connection_version: number;
-            readonly capability_digest: string;
             deleted_at?: string | null;
             /** Format: date-time */
             readonly updated_at: string;

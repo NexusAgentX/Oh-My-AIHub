@@ -297,7 +297,10 @@ func (s *Store) SaveProbe(ctx context.Context, old groupchannel.Record, g market
 		if err != nil {
 			return err
 		}
-		if group.DeletedAt != nil || !group.Enabled || model.DeletedAt != nil || !model.Enabled || model.GroupID != g.ID || group.CapabilityDigest != g.CapabilityDigest || model.CapabilityDigest != m.CapabilityDigest {
+		// The probe's inputs are the Key, the group and the model row: only those
+		// can have moved since it ran. Group UA and header rules may have
+		// changed, which no longer invalidates the result.
+		if group.DeletedAt != nil || !group.Enabled || model.DeletedAt != nil || !model.Enabled || model.GroupID != g.ID || model.CapabilityDigest != m.CapabilityDigest {
 			return nil
 		}
 		raw, err := json.Marshal(p.Tests)

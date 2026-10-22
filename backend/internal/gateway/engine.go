@@ -288,7 +288,10 @@ type callState struct {
 	// usageInjected is set when the gateway turned include_usage on for an
 	// OpenAI Chat stream whose client had not: the usage-only frame that the
 	// upstream then adds is not for the client (see usageFrameFilter).
-	usageInjected   bool
+	usageInjected bool
+	// storeless is set on the entrances forwarded without server-side state:
+	// their upstream body carries no top-level "store" member.
+	storeless       bool
 	hints           billingHints
 	pricedStatement *quotepricing.Statement
 	billingFacts    quotepricing.Facts
@@ -429,6 +432,9 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		return
 	}
 	call.requestEncoding = encoding
+	// The two JSON entrances a client can reach with a body that asks for
+	// upstream-side state are forwarded statelessly: see stateless.go.
+	call.storeless = statelessPath(r.URL.Path)
 
 	// One scan of the body gives the facts of every format: the two members that
 	// pick a price, and for the formats that name the model in the body, the
@@ -459,6 +465,14 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		// and keep upstream state, which this gateway no longer does.
 		e.reject(w, call, OutcomeRejectedFormat, http.StatusBadRequest, "background_unsupported", "本网关不支持后台响应，请移除 background 参数改为同步请求")
 		return
+	}
+	if call.storeless {
+		if field := scan.statefulField(body); field != "" {
+			// A continuation needs the earlier turn, which the gateway does not
+			// keep: answering it would answer a different conversation.
+			e.reject(w, call, OutcomeRejectedFormat, 400, "stateful_request_unsupported", "本网关不保存服务端状态，请移除 "+field+" 并在本次请求中携带完整上下文")
+			return
+		}
 	}
 	if call.requested == "" {
 		e.reject(w, call, OutcomeRejectedModel, 400, "model_context_required", "请求需要明确的模型上下文")
@@ -1057,7 +1071,7 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 	if call.imageMultipart != nil {
 		upstreamBody = call.imageMultipart.replace(body, candidate.UpstreamModel)
 	} else if call.format != channel.FormatGemini {
-		upstreamBody, call.usageInjected = UpstreamBody(body, scan, candidate.UpstreamModel, call.format == channel.FormatOpenAIChat && call.stream)
+		upstreamBody, call.usageInjected = UpstreamBody(body, scan, candidate.UpstreamModel, call.format == channel.FormatOpenAIChat && call.stream, call.storeless)
 	}
 	if call.requestEncoding != "" {
 		upstreamBody, err = nativeencoding.Encode(r.Context(), call.requestEncoding, upstreamBody)
