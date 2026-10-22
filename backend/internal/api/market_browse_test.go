@@ -76,12 +76,11 @@ func TestMarketBrowseUsesApprovedIDsScopesCursorAndPublicationBarrier(t *testing
 	member.expect(t, 200, "GET", "/api/market/models?limit=1&cursor="+first["next_cursor"].(string), nil)
 	second, _ := p.member(t, "market-other")
 	second.expect(t, 409, "GET", "/api/market/models?limit=1&cursor="+first["next_cursor"].(string), nil)
-	filtered := member.expect(t, 200, "GET", "/api/market/models?features=tools,strict_json&only_online=true", nil)
-	if filtered["total"] != float64(0) {
-		t.Fatal("unknown capability admitted", filtered)
+	filtered := member.expect(t, 200, "GET", "/api/market/models?only_online=true&protocol=openai-responses", nil)
+	if filtered["total"] != float64(1) {
+		t.Fatal("plain protocol filter changed the approved page", filtered)
 	}
-	member.expect(t, 422, "GET", "/api/market/models?features=unknown_feature", nil)
-	member.expect(t, 422, "GET", "/api/market/models?min_context=NaN", nil)
+	member.expect(t, 422, "GET", "/api/market/models?sort=unknown_sort", nil)
 	detail := member.expect(t, 200, "GET", "/api/market/models/same%2Fmodel:v1", nil)
 	if detail["model"].(map[string]any)["id"] != "same/model:v1" {
 		t.Fatal(detail)

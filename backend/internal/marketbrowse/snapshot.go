@@ -34,23 +34,17 @@ type Group struct {
 	StatusURL   string   `json:"status_url"`
 	ModelIDs    []string `json:"model_ids"`
 }
-type Capabilities struct {
-	Supported    []string `json:"supported"`
-	ContextLower int64    `json:"context_lower"`
-	OutputLower  int64    `json:"output_lower"`
-}
 type PublicChannel struct {
-	Price        *Price       `json:"price"`
-	ID           string       `json:"id"`
-	Name         string       `json:"name"`
-	Summary      string       `json:"summary"`
-	Description  string       `json:"description"`
-	GroupID      string       `json:"group_id"`
-	GroupModelID string       `json:"group_model_id"`
-	ModelID      string       `json:"model_id"`
-	Protocol     string       `json:"protocol"`
-	Discount     string       `json:"discount"`
-	Capabilities Capabilities `json:"capabilities"`
+	Price        *Price `json:"price"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Summary      string `json:"summary"`
+	Description  string `json:"description"`
+	GroupID      string `json:"group_id"`
+	GroupModelID string `json:"group_model_id"`
+	ModelID      string `json:"model_id"`
+	Protocol     string `json:"protocol"`
+	Discount     string `json:"discount"`
 }
 type PublicOffer struct {
 	ID              string        `json:"id"`
@@ -89,71 +83,6 @@ func Protocol(format channel.Format) string {
 }
 func ChannelKey(channel, offering, protocol string) string {
 	return channel + "\x00" + offering + "\x00" + protocol
-}
-func publicFacts(f Facts) Capabilities {
-	v := Capabilities{Supported: []string{}, ContextLower: f.ContextLower, OutputLower: f.OutputLower}
-	for k, yes := range f.Supported {
-		if yes {
-			v.Supported = append(v.Supported, k)
-		}
-	}
-	slices.Sort(v.Supported)
-	return v
-}
-func EvidenceFacts(protocol string, evidence map[string]bool, capacity map[string]int64) Facts {
-	f := Facts{Supported: map[string]bool{}}
-	has := func(family, label string) bool { return evidence["upstream_protocol/"+protocol+"."+family+"/"+label] }
-	if protocol == "codex-special" {
-		f.Supported["input:text"] = has("RL01", "actual_protocol_marker")
-		f.Supported["output:text"] = f.Supported["input:text"]
-		f.Supported["tools"] = has("RL02", "additional_tools_declaration") && has("RL02", "tool_call_association") && has("RL02", "tool_result_continuation")
-		f.Supported["reasoning"] = has("RL09", "encrypted_reasoning_produced")
-		f.Supported["self_contained_replay"] = has("RL09", "encrypted_reasoning_continued")
-		f.Supported["output:image"] = has("RL25", "native_generation") && has("RL25", "image_model_permission")
-		f.Supported["input:image"] = has("RL25", "native_edit") && has("RL25", "image_model_permission")
-		f.Supported["codex_cli_basic"] = evidence["official_cli/codex-special.RL01/actual_protocol_marker"] && evidence["gateway_proxy/codex-special.RL01/actual_protocol_marker"] && f.Supported["input:text"]
-		return f
-	}
-	if protocol == "openai-images" {
-		f.Supported["output:image"] = evidence["upstream_protocol/images.generations/actual_image_model"]
-		f.Supported["input:image"] = evidence["upstream_protocol/images.edits/actual_image_model"]
-		return f
-	}
-	f.Supported["input:text"] = has("base", "accepted_native_message_shapes")
-	f.Supported["output:text"] = f.Supported["input:text"]
-	f.Supported["tools"] = has("tools", "native_declarations") && has("tools", "call_result_association")
-	f.Supported["strict_json"] = has("output", "json_schema_strict")
-	if protocol == "native-messages" {
-		f.Supported["strict_json"] = has("output", "output_config.format") && has("output", "schema_nested_enum_required")
-	}
-	if protocol == "native-generate-content" {
-		f.Supported["strict_json"] = has("output", "responseJsonSchema") && has("output", "schema_nested_enum_required")
-	}
-	f.Supported["json_object"] = has("output", "json_object")
-	f.Supported["vision_url"] = has("vision", "url_or_uri_content_recognition")
-	f.Supported["vision_inline"] = has("vision", "inline_content_recognition")
-	f.Supported["input:image"] = f.Supported["vision_url"] || f.Supported["vision_inline"]
-	f.Supported["input:document"] = has("document", "native_inline_content_recognition")
-	f.Supported["input:audio"] = has("audio", "native_inline_input_when_applicable") || has("audio", "vendor_extension.input_audio")
-	f.Supported["output:audio"] = has("audio", "native_output_when_applicable")
-	f.Supported["output:image"] = has("image_tool", "native_image_output")
-	f.Supported["input:video"] = has("video", "inline_video_content_recognition") || has("video", "url_video_content_recognition")
-	f.Supported["reasoning"] = has("reasoning", "native_current_configuration") || has("output", "reasoning.effort") || has("output", "reasoning_effort")
-	f.Supported["self_contained_replay"] = has("reasoning", "complete_opaque_signature_or_encrypted_replay") && has("reasoning", "self_contained_replay_without_resource_reference")
-	// Capacity keys start with the exact protocol scenario. Never use the
-	// maximum of unrelated protocol/group declarations as verified capacity.
-	for k, n := range capacity {
-		if !strings.HasPrefix(k, protocol+".") || !strings.Contains(k, "@upstream_protocol/") {
-			continue
-		}
-		if strings.HasSuffix(k, "/context") {
-			f.ContextLower = max(f.ContextLower, n)
-		}
-		if strings.HasSuffix(k, "/max_output") {
-			f.OutputLower = max(f.OutputLower, n)
-		}
-	}
-	return f
 }
 
 // Build uses the same approved immutable candidates as inference. Report
@@ -206,42 +135,27 @@ func Build(state *groupchannel.State, prices *typical.PriceSnapshot, fx int64) (
 			if m.ModelType != "image" && format == channel.FormatOpenAIImages {
 				continue
 			}
-			for _, protocol := range []string{Protocol(format), "codex-special"} {
-				if protocol == "codex-special" && ((m.ModelType == "image") != (format == channel.FormatOpenAIImages)) {
+			protocol := Protocol(format)
+			if !validProtocol(protocol, format) {
+				continue
+			}
+			o := Offering{Protocol: protocol, ModelID: m.ModelID, GroupModelID: m.ID, GroupID: m.GroupID, SupplierID: g.SupplierID, ModelType: m.ModelType, Visible: true, Enabled: true, Format: format}
+			for _, row := range byOffering[m.ID] {
+				if !slices.Contains(row.Formats, format) {
 					continue
 				}
-				if !validProtocol(protocol, format) {
-					continue
+				c := row.Candidate
+				ch := Channel{ID: c.ChannelID, OwnerID: c.OwnerID, Visible: true, Enabled: true, Routable: true}
+				if amount, unit, quantity, ok := prices.LookupComparison(c.ChannelID, m.ModelID, m.GroupID, c.PricingVersion, c.MultiplierNano, fx); ok {
+					ch.Price = &Price{Amount: amount, Unit: unit, Quantity: quantity}
 				}
-				facts := Facts{Supported: map[string]bool{}}
-				o := Offering{Protocol: protocol, ModelID: m.ModelID, GroupModelID: m.ID, GroupID: m.GroupID, SupplierID: g.SupplierID, ModelType: m.ModelType, Visible: true, Enabled: true, Format: format, Facts: facts}
-				for _, row := range byOffering[m.ID] {
-					if !slices.Contains(row.Formats, format) {
-						continue
-					}
-					c := row.Candidate
-					cf := EvidenceFacts(protocol, c.Evidence, c.VerifiedCapacity)
-					// A key's native Codex probe cannot become a public Responses
-					// callable witness (or vice versa) just because wire formats match.
-					endpoint := c.KeyProbeEndpoints[format]
-					if protocol == "codex-special" && (format == channel.FormatOpenAIResponses && !c.Evidence["upstream_protocol/codex-special.RL14/uncompressed_request"] || format == channel.FormatOpenAIImages && !cf.Supported["output:image"]) {
-						continue
-					}
-					if protocol != "codex-special" && strings.HasPrefix(endpoint, "codex.") && !(format == channel.FormatOpenAIResponses && cf.Supported["input:text"] || format == channel.FormatOpenAIImages && c.Evidence["upstream_protocol/images.generations/native_json_or_multipart"]) {
-						continue
-					}
-					ch := Channel{ID: c.ChannelID, OwnerID: c.OwnerID, Visible: true, Enabled: true, Routable: true, Facts: cf}
-					if amount, unit, quantity, ok := prices.LookupComparison(c.ChannelID, m.ModelID, m.GroupID, c.PricingVersion, c.MultiplierNano, fx); ok {
-						ch.Price = &Price{Amount: amount, Unit: unit, Quantity: quantity}
-					}
-					o.Channels = append(o.Channels, ch)
-					v := state.Views[c.ChannelID]
-					s.Channels[ChannelKey(c.ChannelID, m.ID, protocol)] = PublicChannel{Price: ch.Price, ID: c.ChannelID, Name: v.Name, Summary: v.Summary, Description: v.Description, GroupID: g.ID, GroupModelID: m.ID, ModelID: m.ModelID, Protocol: protocol, Discount: discountText(c.MultiplierNano), Capabilities: publicFacts(cf)}
-				}
-				if len(o.Channels) > 0 || hasFacts(facts) {
-					s.Offers = append(s.Offers, o)
-					emitted = true
-				}
+				o.Channels = append(o.Channels, ch)
+				v := state.Views[c.ChannelID]
+				s.Channels[ChannelKey(c.ChannelID, m.ID, protocol)] = PublicChannel{Price: ch.Price, ID: c.ChannelID, Name: v.Name, Summary: v.Summary, Description: v.Description, GroupID: g.ID, GroupModelID: m.ID, ModelID: m.ModelID, Protocol: protocol, Discount: discountText(c.MultiplierNano)}
+			}
+			if len(o.Channels) > 0 {
+				s.Offers = append(s.Offers, o)
+				emitted = true
 			}
 		}
 		if !emitted {
@@ -258,14 +172,6 @@ func Build(state *groupchannel.State, prices *typical.PriceSnapshot, fx int64) (
 		s.Suppliers[id] = p
 	}
 	return s, nil
-}
-func hasFacts(f Facts) bool {
-	for _, yes := range f.Supported {
-		if yes {
-			return true
-		}
-	}
-	return f.ContextLower > 0 || f.OutputLower > 0
 }
 func discountText(n int64) string {
 	whole, fraction := n/1_000_000_000, n%1_000_000_000

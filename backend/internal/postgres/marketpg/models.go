@@ -87,15 +87,6 @@ type MarketObjectVersion struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
-type MarketProtectedKey struct {
-	Purpose           string    `json:"purpose"`
-	EncryptionKeyID   string    `json:"encryption_key_id"`
-	CredentialVersion int64     `json:"credential_version"`
-	Nonce             []byte    `json:"nonce"`
-	Ciphertext        []byte    `json:"ciphertext"`
-	CreatedAt         time.Time `json:"created_at"`
-}
-
 type MarketQuote struct {
 	ID                  string       `json:"id"`
 	GroupModelID        string       `json:"group_model_id"`

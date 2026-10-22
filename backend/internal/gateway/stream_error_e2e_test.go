@@ -60,7 +60,6 @@ func TestHTTP200ProtocolErrorEndToEnd(t *testing.T) {
 				run := newCredentialRun(t, http.StatusOK)
 				store := &protocolErrorStore{fallbackCredential: run.seal("zz-fallback", "sk-test"), candidate: Candidate{ChannelID: "upstream", OwnerID: "provider", BaseURL: upstream.URL, UpstreamModel: "upstream-model", MultiplierNano: ledger.UnitRate, Credential: run.seal("upstream", "sk-test")}}
 				store.candidate = quotedCandidate(t, store.candidate, catalog.Model{ID: "gpt-test"})
-				store.candidate.Evidence = map[string]bool{"upstream_protocol/" + nativeProtocol(protocol.format) + ".stream/text_lifecycle": true}
 				fixture := newServeFixture(t, 10, defaultRouting{})
 				engine := fixture.engine
 				engine.Store, engine.Keyring = store, run.keyring

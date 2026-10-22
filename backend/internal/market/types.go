@@ -165,16 +165,6 @@ type Quote struct {
 	CreatedAt    time.Time   `json:"created_at"`
 }
 
-type EvidenceBinding struct {
-	TargetKind       string `json:"target_kind"`
-	TargetID         string `json:"target_id"`
-	TargetRevision   int64  `json:"target_revision"`
-	CapabilityDigest string `json:"capability_digest"`
-	ManifestVersion  string `json:"manifest_version"`
-	CodeVersion      string `json:"code_version"`
-	CredentialScope  string `json:"-"`
-	ParameterVersion string `json:"parameter_version"`
-}
 type Capability struct {
 	ID       string `json:"id"`
 	Layer    string `json:"layer"`

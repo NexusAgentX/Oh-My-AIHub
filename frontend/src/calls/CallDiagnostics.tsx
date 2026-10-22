@@ -35,7 +35,6 @@ const labels: Record<string, string> = {
   cheapest: '价格优先',
   reliable: '稳定优先',
   fastest: '延迟优先',
-  speed: '速率优先',
   manual: '手动顺序',
   eligible: '可用',
   required_capability_evidence_missing: '所需能力或版本证据不足',

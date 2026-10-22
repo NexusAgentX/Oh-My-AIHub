@@ -240,7 +240,7 @@ func TestNativeModelListsKeepAliasPermissionsAndConservativeGroupMetadata(t *tes
 	large := int64(999999)
 	catalogSource := catalog.NewService(listingCatalog{models: []catalog.Model{{ID: "main", DisplayName: "Unrelated global title", ContextWindow: &large, MaxOutputTokens: &large}, {ID: "blocked"}}})
 	makeCandidate := func(id string, context, output int64) Candidate {
-		return Candidate{ChannelID: id, GroupID: "group", GroupModelID: "group-main", Quotes: groupBook(t, "CNY", 1), VerifiedCapacity: map[string]int64{"native-generate-content.length_search@upstream_protocol/context": context, "native-generate-content.length_search@upstream_protocol/max_output": output}, Evidence: map[string]bool{}}
+		return Candidate{ChannelID: id, GroupID: "group", GroupModelID: "group-main", Quotes: groupBook(t, "CNY", 1), VerifiedCapacity: map[string]int64{"native-generate-content.length_search@upstream_protocol/context": context, "native-generate-content.length_search@upstream_protocol/max_output": output}}
 	}
 	a, b := makeCandidate("a", 8192, 2048), makeCandidate("b", 4096, 0)
 	source := approvedListingStore{listingStore: listingStore{online: []OnlineModel{{ID: "main", Formats: []channel.Format{channel.FormatGemini}}, {ID: "blocked", Formats: []channel.Format{channel.FormatGemini}}}}, records: []CandidateRecord{{ModelID: "main", Formats: []channel.Format{channel.FormatGemini}, Candidate: a}, {ModelID: "main", Formats: []channel.Format{channel.FormatGemini}, Candidate: b}}}

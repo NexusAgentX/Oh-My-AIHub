@@ -70,7 +70,6 @@ func TestGatewayRefusesResponsesContinuationsAndRoutesFromScratch(t *testing.T) 
 		_, _ = io.WriteString(w, `{"id":"resp_cheap","object":"response","usage":{"input_tokens":10,"output_tokens":5}}`)
 	})
 	priceyID := e.createChannel(sharer, channelSpec{name: "pricey", upstream: pricey, multiplier: "5"})
-	e.declareGroupedCapabilities(priceyID, "upstream_protocol/openai-responses.state/previous_response_id_three_turns")
 	e.createChannel(sharer, channelSpec{name: "cheap", upstream: cheap, multiplier: "1"})
 	_, secret := e.defaultKey(consumer)
 	// Route the first turn to the pricey channel by ticking only it.

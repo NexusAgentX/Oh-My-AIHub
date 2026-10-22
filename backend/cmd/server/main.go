@@ -27,7 +27,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/keyringcheck"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/metrics"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
@@ -271,9 +270,8 @@ func main() {
 		}
 	}()
 
-	// Market review transactions, directory rebuilds and the credential-scope
-	// root use two private connections; saturation cannot consume
-	// gateway/settlement pool slots.
+	// Market review transactions and directory rebuilds use two private
+	// connections; saturation cannot consume gateway/settlement pool slots.
 	reviewStartup, cancelReviewStartup := context.WithTimeout(context.Background(), keyringCheckTimeout)
 	reviewPool, err := database.OpenLimited(reviewStartup, databaseURL, 2)
 	if err != nil {
@@ -281,25 +279,9 @@ func main() {
 	}
 	defer reviewPool.Close()
 	reviewMarket := marketpg.NewStore(reviewPool)
-	if err = reviewMarket.VerifyProtectedRoots(reviewStartup, credentialKeyring); err != nil {
-		fatal(logger, "protected market roots cannot be opened", err)
-	}
-	credentialRoot, err := reviewMarket.ProtectedRoot(reviewStartup, credentialKeyring, "credential-scope-root-v1")
-	if err != nil {
-		fatal(logger, "opening market credential root failed", err)
-	}
 	reviewStore := contributionpg.NewStore(reviewPool)
 	if err = reviewStore.SyncPublications(reviewStartup); err != nil {
 		fatal(logger, "waiting for market publication recovery fence failed", err)
-	}
-	groupCredentialRoot := append([]byte{}, credentialRoot...)
-	defer clear(groupCredentialRoot)
-	groupRuntime.CredentialScope = func(r groupchannel.Record) (string, error) {
-		secret, err := credentialKeyring.OpenCredential(r.ID, r.Credential)
-		if err != nil {
-			return "", err
-		}
-		return market.CredentialScope(groupCredentialRoot, r.GroupID, []byte(secret))
 	}
 	marketRuntime := contribution.NewRuntime(reviewMarket, groupRuntime.Install)
 	groupRuntime.Ready = func() error { _, err := marketRuntime.Current(); return err }

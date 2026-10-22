@@ -30,7 +30,6 @@ func TestTokenPricesPersistSettleAndKeepSnapshot(t *testing.T) {
 	if value, present := saved.Tiers[0].Prices.Details["input_audio"]; !present || value != 0 {
 		t.Fatal("explicit zero lost")
 	}
-	e.declareGroupedCapabilities(channelID, "upstream_protocol/openai-chat-completions.cache_tier/service_tier/openai:fast")
 	keyID, secret := e.defaultKey(consumer)
 	e.apiJSON(consumer, http.StatusOK, http.MethodPatch, "/api/keys/"+keyID, map[string]any{"budget_total": "0.017"})
 	rec := e.call(secret, http.MethodPost, "/v1/chat/completions", []byte(`{"model":"gpt-test","service_tier":"priority"}`), nil)

@@ -327,7 +327,7 @@ func conservativeListedModel(name listedModel, entries []nativeModelWitness) lis
 	// when every eligible witness on these endpoint formats proves it.
 	name.model = catalog.Model{ID: name.model.ID, DisplayName: name.model.ID, Enabled: true}
 	context, output := int64(0), int64(0)
-	contextKnown, outputKnown, stream := true, true, true
+	contextKnown, outputKnown := true, true
 	for _, v := range entries {
 		prefix := nativeProtocol(v.format) + ".length_search@upstream_protocol/"
 		c, o := v.candidate.VerifiedCapacity[prefix+"context"], v.candidate.VerifiedCapacity[prefix+"max_output"]
@@ -339,7 +339,6 @@ func conservativeListedModel(name listedModel, entries []nativeModelWitness) lis
 		if o > 0 && (output == 0 || o < output) {
 			output = o
 		}
-		stream = stream && v.candidate.Evidence["upstream_protocol/"+nativeProtocol(v.format)+".stream/text_lifecycle"]
 	}
 	if contextKnown {
 		name.model.ContextWindow = &context
@@ -348,9 +347,6 @@ func conservativeListedModel(name listedModel, entries []nativeModelWitness) lis
 		name.model.MaxOutputTokens = &output
 	}
 	name.generationMethods = []string{"generateContent"}
-	if stream {
-		name.generationMethods = append(name.generationMethods, "streamGenerateContent")
-	}
 	return name
 }
 

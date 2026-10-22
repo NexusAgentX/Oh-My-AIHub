@@ -71,10 +71,17 @@ func TestGatewayEntriesSkipSameOriginAndRequireAPIKey(t *testing.T) {
 
 func TestUnsupportedGatewayPathsAnswerNotFound(t *testing.T) {
 	handler := NewHandler(Dependencies{Gateway: gateway.NewEngine(gateway.Dependencies{})})
+	// The /backend-api namespace has no endpoint left and is not an external
+	// API path: a write is checked for same origin like any other web request.
+	retired := httptest.NewRecorder()
+	handler.ServeHTTP(retired, httptest.NewRequest(http.MethodPost, "/backend-api/codex/responses", strings.NewReader(`{}`)))
+	if retired.Code != http.StatusForbidden || !strings.Contains(retired.Body.String(), `"error":"cross_origin_request"`) {
+		t.Fatalf("POST /backend-api/codex/responses = %d %s", retired.Code, retired.Body.String())
+	}
 	for _, target := range []struct{ method, path string }{
 		{http.MethodPost, "/v1/embeddings"}, {http.MethodPost, "/v1/files"}, {http.MethodGet, "/v1/containers"},
 		{http.MethodPost, "/v1beta/other"},
-		{http.MethodPost, "/backend-api/codex/responses"}, {http.MethodGet, "/backend-api/wham/accounts/check"},
+		{http.MethodGet, "/backend-api/wham/accounts/check"},
 		{http.MethodGet, "/v1/user-auth-credential/whoami"},
 	} {
 		recorder := httptest.NewRecorder()

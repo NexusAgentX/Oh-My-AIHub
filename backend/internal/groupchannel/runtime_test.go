@@ -39,7 +39,7 @@ func TestDynamicInheritanceSelectionAndImmutableQuotes(t *testing.T) {
 	if first.Quotes.Offers["vendor/model:1"].DiscountNano == nil || *first.Quotes.Offers["vendor/model:1"].DiscountNano != 0 {
 		t.Fatal("offer discount not frozen")
 	}
-	if views["channel"].Sources["rpm_limit"] != "group" || len(first.Evidence) != 0 {
+	if views["channel"].Sources["rpm_limit"] != "group" {
 		t.Fatal("inheritance or invented evidence")
 	}
 	oldBinding := data.Probes[0].Binding

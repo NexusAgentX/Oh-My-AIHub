@@ -11,21 +11,17 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 )
 
-// The two JSON entrances are forwarded without server-side state: a store flag
+// The stateless entrances are forwarded without server-side state: a store flag
 // never reaches the upstream, and a request that continues an upstream-side
-// conversation is refused with a code the client can act on.
+// conversation or names an upstream-side cache is refused with a code the
+// client can act on.
 func TestGatewayForwardsWithoutServerSideState(t *testing.T) {
-	manifest, err := gatewaycontract.Load()
-	if err != nil {
-		t.Fatal(err)
-	}
 	var seen [][]byte
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
@@ -46,15 +42,7 @@ func TestGatewayForwardsWithoutServerSideState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	proof := map[string]bool{}
-	for _, suite := range manifest.Suites {
-		for _, requirement := range suite.Requirements {
-			for _, label := range requirement.Assertions {
-				proof["upstream_protocol/"+requirement.ID+"/"+label] = true
-			}
-		}
-	}
-	candidate := gateway.Candidate{GroupID: "group-own", GroupModelID: "offering-own", ChannelID: "channel-own", CredentialRevision: 1, CredentialScope: "synthetic-actual-scope", ConfigRevision: 1, OwnerID: "provider", BaseURL: "https://synthetic.example", UpstreamModel: "native/model:2026", Credential: sealed, Quotes: book, MultiplierNano: ledger.UnitRate, Evidence: proof}
+	candidate := gateway.Candidate{GroupID: "group-own", GroupModelID: "offering-own", ChannelID: "channel-own", CredentialRevision: 1, ConfigRevision: 1, OwnerID: "provider", BaseURL: "https://synthetic.example", UpstreamModel: "native/model:2026", Credential: sealed, Quotes: book, MultiplierNano: ledger.UnitRate}
 	store := &proxyStore{candidate: candidate, key: gateway.KeyAuth{OwnerID: "account-own", KeyID: "key-own", AccountActive: true, Enabled: true}}
 	engine := gateway.NewEngine(gateway.Dependencies{Store: store, Catalog: proxyModels{}, Settings: settings.NewService(newFakeStore()), Routing: newFakeRoutingStore(), Keyring: keyring, Outbound: newTestOutbound(t, upstream)})
 	handler := NewHandler(Dependencies{Gateway: engine})
@@ -117,5 +105,52 @@ func TestGatewayForwardsWithoutServerSideState(t *testing.T) {
 	}
 	if !bytes.Contains(seen[len(seen)-1], []byte(`"conversation":null`)) {
 		t.Fatalf("null conversation was dropped: %s", seen[len(seen)-1])
+	}
+
+	// Gemini names its cached context in the body. Its cache management
+	// endpoints are retired, so a reference to an existing cache is refused
+	// the same way, while an empty or absent member is forwarded untouched.
+	const gemini = "/v1beta/models/platform%2Fmodel:2026:generateContent"
+	for _, tc := range []struct{ name, body string }{
+		{"cached content", `{"contents":[{"parts":[{"text":"x"}]}],"cachedContent":"cachedContents/owned"}`},
+		{"capitalised cached content", `{"contents":[],"CACHEDCONTENT":"cachedContents/owned"}`},
+	} {
+		before := len(seen)
+		recorder := call(gemini, tc.body)
+		if recorder.Code != http.StatusBadRequest {
+			t.Fatalf("%s: %d %s", tc.name, recorder.Code, recorder.Body.String())
+		}
+		if len(seen) != before {
+			t.Fatalf("%s: the request reached the upstream", tc.name)
+		}
+		var body struct {
+			Error struct {
+				Code    int    `json:"code"`
+				Message string `json:"message"`
+				Details []struct {
+					Reason string `json:"reason"`
+				} `json:"details"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		if body.Error.Code != http.StatusBadRequest || len(body.Error.Details) == 0 || body.Error.Details[0].Reason != "STATEFUL_REQUEST_UNSUPPORTED" || !strings.Contains(body.Error.Message, "cachedContent") {
+			t.Fatalf("%s: %d %q %+v", tc.name, body.Error.Code, body.Error.Message, body.Error.Details)
+		}
+	}
+	for _, tc := range []struct{ name, body string }{
+		{"cached content empty", `{"contents":[{"parts":[{"text":"x"}]}],"cachedContent":""}`},
+		{"cached content null", `{"contents":[{"parts":[{"text":"x"}]}],"cachedContent":null}`},
+		{"without cached content", `{"contents":[{"parts":[{"text":"x"}]}]}`},
+	} {
+		before := len(seen)
+		recorder := call(gemini, tc.body)
+		if recorder.Code != http.StatusOK || len(seen) != before+1 {
+			t.Fatalf("%s: %d %s (upstream calls %d)", tc.name, recorder.Code, recorder.Body.String(), len(seen)-before)
+		}
+		if got := string(seen[len(seen)-1]); got != tc.body {
+			t.Fatalf("%s: upstream body\n got %s\nwant %s", tc.name, got, tc.body)
+		}
 	}
 }

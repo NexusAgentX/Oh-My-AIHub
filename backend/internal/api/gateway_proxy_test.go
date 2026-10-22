@@ -146,15 +146,7 @@ func TestGatewayF7EveryNativeEndpointUsesRealEntryAndScope(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			proof := map[string]bool{}
-			for _, suite := range manifest.Suites {
-				for _, req := range suite.Requirements {
-					for _, label := range req.Assertions {
-						proof["upstream_protocol/"+req.ID+"/"+label] = true
-					}
-				}
-			}
-			candidate := gateway.Candidate{GroupID: "group-own", GroupModelID: "offering-own", ChannelID: "channel-own", CredentialRevision: 1, CredentialScope: "synthetic-actual-scope", ConfigRevision: 1, OwnerID: "provider", BaseURL: "https://synthetic.example", UpstreamModel: "native/model:2026", Credential: sealed, Quotes: book, MultiplierNano: ledger.UnitRate, Evidence: proof}
+			candidate := gateway.Candidate{GroupID: "group-own", GroupModelID: "offering-own", ChannelID: "channel-own", CredentialRevision: 1, ConfigRevision: 1, OwnerID: "provider", BaseURL: "https://synthetic.example", UpstreamModel: "native/model:2026", Credential: sealed, Quotes: book, MultiplierNano: ledger.UnitRate}
 			store := &proxyStore{candidate: candidate, key: gateway.KeyAuth{OwnerID: "account-own", KeyID: "key-own", AccountActive: true, Enabled: true}}
 			engine := gateway.NewEngine(gateway.Dependencies{Store: store, Catalog: proxyModels{}, Settings: settings.NewService(newFakeStore()), Routing: newFakeRoutingStore(), Keyring: keyring, Outbound: newTestOutbound(t, upstream)})
 			handler := NewHandler(Dependencies{Gateway: engine})

@@ -20,7 +20,6 @@ describe('approved group market presentation',()=>{
     const html=renderToStaticMarkup(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/models']}><MarketModelsPage/></MemoryRouter></QueryClientProvider>)
     expect(html).toContain('vendor/model:v1')
     expect(html).toContain('共 1 个模型')
-    expect(html).toContain('同一候选同时满足')
     expect(html).toContain('匹配候选的典型费用')
     expect(html).not.toContain('最低参考价')
     expect(html).not.toContain('0 积分')
