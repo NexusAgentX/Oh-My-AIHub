@@ -171,7 +171,7 @@ func TestSetProfileChangesLaterAnswers(t *testing.T) {
 	}
 }
 
-func TestResponsesIDsAreUniqueAndFollowUpsAreChecked(t *testing.T) {
+func TestResponsesIDsAreUnique(t *testing.T) {
 	upstream := NewUpstream(Profile{Tokens: 2})
 	server := httptest.NewServer(upstream)
 	defer server.Close()
@@ -181,14 +181,6 @@ func TestResponsesIDsAreUniqueAndFollowUpsAreChecked(t *testing.T) {
 	a, b := ResponseID(first), ResponseID(second)
 	if a == "" || a == b {
 		t.Fatalf("ids %q and %q", a, b)
-	}
-	spec.PreviousResponseID = a
-	fetch(t, server.URL, spec.Build(server.URL))
-	spec.PreviousResponseID = "resp_elsewhere_9"
-	fetch(t, server.URL, spec.Build(server.URL))
-	// The test server's host is 127.0.0.1:port, whose first label is "127".
-	if stats := upstream.Stats(); stats.StickyChecked != 2 || stats.StickyMisses != 1 {
-		t.Fatalf("stats = %+v (first id %s)", stats, a)
 	}
 }
 

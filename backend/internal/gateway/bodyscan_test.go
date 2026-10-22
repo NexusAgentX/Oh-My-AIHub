@@ -9,12 +9,12 @@ import (
 )
 
 func TestScanRequestReadsOnlyTopLevelKeys(t *testing.T) {
-	body := []byte(` {"messages":[{"model":"inner","content":"{\"model\":\"x\"}"}],"mod\u0065l" : "gpt-5" ,"stream":true,"previous_response_id":"resp_1","extra":{"model":"nested"}} `)
+	body := []byte(` {"messages":[{"model":"inner","content":"{\"model\":\"x\"}"}],"mod\u0065l" : "gpt-5" ,"stream":true,"extra":{"model":"nested"}} `)
 	facts, _, err := ScanRequest(body)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := RequestFacts{Model: "gpt-5", HasModel: true, Stream: true, PreviousResponseID: "resp_1"}
+	want := RequestFacts{Model: "gpt-5", HasModel: true, Stream: true}
 	if facts != want {
 		t.Fatalf("facts = %#v, want %#v", facts, want)
 	}

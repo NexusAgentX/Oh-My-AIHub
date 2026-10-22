@@ -11,8 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
@@ -312,69 +310,6 @@ func TestLoadReportsAnUnreadableDatabase(t *testing.T) {
 	loader := &fakeLoader{err: errors.New("database down")}
 	if err := newTestCache(loader).Load(ctx); err == nil {
 		t.Fatal("Load hid the failure")
-	}
-}
-
-func TestResponseChannelIsRememberedWhenACallEndsAndFoundInTheDatabaseOtherwise(t *testing.T) {
-	raw := &countingStore{responseChannels: map[string]string{"acct/resp_old": "ch-old"}}
-	store := newTestCache(&fakeLoader{}).Gateway(raw)
-	ctx := context.Background()
-
-	// A call that ended in this process: the next turn finds it in memory.
-	raw.finishResult = gateway.FinishResult{Finished: true}
-	if _, err := store.FinishCall(ctx, gateway.CallFinish{AccountID: "acct", UpstreamResponseID: "resp_new", ChannelID: "ch-new"}); err != nil {
-		t.Fatal(err)
-	}
-	if channelID, err := store.ResponseChannel(ctx, "acct", "resp_new"); err != nil || channelID != "ch-new" {
-		t.Fatalf("recent response = %q, %v", channelID, err)
-	}
-	if raw.lookups.Load() != 0 {
-		t.Fatal("a response closed by this process was looked up in the database")
-	}
-	// One from before the process started: the database answers once.
-	for range 2 {
-		if channelID, err := store.ResponseChannel(ctx, "acct", "resp_old"); err != nil || channelID != "ch-old" {
-			t.Fatalf("old response = %q, %v", channelID, err)
-		}
-	}
-	if raw.lookups.Load() != 1 {
-		t.Fatalf("database lookups = %d, want 1", raw.lookups.Load())
-	}
-	// An unknown one stays unknown (and is not remembered as missing).
-	if _, err := store.ResponseChannel(ctx, "acct", "resp_none"); !errors.Is(err, pgx.ErrNoRows) {
-		t.Fatalf("unknown response err = %v", err)
-	}
-	// Another account cannot continue from it.
-	if _, err := store.ResponseChannel(ctx, "other", "resp_new"); err == nil {
-		t.Fatal("a response of another account was found")
-	}
-	// A call that did not end here, or that has no response id, is not remembered.
-	raw.finishResult = gateway.FinishResult{Finished: false}
-	_, _ = store.FinishCall(ctx, gateway.CallFinish{AccountID: "acct", UpstreamResponseID: "resp_late", ChannelID: "ch-x"})
-	if _, err := store.ResponseChannel(ctx, "acct", "resp_late"); err == nil {
-		t.Fatal("a call that did not finish here was remembered")
-	}
-}
-
-func TestResponseLRUEvictsTheLeastRecentlyUsed(t *testing.T) {
-	lru := newResponseLRU(2)
-	lru.put("a", "1", "c1")
-	lru.put("a", "2", "c2")
-	if _, ok := lru.get("a", "1"); !ok { // 1 is now the most recent
-		t.Fatal("1 missing")
-	}
-	lru.put("a", "3", "c3") // evicts 2
-	if _, ok := lru.get("a", "2"); ok {
-		t.Fatal("2 survived")
-	}
-	for _, id := range []string{"1", "3"} {
-		if _, ok := lru.get("a", id); !ok {
-			t.Fatalf("%s evicted", id)
-		}
-	}
-	lru.put("a", "3", "c3b")
-	if channelID, _ := lru.get("a", "3"); channelID != "c3b" {
-		t.Fatalf("update = %q", channelID)
 	}
 }
 

@@ -56,11 +56,6 @@ WHERE c.created_at >= sqlc.arg(since)::timestamptz
   AND att->>'selection_final' IS DISTINCT FROM 'false'
 GROUP BY 1, 2, 3, 4;
 
--- name: ResponseChannel :one
-SELECT final_channel_id FROM calls
-WHERE upstream_response_id = $1 AND account_id = $2 AND final_channel_id IS NOT NULL
-ORDER BY created_at DESC LIMIT 1;
-
 -- One bounded startup read, never a background scan or request-path query.
 -- Only v2 attempt facts populate model/protocol/tier/stream scopes. At most
 -- 20k recently completed calls and caller-limited aggregate rows are examined;

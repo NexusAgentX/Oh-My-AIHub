@@ -27,7 +27,7 @@ on:
       scenarios:
         description: '场景，逗号分隔，语法见 scripts/perf-ab.sh（nonstream@200 表示 200 次/秒的非流式）'
         required: false
-        default: 'nonstream,nonstream@200,stream,concurrent,budget,sticky,sweep-nonstream,sweep-stream'
+        default: 'nonstream,nonstream@200,stream,concurrent,budget,sweep-nonstream,sweep-stream'
         type: string
       repeat:
         description: '轮数：每轮把每个场景在两侧各测一次，两侧交替先后'

@@ -6,10 +6,8 @@
 
 契约是 `backend/api/openapi.yaml` 根级的扩展字段，位于 `paths` 之外，不登记正式路由，只描述已交付入口的来源与策略：
 
-- 端点只声明 8 条推理/图片入口（OpenAI Chat、Responses、Anthropic Messages、Gemini `generateContent`/`streamGenerateContent`、图片生成/编辑/变体）以及 OpenAI、Anthropic、Gemini 三种风格的模型列表与单模型元数据。`/v1`、`/v1beta`、`/backend-api` 上的其他路径回答 404 `unsupported_endpoint`。
-- `sources` 只保留与保留入口相关的官方文档或 SDK 来源；`suites` 记录上游协议来源编号与断言分组；`exclusions` 记录移出范围的来源编号及原因（含已退役能力），表示“不验证”，不表示“上游不支持”。
-- `adjustments` 记录来源编号的合并/拆分与请求边界结论。
-- 来源编号是外部可追溯基线，不是请求次数或完整性分母。新增或删除入口必须同时修改契约与真实路由；契约里的条目不会自动变成可用入口。
+- 契约只有 `sources` 与 `endpoints`。端点声明 8 条推理/图片入口（OpenAI Chat、Responses、Anthropic Messages、Gemini `generateContent`/`streamGenerateContent`、图片生成/编辑/变体）以及 OpenAI、Anthropic、Gemini 三种风格的模型列表与单模型元数据。`/v1`、`/v1beta`、`/backend-api` 上的其他路径回答 404 `unsupported_endpoint`。
+- `sources` 只保留保留入口引用的官方文档或 SDK 来源，每条都必须被至少一个端点引用。新增或删除入口必须同时修改契约与真实路由；契约里的条目不会自动变成可用入口。
 
 ## 验证
 
@@ -20,13 +18,13 @@ mise run generate   # 重新生成 frontend/src/api/schema.gen.ts，提交前确
 
 覆盖范围：
 
-- `TestManifestTraceabilityAndScope` 要求四个协议的来源编号完整（Chat 51、Responses 80、Messages 68、GenerateContent 80），并拒绝文件、上传、向量库、容器类资源路径重新进入端点表。
-- `TestManifestRejectsBrokenHandoffs` 要求缺失端点、重复 ID、缺失来源、错误 Feature、聚合环等破坏都无法通过校验。
+- `TestManifestTraceabilityAndScope` 固定端点表：8 条推理/图片入口与 7 条模型目录入口，逐条核对 `feature`，并拒绝文件、上传、向量库、容器类资源路径重新进入端点表。
+- `TestManifestRejectsBrokenHandoffs` 要求重复 ID、缺失来源、无人引用的来源、错误 Feature、缺失字段、未定的认证方式等破坏都无法通过校验。
 - `TestGatewayF7EveryNativeEndpointUsesRealEntryAndScope` 逐个 F7 推理/图片端点走真实入口：平台 Key 换渠道上游 Key、图片 multipart 只替换模型字段、Gemini 路径解析 `{model}:{operation}`、未实现的 operation 回答 `unsupported_endpoint`。
 - `TestRetiredGatewayEndpointsAnswerNotFound` 与 `TestGatewayForwardsWithoutServerSideState` 固定退役路径与请求边界；`TestBackgroundResponseIsRejected` 固定后台请求的拒绝。
 - `internal/gateway` 的 `stateless` 用例固定 `store` 剥离、`previous_response_id`/`conversation`/`cachedContent` 识别与零复制路径。
 
-契约失败时的排查顺序：先看 `paths` 与路由表是否一致，再看端点引用的 `source` 是否存在、`suite` 的 `endpoints` 是否都还在端点表里。删除入口时要把对应来源编号移入 `exclusions` 并写明原因，而不是留下悬空引用。
+契约失败时的排查顺序：先看 `paths` 与路由表是否一致，再看端点引用的 `source` 是否存在、每条来源是否仍被端点引用。删除入口时连同只被它引用的来源一起删掉，不留悬空引用。
 
 ## 请求边界
 

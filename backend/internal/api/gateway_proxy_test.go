@@ -72,7 +72,7 @@ func TestGatewayF7EveryNativeEndpointUsesRealEntryAndScope(t *testing.T) {
 	for _, ep := range manifest.Endpoints {
 		// Only stateless inference is served now; the retired resource, cache
 		// and token-counting paths are covered by TestRetiredGatewayEndpointsAnswerNotFound.
-		if ep.Feature != "F7" || ep.Replay != "inference" || ep.Retired {
+		if ep.Feature != "F7" || ep.Replay != "inference" {
 			continue
 		}
 		t.Run(ep.ID, func(t *testing.T) {
@@ -206,7 +206,7 @@ func TestGatewayF7EveryNativeEndpointUsesRealEntryAndScope(t *testing.T) {
 				handler.ServeHTTP(cross, request)
 				want := strings.Replace(portable, `"platform/model:2026"`, `"native/model:2026"`, 1)
 				if cross.Code != 200 || string(inferenceBody) != want || store.finished[len(store.finished)-1].ChannelID != "channel-second" {
-					t.Fatal("self-contained state became sticky or changed", cross.Code, string(inferenceBody))
+					t.Fatal("self-contained state changed or stayed bound to the first channel", cross.Code, string(inferenceBody))
 				}
 			}
 		})

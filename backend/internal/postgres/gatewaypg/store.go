@@ -137,17 +137,6 @@ func (s *Store) AttemptHistory(ctx context.Context, since time.Time) ([]gateway.
 	return history, nil
 }
 
-func (s *Store) ResponseChannel(ctx context.Context, accountID, responseID string) (string, error) {
-	id, err := s.q.ResponseChannel(ctx, ResponseChannelParams{UpstreamResponseID: &responseID, AccountID: accountID})
-	if err != nil {
-		return "", err
-	}
-	if id == nil {
-		return "", pgx.ErrNoRows
-	}
-	return *id, nil
-}
-
 func optional(value string) *string {
 	if value == "" {
 		return nil

@@ -59,7 +59,7 @@ type Plan struct {
 	// counts the request as incomplete. Nil accepts every answer that ends cleanly.
 	Complete func(tail []byte) bool
 	// Captured, when set, receives the body of every successful answer (at most
-	// CaptureLimit bytes of it). Used to follow a conversation by response ID.
+	// CaptureLimit bytes of it), for a load that reads the answer.
 	Captured     func(seq int64, status int, body []byte)
 	CaptureLimit int
 }

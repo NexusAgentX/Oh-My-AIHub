@@ -328,7 +328,7 @@ func TestGatewayRequestsDoNotReadSnapshotDataFromTheDatabase(t *testing.T) {
 	t.Logf("statements for %d requests: %v (%.1f per request)", requests, statements, float64(gatewaybench.Total(statements))/requests)
 	for _, name := range []string{
 		"LookupKey", "GetModel", "ListModels", "ListTiers", "ListCandidates", "ListAllCandidates", "ListAllKeys", "ListAllRoutePrefs",
-		"ListRoutePrefs", "ListRoutePrefChannels", "CustomModelOnline", "ListOnlineModels", "ResponseChannel",
+		"ListRoutePrefs", "ListRoutePrefChannels", "CustomModelOnline", "ListOnlineModels",
 		"GetPoints", "ListPoints",
 	} {
 		if statements[name] != 0 {

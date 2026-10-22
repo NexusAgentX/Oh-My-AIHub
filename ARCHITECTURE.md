@@ -47,7 +47,7 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 | `market` / `postgres/marketpg` | 供应商分组、稳定地址关系、模型报价与治理的类型化持久契约 |
 | `supplier` | 贡献页官网图标的有界抓取、栅格验证与重新编码；无独立目录存储或地址识别服务 |
 | `gateway` | 透明网关（ADR-0035）：请求体扫描与 `model` 替换、旁路用量解析、候选排序、进程内渠道状态、事件总线 |
-| `gatewaycontract` | 版本化端点与套件来源清单：F7 只注册无状态推理/图片入口，套件记录上游协议来源与断言，不表示本网关已开放该能力 |
+| `gatewaycontract` | 版本化端点表：F7 只登记无状态推理/图片入口，`sources` 只留这些入口的官方文档或 SDK 来源 |
 | `snapshot` | 网关热路径数据的进程内缓存与写路径包装：Key、目录模型、渠道候选、路由偏好的快照，写提交后同步重建，另周期性全量重建；账号余额与信用额度缓存（ADR-0040） |
 | `observe`、`metrics` | 现算观测、对账核对与补记、SSE 推送；Prometheus 指标（ADR-0029） |
 | `c2c` | 卖单市场纯状态机与服务、C2C 私密数据密钥环 |

@@ -438,9 +438,9 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 
 	// One scan of the body gives the facts of every format: the two members that
 	// pick a price, and for the formats that name the model in the body, the
-	// model, stream flag and sticky response too. A Gemini body is not
-	// validated here (its model and stream flag are in the path), so a body the
-	// scan rejects only means there are no pricing members to read.
+	// model and stream flag. A Gemini body is not validated here (its model and
+	// stream flag are in the path), so a body the scan rejects only means there
+	// are no pricing members to read.
 	facts, scan, scanErr := ScanRequest(body)
 	if format == channel.FormatOpenAIImages && strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "multipart/") {
 		facts, scan, call.imageMultipart, scanErr = scanImageMultipart(body, r.Header.Get("Content-Type"))
@@ -450,7 +450,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		call.hints = scan.billingHints(body, format)
 	}
 
-	stickyResponseID := ""
 	if format == channel.FormatGemini {
 		call.requested, call.stream = pathModel, pathStream
 	} else {
@@ -477,9 +476,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	if call.requested == "" {
 		e.reject(w, call, OutcomeRejectedModel, 400, "model_context_required", "请求需要明确的模型上下文")
 		return
-	}
-	if format == channel.FormatOpenAIResponses {
-		stickyResponseID = facts.PreviousResponseID
 	}
 
 	call.stage("request", prepareAt, e.Now())
@@ -587,12 +583,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		candidates[index].RateNano = ledger.ModelRate(pricing.PriceCurrency, defaults.USDCNYRateNano)
 	}
 	e.applyTypicalPrices(candidates, call.modelID, defaults.USDCNYRateNano)
-	sticky := ""
-	if stickyResponseID != "" {
-		if channelID, err := e.Store.ResponseChannel(ctx, key.OwnerID, stickyResponseID); err == nil {
-			sticky = channelID
-		}
-	}
 	stats := e.statsView()
 	channelStats, demoted := stats.channels, stats.anomalies[call.modelID]
 	for _, candidate := range candidates {
@@ -616,7 +606,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	}
 	ordered := Rank(RankInput{
 		Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: channelStats,
-		Demoted: demoted, ConsumerID: key.OwnerID, Sticky: sticky,
+		Demoted: demoted, ConsumerID: key.OwnerID,
 		Available: func(c Candidate) bool {
 			if !c.ValidOffering(call.modelID) {
 				return false
@@ -630,9 +620,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			d := &call.diagnostics.Routing[j]
 			if d.Channel.ID == candidate.ChannelID {
 				d.Rank = i + 1
-				if candidate.ChannelID == sticky {
-					d.Reason = "sticky"
-				} else if d.Reason == "eligible" {
+				if d.Reason == "eligible" {
 					d.Reason = string(pref.Mode)
 				}
 			}

@@ -12,9 +12,8 @@ import (
 )
 
 // Gateway returns the store the engine reads through: key lookup, candidates,
-// the online models, the Responses stickiness and the balances come from
-// memory, everything else (opening and closing calls, spend, stats) goes to
-// raw.
+// the online models and the balances come from memory, everything else
+// (opening and closing calls, spend, stats) goes to raw.
 //
 // A key the snapshot does not know is unknown: there is no fallback to the
 // database. The snapshot holds every key, so a missing one does not exist;
@@ -75,29 +74,6 @@ func (s gatewayStore) OnlineModels(ctx context.Context) ([]gateway.OnlineModel, 
 	return fleet.online, nil
 }
 
-// ResponseChannel answers from the recent Responses turns this process has
-// closed, and asks the database for older ones.
-func (s gatewayStore) ResponseChannel(ctx context.Context, accountID, responseID string) (string, error) {
-	if channelID, found := s.c.sticky.get(accountID, responseID); found {
-		return channelID, nil
-	}
-	channelID, err := s.Store.ResponseChannel(ctx, accountID, responseID)
-	if err == nil {
-		s.c.sticky.put(accountID, responseID, channelID)
-	}
-	return channelID, err
-}
-
-// FinishCall closes the call and remembers which channel answered it, for the
-// next Responses turn that continues from it.
-func (s gatewayStore) FinishCall(ctx context.Context, finish gateway.CallFinish) (gateway.FinishResult, error) {
-	result, err := s.Store.FinishCall(ctx, finish)
-	if err == nil && result.Finished && finish.UpstreamResponseID != "" && finish.ChannelID != "" {
-		s.c.sticky.put(finish.AccountID, finish.UpstreamResponseID, finish.ChannelID)
-	}
-	return result, err
-}
-
 // What each method of gateway.Store does here. The first list is answered from
 // the snapshots and the balance cache; the others go to the database store and
 // change nothing they hold (TouchKey only stamps last_used_at,
@@ -105,7 +81,7 @@ func (s gatewayStore) FinishCall(ctx context.Context, finish gateway.CallFinish)
 // reaches the balance cache through the ledger's Books).
 // TestEveryStoreMethodIsClassified keeps both lists complete.
 var (
-	gatewayStoreSnapshot = []string{"LookupKey", "Candidates", "OnlineModels", "ResponseChannel", "Points"}
+	gatewayStoreSnapshot = []string{"LookupKey", "Candidates", "OnlineModels", "Points"}
 	gatewayStoreOthers   = []string{
 		"TouchKey", "KeySpend", "AttemptHistory", "InsertCall", "FinishCall",
 		"SweepStaleCalls", "RecordChannelEvent",

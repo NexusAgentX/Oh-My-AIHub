@@ -8,8 +8,8 @@
 #
 # 环境变量：
 #   PERF_SCENARIOS  逗号分隔，默认与 G8.0 一致。取值同基线工具的 -perf.scenarios：
-#                   nonstream stream concurrent saturate budget sticky formats responses sweep-nonstream sweep-stream；
-#                   另可写 <场景>@<速率>（场景限 nonstream stream budget sticky），以 -perf.qps=<速率> 单独运行，
+#                   nonstream stream concurrent saturate budget formats responses sweep-nonstream sweep-stream；
+#                   另可写 <场景>@<速率>（场景限 nonstream stream budget），以 -perf.qps=<速率> 单独运行，
 #                   如 nonstream@200 就是 200 次/秒的非流式。
 #   PERF_ROUNDS     轮数，默认 3。每轮把每个场景在 base 与 head 上各测一次；奇数轮 base 先、偶数轮 head 先，
 #                   两边交替，抵消机器随时间的漂移。报告里的中位数与范围就是对这些轮取的。
@@ -39,7 +39,7 @@ out_dir="$3"
 # 基线工具在包目录里运行，输出目录必须是绝对路径。
 case "$out_dir" in /*) ;; *) out_dir="$PWD/$out_dir" ;; esac
 
-scenarios="${PERF_SCENARIOS:-nonstream,nonstream@200,stream,concurrent,budget,sticky,sweep-nonstream,sweep-stream}"
+scenarios="${PERF_SCENARIOS:-nonstream,nonstream@200,stream,concurrent,budget,sweep-nonstream,sweep-stream}"
 rounds="${PERF_ROUNDS:-3}"
 tool_args="${PERF_TOOL_ARGS:-}"
 dry_run="${PERF_DRY_RUN:-}"
@@ -59,8 +59,8 @@ rates=()
 for token in "${tokens[@]}"; do
   case "$token" in
     sweep-nonstream | sweep-stream) sweeps+=("$token") ;;
-    nonstream | stream | concurrent | saturate | budget | sticky | formats | responses) plain+=("$token") ;;
-    nonstream@* | stream@* | budget@* | sticky@*)
+    nonstream | stream | concurrent | saturate | budget | formats | responses) plain+=("$token") ;;
+    nonstream@* | stream@* | budget@*)
       rate="${token#*@}"
       [[ "$rate" =~ ^[1-9][0-9]*$ ]] || die "速率必须是正整数：$token"
       case " ${rates[*]-} " in
