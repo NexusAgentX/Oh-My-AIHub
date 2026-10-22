@@ -29,21 +29,17 @@ type Source struct {
 }
 
 type Endpoint struct {
-	ID       string   `yaml:"id"`
-	Protocol string   `yaml:"protocol"`
-	Method   string   `yaml:"method"`
-	Path     string   `yaml:"path"`
-	Feature  string   `yaml:"feature"`
-	Auth     string   `yaml:"auth"`
-	Scope    string   `yaml:"scope"`
-	Model    string   `yaml:"model"`
-	Billing  string   `yaml:"billing"`
-	Replay   string   `yaml:"replay"`
-	Source   string   `yaml:"source"`
-	Headers  []string `yaml:"headers,omitempty"`
-	Fields   []string `yaml:"fields,omitempty"`
-	Required []string `yaml:"required_fields,omitempty"`
-	Returns  []string `yaml:"return_fields,omitempty"`
+	ID       string `yaml:"id"`
+	Protocol string `yaml:"protocol"`
+	Method   string `yaml:"method"`
+	Path     string `yaml:"path"`
+	Feature  string `yaml:"feature"`
+	Auth     string `yaml:"auth"`
+	Scope    string `yaml:"scope"`
+	Model    string `yaml:"model"`
+	Billing  string `yaml:"billing"`
+	Replay   string `yaml:"replay"`
+	Source   string `yaml:"source"`
 }
 
 // Load reads discovery metadata from the same document as the live API. The
@@ -105,18 +101,6 @@ func (m Manifest) Validate() error {
 		}
 		if e.Model == "" || e.Billing == "" || (e.Replay != "read" && e.Replay != "write" && e.Replay != "inference") {
 			return fmt.Errorf("incomplete policy for %s", e.ID)
-		}
-		fields := map[string]bool{}
-		for _, field := range e.Fields {
-			if field == "" || fields[field] {
-				return fmt.Errorf("invalid field for %s", e.ID)
-			}
-			fields[field] = true
-		}
-		for _, field := range e.Required {
-			if !fields[field] {
-				return fmt.Errorf("missing required field %s for %s", field, e.ID)
-			}
 		}
 		endpoints[e.ID] = true
 	}

@@ -11604,10 +11604,7 @@ x-aihub-gateway-contract:
         "billing": "reliable_operation",
         "replay": "inference",
         "feature": "F7",
-        "auth": "platform_key",
-        "headers": [
-          "anthropic-version:2023-06-01"
-        ]
+        "auth": "platform_key"
       },
       {
         "id": "gemini.generateContent",
@@ -11672,10 +11669,7 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "read",
         "feature": "F11",
-        "auth": "platform_key",
-        "headers": [
-          "anthropic-version:2023-06-01"
-        ]
+        "auth": "platform_key"
       },
       {
         "id": "models.anthropic.get",
@@ -11688,10 +11682,7 @@ x-aihub-gateway-contract:
         "billing": "none",
         "replay": "read",
         "feature": "F11",
-        "auth": "platform_key",
-        "headers": [
-          "anthropic-version:2023-06-01"
-        ]
+        "auth": "platform_key"
       },
       {
         "id": "models.gemini.list",

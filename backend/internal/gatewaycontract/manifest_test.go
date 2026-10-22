@@ -54,7 +54,7 @@ func TestManifestTraceabilityAndScope(t *testing.T) {
 }
 
 func TestManifestRejectsBrokenHandoffs(t *testing.T) {
-	for _, name := range []string{"duplicate_id", "missing_source", "unused_source", "wrong_feature", "missing_required_field", "pending_identity"} {
+	for _, name := range []string{"duplicate_id", "missing_source", "unused_source", "wrong_feature", "pending_identity"} {
 		t.Run(name, func(t *testing.T) {
 			m, err := Load()
 			if err != nil {
@@ -69,8 +69,6 @@ func TestManifestRejectsBrokenHandoffs(t *testing.T) {
 				m.Sources = append(m.Sources, Source{ID: "unsolicited", URL: "https://example.com/docs", Version: "v0"})
 			case "wrong_feature":
 				m.Endpoints[0].Feature = "F99"
-			case "missing_required_field":
-				m.Endpoints[0].Required = []string{"not-declared"}
 			case "pending_identity":
 				m.Endpoints[0].Auth = "identity_decision_pending"
 			}
