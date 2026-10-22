@@ -22,7 +22,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/forum"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/geolocation"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
@@ -35,7 +34,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/contributionpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/groupchannelpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/marketpg"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/resourcepg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/settingspg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/typicalpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
@@ -218,36 +216,11 @@ func main() {
 		cancel()
 	}
 
-	resourceStartup, stopResourceStartup := context.WithTimeout(context.Background(), keyringCheckTimeout)
-	resourcePool, err := database.OpenLimited(resourceStartup, databaseURL, 2)
-	if err != nil {
-		fatal(logger, "opening resource metadata pool failed", err)
-	}
-	defer resourcePool.Close()
-	cursorRoot, err := store.Market.ProtectedRoot(resourceStartup, credentialKeyring, "cursor-root-v1")
-	if err != nil {
-		fatal(logger, "opening resource cursor root failed", err)
-	}
-	resourceCursors, err := gatewaycontract.NewCursorCodec(cursorRoot)
-	clear(cursorRoot)
-	if err != nil {
-		fatal(logger, "initializing resource cursor codec failed", err)
-	}
-	stopResourceStartup()
 	engine := gateway.NewEngine(gateway.Dependencies{
-		Resources: resourcepg.NewStore(resourcePool), ResourceCursors: resourceCursors,
 		TrustedProxyCIDRs: trustedProxyCIDRs, Geo: geo, GatewayLocation: gatewayLocation, LocationSource: geoSource(geoEnabled),
-		Ready: groupRuntime.Check, Jobs: store.Gateway, Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
+		Ready: groupRuntime.Check, Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
 		Keyring: credentialKeyring, Outbound: outboundPolicy, Events: gateway.Publishers{bus, platformMetrics}, Telemetry: platformMetrics, Logger: logger, Runtime: runtime,
 	})
-	backgroundCheckCtx, cancelBackgroundCheck := context.WithTimeout(context.Background(), keyringCheckTimeout)
-	if err := store.Gateway.VerifyBackgroundCredentials(backgroundCheckCtx, credentialKeyring); err != nil {
-		fatal(logger, "checking background credentials failed", err)
-	}
-	if err := engine.RestoreBackground(backgroundCheckCtx); err != nil {
-		fatal(logger, "restoring background tasks failed", err)
-	}
-	cancelBackgroundCheck()
 	// An edit of a channel (settings, models, formats, suspension) clears what the
 	// 4xx anomaly rule counted against it before, and a channel ranked last for
 	// those answers is ranked on its merits again before the edit returns.
@@ -268,7 +241,6 @@ func main() {
 	cancelStats()
 	go engine.RunReaper(engineContext, time.Minute)
 	go engine.RunRefresh(engineContext)
-	go engine.RunBackground(engineContext)
 	go cached.Cache.Run(engineContext)
 
 	c2cService := c2c.NewService(store.C2C, c2cKeyring)

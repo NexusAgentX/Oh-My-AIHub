@@ -296,7 +296,6 @@ type nativeModelWitness struct {
 }
 
 // ModelListSource includes approved inference candidates in the current snapshot.
-// AuxiliarySource has a narrower state/quote contract and cannot stand in for it.
 type ModelListSource interface {
 	ModelListCandidates(context.Context, channel.Format) ([]CandidateRecord, error)
 }

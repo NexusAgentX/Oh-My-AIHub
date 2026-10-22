@@ -129,22 +129,6 @@ func TestBuildFleetIndexesByModelAndFormatInChannelOrder(t *testing.T) {
 
 }
 
-func TestModelListingDoesNotWidenAuxiliaryStateCandidates(t *testing.T) {
-	records := []gateway.CandidateRecord{
-		{ModelID: "legacy", Formats: []channel.Format{channel.FormatOpenAIChat}, Candidate: gateway.Candidate{ChannelID: "old"}},
-		{ModelID: "group", Formats: []channel.Format{channel.FormatOpenAIChat}, Candidate: gateway.Candidate{ChannelID: "new", GroupID: "g"}},
-	}
-	fleet := buildFleet(records)
-	listed := fleet.modelLists[channel.FormatOpenAIChat]
-	auxiliary := fleet.auxiliary[channel.FormatOpenAIChat]
-	if len(listed) != 2 || listed[0].ModelID != "legacy" || listed[1].ModelID != "group" {
-		t.Fatal("listing lost an inference candidate", listed)
-	}
-	if len(auxiliary) != 1 || auxiliary[0].Candidate.GroupID != "g" {
-		t.Fatal("legacy candidate acquired auxiliary state access", auxiliary)
-	}
-}
-
 func TestBuildModelsKeepsOrderAndFiltersDisabled(t *testing.T) {
 	set := buildModels([]catalog.Model{{ID: "b", Enabled: true}, {ID: "a"}, {ID: "c", Enabled: true}})
 	if ids := modelIDs(set.all); !slices.Equal(ids, []string{"b", "a", "c"}) {

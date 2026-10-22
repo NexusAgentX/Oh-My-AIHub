@@ -8,21 +8,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/nativeencoding"
 )
 
-func nativeZstdRequirement(path string) CapabilityRequirement {
-	id := "transport.zstd/" + path
-	if path == "/v1/responses" {
-		id = "codex-special.RL14/public_zstd_request"
-	}
-	// Each entrance keeps its own transport evidence label; a missing
-	// endpoint-specific proof follows normal unknown-capability rules.
-	return CapabilityRequirement{Layer: "upstream_protocol", ID: id}
-}
-
-type requestCodecError struct{ cause error }
-
-func (e *requestCodecError) Error() string { return "request transport encoding failed" }
-func (e *requestCodecError) Unwrap() error { return e.cause }
-
 func readNativeRequest(w http.ResponseWriter, r *http.Request) ([]byte, string, error) {
 	encoding, err := nativeencoding.Encoding(r.Header.Values("Content-Encoding"))
 	if err != nil {

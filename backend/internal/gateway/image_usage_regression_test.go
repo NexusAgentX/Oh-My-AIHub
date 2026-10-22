@@ -1,10 +1,7 @@
 package gateway
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"runtime"
 	"strings"
 	"testing"
@@ -30,37 +27,6 @@ func TestImageSubUsageCannotStandInForParentUsage(t *testing.T) {
 				t.Fatal("image facts manufactured reported parent usage", got)
 			}
 		}
-	}
-}
-
-func TestBackgroundImageOnlyUsagePersistsAsUnbilled(t *testing.T) {
-	for _, stream := range []bool{false, true} {
-		t.Run(fmt.Sprint(stream), func(t *testing.T) {
-			body := `{"id":"resp_followup","status":"completed","output":[{"id":"ig_one","type":"image_generation_call","model":"image-model","usage":{"input_tokens":1000000,"output_tokens":1000000,"input_tokens_details":{"image_tokens":1000000}}}]}`
-			e, store, job := followupFixture(t, func(w http.ResponseWriter, _ *http.Request) {
-				if stream {
-					w.Header().Set("Content-Type", "text/event-stream")
-					fmt.Fprint(w, "data: "+`{"type":"response.completed","response":`+body+"}\n\n")
-				} else {
-					w.Header().Set("Content-Type", "application/json")
-					fmt.Fprint(w, body)
-				}
-			})
-			e.reserveBackground(job.CallID)
-			e.pollBackgroundJob(context.Background(), job)
-			store.mu.Lock()
-			defer store.mu.Unlock()
-			finish, ok := store.finished[job.CallID]
-			if !ok || finish.Outcome != OutcomeUnbilled || finish.Bill != nil || finish.Cost != 0 || finish.Fee != 0 || !strings.Contains(string(finish.PriceSnapshot), "missing_main_usage") {
-				t.Fatalf("finish=%+v", finish)
-			}
-			var snapshot struct {
-				Detail ledger.UsageDetail `json:"detail"`
-			}
-			if err := json.Unmarshal(finish.PriceSnapshot, &snapshot); err != nil || len(snapshot.Detail.Iterations) != 1 || snapshot.Detail.Iterations[0].Usage.Detail.Tokens["input_image"] != 1_000_000 {
-				t.Fatalf("snapshot=%s err=%v", finish.PriceSnapshot, err)
-			}
-		})
 	}
 }
 

@@ -19,7 +19,9 @@ describe('gateway proxy log safety', () => {
 	})
 
 	it('proxies every contracted gateway endpoint in the development server', () => {
-		expect(gatewayPaths.length).toBeGreaterThan(20)
+		// Only stateless inference and model metadata remain; the Codex,
+		// resource, cache and token-counting paths are gone.
+		expect(gatewayPaths.length).toBeGreaterThan(8)
 		const patterns = Object.keys(config.server?.proxy ?? {}).filter((key) => key.startsWith('^')).map((key) => new RegExp(key))
 		for (const path of gatewayPaths) expect(patterns.some((pattern) => pattern.test(path)), path).toBe(true)
 	})

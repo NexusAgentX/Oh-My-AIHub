@@ -236,11 +236,6 @@ func (s *Store) FinishCall(ctx context.Context, finish gateway.CallFinish) (gate
 			return nil // already closed: never book twice
 		}
 		result.Finished = true
-		if finish.Background {
-			if err := q.SettleBackground(ctx, finish.ID); err != nil {
-				return err
-			}
-		}
 		if finish.Bill == nil {
 			return nil
 		}

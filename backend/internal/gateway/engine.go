@@ -27,13 +27,11 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/clientip"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/geolocation"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/nativeencoding"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/resourcestate"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/secretguard"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
@@ -74,14 +72,11 @@ type TypicalPriceLookup interface {
 
 type Dependencies struct {
 	TypicalPrices     func() TypicalPriceLookup
-	Resources         resourcestate.Repository
-	ResourceCursors   *gatewaycontract.CursorCodec
 	Ready             func() error
 	TrustedProxyCIDRs []netip.Prefix
 	Geo               *geolocation.Service
 	GatewayLocation   *geolocation.Location
 	LocationSource    string
-	Jobs              BackgroundStore
 	Store             Store
 	Catalog           Models
 	Settings          *settings.Service
@@ -107,11 +102,8 @@ type Dependencies struct {
 // Engine serves the gateway endpoints.
 type Engine struct {
 	Dependencies
-	spend         *SpendCache
-	inflight      *Inflight
-	jobsMu        sync.Mutex
-	followupSlots chan struct{}
-	jobs          map[string]backgroundLease
+	spend    *SpendCache
+	inflight *Inflight
 
 	// Settings are published as an immutable snapshot by RunRefresh, so the
 	// request path reads them without locking or waiting on the database. The
@@ -159,7 +151,7 @@ func NewEngine(dependencies Dependencies) *Engine {
 	if dependencies.StatsBook == nil {
 		dependencies.StatsBook = NewStatsBook()
 	}
-	return &Engine{Dependencies: dependencies, spend: NewSpendCache(), inflight: NewInflight(), followupSlots: make(chan struct{}, 32), jobs: map[string]backgroundLease{}, touched: map[string]time.Time{}, anomalyNotified: map[anomalyKey]time.Time{}}
+	return &Engine{Dependencies: dependencies, spend: NewSpendCache(), inflight: NewInflight(), touched: map[string]time.Time{}, anomalyNotified: map[anomalyKey]time.Time{}}
 }
 
 // Runtime exposes the in-process channel state for display.
@@ -272,12 +264,7 @@ func EffectiveLimits(advanced channel.Advanced, defaults settings.Settings) Limi
 type callState struct {
 	metricProtocol       string
 	requestEncoding      string
-	resourceReferences   []gatewaycontract.Reference
-	auxiliaryEndpoint    *gatewaycontract.Endpoint
 	imageMultipart       *imageMultipart
-	resourceObserver     *resourceObserver
-	resourceBinding      *resourcestate.Record
-	resourceRequired     []CapabilityRequirement
 	phase                string
 	phaseAt              time.Time
 	diagnostics          Diagnostics
@@ -305,13 +292,8 @@ type callState struct {
 	hints           billingHints
 	pricedStatement *quotepricing.Statement
 	billingFacts    quotepricing.Facts
-	pending         bool
-	polling         bool
 	completed       bool
-	releaseAccount  func()
-	releaseChannel  func()
 	authLocation    authLocation
-	upstreamHeaders http.Header
 }
 
 // ---- authentication ----
@@ -404,9 +386,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 			return
 		}
 		e.Telemetry.Active(string(format), -1)
-		if call.pending && !call.completed {
-			return
-		}
 		if call.phase != "" {
 			call.stage(call.phase, call.phaseAt, e.Now())
 		}
@@ -464,14 +443,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	if call.imageMultipart == nil {
 		call.hints = scan.billingHints(body, format)
 	}
-	if call.hints.Background {
-		call.upstreamHeaders = http.Header{}
-		for _, name := range []string{"OpenAI-Beta", "OpenAI-Organization", "OpenAI-Project"} {
-			if v := r.Header.Get(name); v != "" {
-				call.upstreamHeaders.Set(name, v)
-			}
-		}
-	}
 
 	stickyResponseID := ""
 	if format == channel.FormatGemini {
@@ -483,15 +454,11 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		e.reject(w, call, OutcomeRejectedModel, 400, "invalid_request", "请求体不是合法的原生请求")
 		return
 	}
-	if err = e.prepareResources(ctx, call, body, r.URL.Path); err != nil {
-		e.reject(w, call, OutcomeRejectedNoChannel, 404, "resource_unavailable", "资源不存在、归属冲突或已不可用")
+	if call.hints.Background {
+		// Synchronous inference only: a background job would outlive the request
+		// and keep upstream state, which this gateway no longer does.
+		e.reject(w, call, OutcomeRejectedFormat, http.StatusBadRequest, "background_unsupported", "本网关不支持后台响应，请移除 background 参数改为同步请求")
 		return
-	}
-	if call.requestEncoding != "" {
-		call.resourceRequired = append(call.resourceRequired, nativeZstdRequirement(r.URL.Path))
-	}
-	if call.requested == "" && call.resourceBinding != nil {
-		call.requested = call.resourceBinding.ContextModelID
 	}
 	if call.requested == "" {
 		e.reject(w, call, OutcomeRejectedModel, 400, "model_context_required", "请求需要明确的模型上下文")
@@ -576,27 +543,8 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		e.finishRejected(w, call, OutcomeRejectedInflight, http.StatusTooManyRequests, "too_many_inflight_calls", "同时进行的调用过多，请稍后重试")
 		return
 	}
-	call.releaseAccount = releaseInflight
-	defer func() {
-		if !call.pending {
-			releaseInflight()
-		}
-	}()
-	if call.hints.Background {
-		if format != channel.FormatOpenAIResponses || e.Jobs == nil {
-			e.finishRejected(w, call, OutcomeRejectedFormat, 400, "background_unavailable", "后台响应暂不可用")
-			return
-		}
-		if !e.reserveBackground(call.id) {
-			e.finishRejected(w, call, OutcomeRejectedInflight, 429, "background_capacity_exceeded", "后台任务已满，请稍后重试")
-			return
-		}
-		defer func() {
-			if !call.pending {
-				e.releaseBackground(call.id)
-			}
-		}()
-	}
+	defer releaseInflight()
+	defer releaseInflight()
 
 	call.stage("admission", admissionAt, e.Now())
 	routingAt := e.Now()
@@ -626,7 +574,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	}
 	e.applyTypicalPrices(candidates, call.modelID, defaults.USDCNYRateNano)
 	sticky := ""
-	if e.Resources == nil && stickyResponseID != "" {
+	if stickyResponseID != "" {
 		if channelID, err := e.Store.ResponseChannel(ctx, key.OwnerID, stickyResponseID); err == nil {
 			sticky = channelID
 		}
@@ -638,8 +586,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		switch {
 		case !candidate.ValidOffering(call.modelID):
 			reason = "missing_group_quote"
-		case !resourceMatch(candidate, call.resourceBinding):
-			reason = "resource_scope_unavailable"
 		case containsString(pref.Excluded, candidate.ChannelID):
 			reason = "excluded"
 		case pref.Mode == routing.ModeManual && !containsString(pref.Order, candidate.ChannelID):
@@ -658,7 +604,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: channelStats,
 		Demoted: demoted, ConsumerID: key.OwnerID, Sticky: sticky,
 		Available: func(c Candidate) bool {
-			if !c.ValidOffering(call.modelID) || !resourceMatch(c, call.resourceBinding) || call.resourceObserver != nil && c.GroupID == "" {
+			if !c.ValidOffering(call.modelID) {
 				return false
 			}
 			state, _ := e.Runtime.Check(c.ChannelID, EffectiveLimits(c.Advanced, defaults), started)
@@ -750,11 +696,8 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 				release()
 				return
 			case result.response != nil:
-				call.releaseChannel = release
 				e.streamBack(w, call, candidate.PricingModel(model), candidate, result, defaults)
-				if !call.pending {
-					release()
-				}
+				release()
 				return
 			}
 			if result.failure != nil {
@@ -1124,9 +1067,6 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		}
 	}
 	target, err := UpstreamURL(candidate.BaseURL, r.URL.Path, r.URL.RawQuery, call.format, candidate.UpstreamModel, location, secret)
-	if call.auxiliaryEndpoint != nil {
-		target, err = auxiliaryURL(candidate, nativePath(*call.auxiliaryEndpoint, r, candidate.UpstreamModel), r.URL.RawQuery, location, secret)
-	}
 	if err != nil {
 		return fail(EndConnectError, "bad_upstream_url", "无法构造上游地址", nil)
 	}
@@ -1172,11 +1112,7 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		network.Phases = append(network.Phases, phase("prepare", result.started, result.started, trace.start))
 	}
 
-	method := http.MethodPost
-	if call.auxiliaryEndpoint != nil {
-		method = r.Method
-	}
-	request, err := http.NewRequestWithContext(withNetworkTrace(attemptCtx, trace), method, target, bytes.NewReader(upstreamBody))
+	request, err := http.NewRequestWithContext(withNetworkTrace(attemptCtx, trace), http.MethodPost, target, bytes.NewReader(upstreamBody))
 	if err != nil {
 		cancel(nil)
 		return fail(EndConnectError, "bad_upstream_request", "无法构造上游请求", nil)
@@ -1398,48 +1334,20 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	defer putChunk(buffer)
 	defer response.Body.Close()
 	defer result.cancel(nil)
-	if call.hints.Background && !call.polling && !call.stream {
-		payload, err := stageBackground(&result)
-		if err != nil {
-			e.internalError(w, call, err)
-			return
-		}
-		initial := NewObserver(call.format, false, response.Header.Get("Content-Type"))
-		initial.Write(payload, e.Now())
-		ack := initial.Finish()
-		if ack.ResponseID != "" {
-			if err := e.keepBackground(call, model, candidate, defaults, ack.ResponseID); err != nil {
-				e.internalError(w, call, err)
-				return
-			}
-		}
-	}
 	var stagedImage []byte
-	// Native JSON resources are registered before any response byte is visible.
-	// Holding the already bounded response is necessary for an ID that may
-	// appear at the end; no body is retained after this call.
-	if (call.resourceObserver != nil || call.format == channel.FormatOpenAIImages) && !isResourceSSE(response.Header.Get("Content-Type")) {
-		payload, err := stageResourceJSON(&result)
-		if err == nil && call.resourceObserver != nil {
-			err = e.registerResources(call, candidate, payload)
-		}
+	// A native JSON answer is held until its bounded bytes have been read for
+	// image facts; no body is retained after this call.
+	if call.format == channel.FormatOpenAIImages && !isSSE(response.Header.Get("Content-Type")) {
+		payload, err := stageResponseJSON(&result)
 		if err != nil {
-			if call.pending {
-				if !call.polling {
-					WriteError(w, call.dialect, 502, "resource_registration_failed", "资源归属登记暂未完成，后台调用将继续收尾", call.id)
-				}
-				return
-			}
 			e.internalError(w, call, err)
 			return
 		}
-		if call.format == channel.FormatOpenAIImages {
-			stagedImage = payload
-		}
+		stagedImage = payload
 	}
 
 	watch := result.watch
-	if !watch.commit() && !call.pending {
+	if !watch.commit() {
 		// The client left between the first byte and the first write: nothing
 		// was delivered and the attempt has been cancelled, so nothing is billed.
 		record := &call.attempts[len(call.attempts)-1]
@@ -1466,7 +1374,6 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	observer.containerMemory, observer.imageModel = call.hints.ContainerMemory, call.hints.ImageModel
 	observer.geminiToolInputBillable = call.hints.GeminiToolInputBillable
 	var written, upstreamBytes int64
-	resourceFailure := false
 	var clientWriteTime time.Duration
 	// undelivered is set when a part of the answer did not reach the client.
 	undelivered := false
@@ -1502,10 +1409,6 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	if call.usageInjected && call.format == channel.FormatOpenAIChat && call.stream && observer.sse {
 		strip = &usageFrameFilter{}
 	}
-	var resourceGate *resourceEventGate
-	if call.resourceObserver != nil && observer.sse {
-		resourceGate = &resourceEventGate{observe: func(raw []byte) error { return e.registerResources(call, candidate, raw) }, send: send}
-	}
 	deliver := func(chunk []byte) {
 		if len(chunk) == 0 {
 			return
@@ -1516,28 +1419,10 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		if stagedImage == nil {
 			observer.Write(chunk, e.Now())
 		}
-		if call.hints.Background && !call.pending && !call.polling && observer.responseID != "" {
-			if err := e.keepBackground(call, model, candidate, defaults, observer.responseID); err != nil {
-				e.Logger.Error("gateway: saving background response failed", "request_id", call.id, "error", err)
-				result.cancel(err)
-				undelivered = true
-				watch.left()
-				return
-			}
-		}
 		if strip != nil {
 			chunk = strip.Filter(chunk)
 		}
-		if resourceGate != nil {
-			if err := resourceGate.write(chunk); err != nil {
-				resourceFailure = true
-				result.cancel(err)
-				undelivered = true
-				watch.left()
-			}
-		} else {
-			send(chunk)
-		}
+		send(chunk)
 	}
 	deliver(result.first)
 	readErr := result.firstErr
@@ -1550,20 +1435,7 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 		deliver((*buffer)[:n])
 	}
 	if strip != nil {
-		tail := strip.Flush()
-		if resourceGate != nil {
-			_ = resourceGate.write(tail)
-		} else {
-			send(tail)
-		}
-	}
-	if resourceGate != nil && answerEnded(result.upstream, readErr) {
-		if err := resourceGate.finish(); err != nil {
-			resourceFailure = true
-			result.cancel(err)
-			undelivered = true
-			watch.left()
-		}
+		send(strip.Flush())
 	}
 	// Whether the answer ran to its end, and whether the client was gone while
 	// it did. A client that closes its side after receiving everything, before
@@ -1578,12 +1450,6 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 	// The exchange is over: stop its clocks before settling.
 	result.cancel(nil)
 	observation := observer.Finish()
-	if resourceFailure && call.pending {
-		return
-	}
-	if call.hints.Background && call.pending && !terminalResponse(observation.ResponseStatus) && !observation.ProtocolError {
-		return
-	}
 	call.diagnostics.StopReason = observation.StopReason
 	call.diagnostics.UsageStatus = observation.UsageStatus
 	call.diagnostics.Frames = observation.Frames
@@ -1599,27 +1465,9 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 
 	duration := int(e.Now().Sub(call.started).Milliseconds())
 	ttftFromStart := int(result.started.Sub(call.started).Milliseconds()) + int(result.ttft.Milliseconds())
-	if call.polling && len(call.attempts) > 0 {
-		previous := call.attempts[len(call.attempts)-1]
-		if previous.TTFTMS != nil {
-			ttftFromStart = *previous.TTFTMS
-			if previous.OffsetMS != nil {
-				ttftFromStart += *previous.OffsetMS
-			}
-		}
-		// Polling sees the final object, not the original client's delivery or
-		// generation cadence. Do not publish invented streaming measurements.
-		call.diagnostics.Frames = 0
-		call.diagnostics.MaxFrameGapMS = nil
-		call.diagnostics.Delivery = "not_observed"
-		written = 0
-		observation.IntervalP50MS, observation.IntervalP95MS = nil, nil
-	}
 	outcome := OutcomeSucceeded
 	endReason := EndCompleted
 	switch {
-	case resourceFailure:
-		outcome, endReason = OutcomeUpstreamFailed, EndInterrupted
 	case observation.ProtocolError:
 		outcome, endReason = OutcomeUpstreamFailed, EndUpstreamError
 		if observation.ProtocolClientError {
@@ -1675,15 +1523,15 @@ func (e *Engine) streamBack(w http.ResponseWriter, call *callState, model catalo
 			e.Logger.Error("gateway: pricing failed", "request_id", call.id, "error", err)
 		} else {
 			finish.PriceSnapshot = snapshot
-			if !observation.ProtocolError && !resourceFailure {
+			if !observation.ProtocolError {
 				finish.QuoteStatement = call.pricedStatement
 			}
 			// Explicit upstream failure is not charged (PRODUCT.md), but reliable
 			// usage and its contemporaneous price snapshot remain diagnostic facts.
-			if !observation.ProtocolError && !resourceFailure {
+			if !observation.ProtocolError {
 				finish.Cost, finish.Fee = priced.Cost, priced.Fee
 			}
-			if !observation.ProtocolError && !resourceFailure && !self && priced.Cost+priced.Fee > 0 {
+			if !observation.ProtocolError && !self && priced.Cost+priced.Fee > 0 {
 				finish.Bill = &Billing{ConsumerID: call.key.OwnerID, ProviderID: candidate.OwnerID, Cost: priced.Cost, Fee: priced.Fee}
 			}
 		}
@@ -1721,17 +1569,11 @@ func (e *Engine) settle(call *callState, candidate Candidate, finish CallFinish,
 	}
 	if closed {
 		call.completed = true
-		if call.pending {
-			e.releaseBackground(call.id)
-		}
 	}
 	if !finished {
 		return
 	}
 	call.finish = finish
-	if call.polling && e.Telemetry != nil {
-		e.Telemetry.Complete(Completion{Format: string(call.format), Stream: call.stream, Status: status, Duration: e.Now().Sub(call.started), Finish: finish, Booked: call.booked})
-	}
 	e.log(call, finish.Outcome, status, finish.DurationMS, usage, finish.Cost, finish.Fee)
 	event := Event{Kind: EventCallFinished, At: e.Now(), CallID: call.id, AccountID: call.key.OwnerID, KeyID: call.key.KeyID, ChannelID: candidate.ChannelID, Model: call.modelID, Format: string(call.format), Outcome: finish.Outcome, StatusCode: status, DurationMS: finish.DurationMS}
 	if finish.TTFTMS != nil {

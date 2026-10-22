@@ -124,12 +124,4 @@ func TestCutoverReadOnlyEvidenceProtectsIndividualBalancesAndLegacyCiphertext(t 
 	if _, err = pool.Exec(ctx, `UPDATE calls SET outcome='upstream_failed' WHERE outcome='in_progress'`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = pool.Exec(ctx, `INSERT INTO gateway_background_jobs(call_id,account_id,key_id,channel_id,response_id,metadata,deadline_at)
- SELECT id,account_id,'b0000000-0000-4000-8000-000000000062',$1,'synthetic-pending','{}',now()+interval '1 minute' FROM calls LIMIT 1`, cid); err != nil {
-		t.Fatal(err)
-	}
-	blocked, err = reader.Inspect(ctx, nil)
-	if !errors.Is(err, cutover.ErrNotDrained) || blocked.Pending.Background != 1 || len(blocked.Tables) != 0 {
-		t.Fatal("pending background produced completed evidence", blocked.Pending, err)
-	}
 }

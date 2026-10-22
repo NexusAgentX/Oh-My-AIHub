@@ -31,7 +31,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaybench"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -40,7 +39,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	storepg "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/groupchannelpg"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/resourcepg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/settings"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/snapshot"
 )
@@ -240,7 +238,6 @@ func (b *syncBuffer) String() string {
 
 func newGroupEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, configure func(*gateway.Dependencies)) *env {
 	t.Helper()
-	ctx := context.Background()
 	logs := &syncBuffer{}
 	logger := slog.New(slog.NewJSONHandler(logs, nil))
 	// Like the server, run the gateway on the cached stores and build every
@@ -313,21 +310,11 @@ func newGroupEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, confi
 	e.metrics = metrics.New(func(id string, now time.Time) bool { return !runtime.CooldownUntil(id, now).IsZero() })
 	e.metrics.SetModels([]string{"gpt-test", "claude-test", "gemini-test"})
 	dependencies := gateway.Dependencies{
-		Jobs: store.Gateway, Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
+		Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
 		Keyring: keyring, Outbound: outbound, Logger: logger, Runtime: runtime, Events: gateway.Publishers{bus, e.metrics}, Telemetry: e.metrics,
 	}
 
 	dependencies.TypicalPrices = groupedPrices.View
-	dependencies.Resources = resourcepg.NewStore(pool)
-	cursorRoot, err := store.Market.ProtectedRoot(ctx, keyring, "cursor-root-v1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	dependencies.ResourceCursors, err = gatewaycontract.NewCursorCodec(cursorRoot)
-	clear(cursorRoot)
-	if err != nil {
-		t.Fatal(err)
-	}
 	if configure != nil {
 		configure(&dependencies)
 	}

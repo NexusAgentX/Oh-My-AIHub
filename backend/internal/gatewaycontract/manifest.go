@@ -31,17 +31,21 @@ type Source struct {
 }
 
 type Endpoint struct {
-	ID       string   `yaml:"id"`
-	Protocol string   `yaml:"protocol"`
-	Method   string   `yaml:"method"`
-	Path     string   `yaml:"path"`
-	Feature  string   `yaml:"feature"`
-	Auth     string   `yaml:"auth"`
-	Scope    string   `yaml:"scope"`
-	Model    string   `yaml:"model"`
-	Billing  string   `yaml:"billing"`
-	Replay   string   `yaml:"replay"`
-	Source   string   `yaml:"source"`
+	ID       string `yaml:"id"`
+	Protocol string `yaml:"protocol"`
+	Method   string `yaml:"method"`
+	Path     string `yaml:"path"`
+	Feature  string `yaml:"feature"`
+	Auth     string `yaml:"auth"`
+	Scope    string `yaml:"scope"`
+	Model    string `yaml:"model"`
+	Billing  string `yaml:"billing"`
+	Replay   string `yaml:"replay"`
+	Source   string `yaml:"source"`
+	// Retired marks an endpoint the discovery source still documents but this
+	// gateway no longer proxies. It is registered nowhere and answers
+	// unsupported_endpoint; suites may still record upstream evidence for it.
+	Retired  bool     `yaml:"retired,omitempty"`
 	Headers  []string `yaml:"headers,omitempty"`
 	Fields   []string `yaml:"fields,omitempty"`
 	Required []string `yaml:"required_fields,omitempty"`

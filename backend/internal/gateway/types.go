@@ -206,7 +206,6 @@ type Billing struct {
 // transaction "call:<id>" in the same database transaction.
 type CallFinish struct {
 	QuoteStatement     *quotepricing.Statement
-	Background         bool
 	Diagnostics        *Diagnostics
 	ID                 string
 	AccountID          string

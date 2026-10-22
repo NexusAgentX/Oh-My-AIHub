@@ -35,35 +35,13 @@ func (a *app) registerGatewayRoutes(r *router) {
 	if err != nil {
 		panic(err)
 	}
-	endpoints := map[string]gatewaycontract.Endpoint{}
-	for _, endpoint := range manifest.Endpoints {
-		endpoints[endpoint.ID] = endpoint
-	}
 	serve := func(format channel.Format) http.HandlerFunc {
 		return func(w http.ResponseWriter, req *http.Request) { a.gateway.Serve(w, req, format, "", false) }
 	}
 	r.implement("B", "POST /v1/chat/completions", accessGatewayKey, serve(channel.FormatOpenAIChat))
 	r.implement("B", "POST /v1/responses", accessGatewayKey, serve(channel.FormatOpenAIResponses))
-	r.implement("B", "GET /v1/responses/{responseID}", accessGatewayKey, func(w http.ResponseWriter, r *http.Request) {
-		if a.gateway.Resources != nil {
-			a.gateway.ServeAuxiliary(w, r, endpoints["responses.get"])
-		} else {
-			a.gateway.ServeResponse(w, r, false)
-		}
-	})
-	r.implement("B", "POST /v1/responses/{responseID}/cancel", accessGatewayKey, func(w http.ResponseWriter, r *http.Request) {
-		if a.gateway.Resources != nil {
-			a.gateway.ServeAuxiliary(w, r, endpoints["responses.cancel"])
-		} else {
-			a.gateway.ServeResponse(w, r, true)
-		}
-	})
 	r.implement("B", "POST /v1/messages", accessGatewayKey, serve(channel.FormatAnthropic))
 	r.implement("B", "POST /v1beta/models/{model}", accessGatewayKey, func(w http.ResponseWriter, req *http.Request) {
-		if strings.HasSuffix(req.PathValue("model"), ":countTokens") {
-			a.gateway.ServeAuxiliary(w, req, endpoints["gemini.countTokens"])
-			return
-		}
 		a.serveGemini(w, req)
 	})
 	r.implement("B", "GET /v1/models", accessGatewayKey, func(w http.ResponseWriter, req *http.Request) { a.gateway.ListModels(w, req, false) })
@@ -74,7 +52,7 @@ func (a *app) registerGatewayRoutes(r *router) {
 	r.implement("499", "GET /v1beta/models/{model}", accessGatewayKey, func(w http.ResponseWriter, req *http.Request) {
 		a.gateway.GetModel(w, req, req.PathValue("model"), true)
 	})
-	existing := map[string]bool{"chat.create": true, "responses.create": true, "responses.get": true, "responses.cancel": true, "messages.create": true, "gemini.generateContent": true, "gemini.streamGenerateContent": true, "gemini.countTokens": true}
+	existing := map[string]bool{"chat.create": true, "responses.create": true, "messages.create": true, "gemini.generateContent": true, "gemini.streamGenerateContent": true}
 	a.gatewayEndpoints = map[string]bool{"models.openai.list": true, "models.openai.get": true, "models.anthropic.list": true, "models.anthropic.get": true, "models.gemini.list": true, "models.gemini.get": true, "models.gemini.v1.list": true}
 	for id := range existing {
 		a.gatewayEndpoints[id] = true
@@ -83,14 +61,13 @@ func (a *app) registerGatewayRoutes(r *router) {
 		if endpoint.Feature != "F7" || existing[endpoint.ID] {
 			continue
 		}
-		path := strings.NewReplacer("{completion_id}", "{completionID}", "{response_id}", "{responseID}", "{conversation_id}", "{conversationID}", "{item_id}", "{itemID}", "{cache_id}", "{cacheID}").Replace(endpoint.Path)
-		var handler http.HandlerFunc
-		if endpoint.Replay == "inference" {
-			handler = serve(protocolFormatForAPI(endpoint.Protocol))
-		} else {
-			handler = func(w http.ResponseWriter, req *http.Request) { a.gateway.ServeAuxiliary(w, req, endpoint) }
+		// Only stateless inference is proxied now; resource, cache and token
+		// counting paths are retired and answer unsupported_endpoint.
+		if endpoint.Replay != "inference" || endpoint.Retired {
+			continue
 		}
-		r.implement("495", endpoint.Method+" "+path, accessGatewayKey, handler)
+		path := strings.NewReplacer("{completion_id}", "{completionID}", "{response_id}", "{responseID}", "{conversation_id}", "{conversationID}", "{item_id}", "{itemID}", "{cache_id}", "{cacheID}").Replace(endpoint.Path)
+		r.implement("495", endpoint.Method+" "+path, accessGatewayKey, serve(protocolFormatForAPI(endpoint.Protocol)))
 		a.gatewayEndpoints[endpoint.ID] = true
 	}
 	r.mux.HandleFunc("/v1/", unsupportedEndpoint)
