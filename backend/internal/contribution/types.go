@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 )
 
@@ -17,7 +16,7 @@ var (
 	ErrInvalid         = errors.New("invalid market contribution")
 	ErrNotFound        = errors.New("contribution not found")
 	ErrConflict        = errors.New("contribution revision or published base changed")
-	ErrReports         = errors.New("complete compatible reports required")
+	ErrPending         = errors.New("another pending contribution targets the same entity")
 	ErrPublication     = errors.New("publication committed; runtime refresh pending")
 	ErrCommitUncertain = errors.New("publication commit outcome not yet confirmed")
 )
@@ -36,8 +35,6 @@ type Draft struct {
 	Revision      int64               `json:"revision"`
 	Changes       market.Changes      `json:"changes"`
 	Base          market.Changes      `json:"base"`
-	ReportIDs     []string            `json:"report_ids"`
-	TaskIDs       []string            `json:"task_ids"`
 	PriceBlanks   map[string][]string `json:"price_blanks"`
 	PendingPrices []string            `json:"pending_prices"`
 	ReviewReason  string              `json:"review_reason"`
@@ -52,33 +49,30 @@ type Cursor struct {
 	ID string
 }
 type Summary struct {
-	ID        string    `json:"id"`
-	Title     string    `json:"title"`
-	Kind      string    `json:"kind"`
-	State     string    `json:"state"`
-	Revision  int64     `json:"revision"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID           string    `json:"id"`
+	Title        string    `json:"title"`
+	Kind         string    `json:"kind"`
+	TargetID     string    `json:"target_id"`
+	State        string    `json:"state"`
+	Revision     int64     `json:"revision"`
+	ReviewReason string    `json:"review_reason"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // UnitOfWork owns the locked draft and the same database transaction used to
 // check bases, publish market.Apply, save review state and append audit.
 type UnitOfWork interface {
 	Directory(context.Context) (market.Directory, error)
-	Report(context.Context, string) (detection.Job, error)
-	ApprovedReports(context.Context, []string) ([]string, error)
 	Publish(context.Context, string, market.Changes) error
-	RecordEvidence(context.Context, detection.Job) error
 	Audit(context.Context, string, string, map[string]any) error
 }
 type Store interface {
 	Create(context.Context, Draft) error
 	Get(context.Context, string) (Draft, error)
+	Pending(context.Context, string, string) (string, error)
 	List(context.Context, Actor, bool, *Cursor, int) ([]Summary, error)
 	Edit(context.Context, string, func(*Draft, UnitOfWork) error) (Draft, error)
-}
-type ReportPlanner interface {
-	Plan(detection.Target) (detection.Plan, error)
 }
 
 // Runtime publication is serialized by Service. Block precedes database
@@ -96,7 +90,6 @@ type Service struct {
 	publishMu sync.Mutex
 	Store     Store
 	Live      market.Store
-	Planner   ReportPlanner
 	Publisher Publisher
 	Outbound  AddressPolicy
 }

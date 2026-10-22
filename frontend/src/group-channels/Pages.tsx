@@ -142,7 +142,7 @@ export function GroupChannelEditorPage() {
   const { id = '' } = useParams()
   const detail = useGroupChannel(id)
   const sources = useGroupSources()
-  return <><PageHeader title={id ? '渠道配置' : '添加分组渠道'} back={{ to: '/channels', label: '分组渠道' }} /><QueryBoundary query={sources} errorFallback="分组加载失败">{(data) => id ? <QueryBoundary query={detail} errorFallback="渠道加载失败">{(channel) => <Editor key={channel.id} channel={channel} sources={data.items} />}</QueryBoundary> : data.items.length ? <Editor sources={data.items} /> : <EmptyState title="还没有可用分组" action={<ButtonLink to="/contributions">贡献供应商分组</ButtonLink>} />}</QueryBoundary></>
+  return <><PageHeader title={id ? '渠道配置' : '添加分组渠道'} back={{ to: '/channels', label: '分组渠道' }} /><QueryBoundary query={sources} errorFallback="分组加载失败">{(data) => id ? <QueryBoundary query={detail} errorFallback="渠道加载失败">{(channel) => <Editor key={channel.id} channel={channel} sources={data.items} />}</QueryBoundary> : data.items.length ? <Editor sources={data.items} /> : <EmptyState title="还没有可用分组" />}</QueryBoundary></>
 }
 
 function Governance({ channel }: { channel: GroupChannel }) {

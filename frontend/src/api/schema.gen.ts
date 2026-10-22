@@ -3157,8 +3157,6 @@ export interface components {
             revision: number;
             changes: components["schemas"]["ContributionChanges"];
             base: components["schemas"]["ContributionChanges"];
-            report_ids: string[];
-            task_ids: string[];
             pending_prices: string[];
             review_reason: string;
             reviewed_by: string | null;
@@ -3174,41 +3172,17 @@ export interface components {
             id: string;
             title: string;
             kind: string;
+            target_id: string;
             state: string;
             revision: number;
+            review_reason: string;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
             updated_at: string;
         };
-        ContributionReportUse: {
-            /** Format: uuid */
-            report_id: string;
-            target_kind: string;
-            /** Format: uuid */
-            target_id: string;
-            reused: boolean;
-            /** Format: date-time */
-            finished_at: string;
-            manifest_version: string;
-            code_version: string;
-        };
-        ContributionTargetReview: {
-            kind: string;
-            /** Format: uuid */
-            id: string;
-            model_id: string;
-            /** @enum {string} */
-            state: "ready" | "report_required" | "suite_pending";
-            report: components["schemas"]["ContributionReportUse"] | null;
-        };
-        ContributionEvaluation: {
-            ready: boolean;
-            targets: components["schemas"]["ContributionTargetReview"][];
-        };
         ContributionDetail: {
             draft: components["schemas"]["ContributionDraft"];
-            evaluation: components["schemas"]["ContributionEvaluation"];
             stage: string;
             linked_channels: number;
             addresses: components["schemas"]["ContributionAddress"][];
@@ -3235,7 +3209,6 @@ export interface components {
             revision: number;
             title: string;
             changes: components["schemas"]["ContributionChanges"];
-            report_ids: string[];
         };
         ContributionChild: {
             revision: number;

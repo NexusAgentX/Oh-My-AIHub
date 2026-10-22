@@ -33,8 +33,8 @@ func (s *Service) List(ctx context.Context, actor Actor, queue bool, cursor *Cur
 	}
 	return s.Store.List(ctx, actor, queue, cursor, limit)
 }
-func (s *Service) Save(ctx context.Context, actor Actor, id string, revision int64, title string, changes market.Changes, reports []string, declaredPrices []string, blanks ...map[string][]string) (Draft, error) {
-	if title == "" || utf8.RuneCountInString(title) > 128 || len(reports) > 1024 {
+func (s *Service) Save(ctx context.Context, actor Actor, id string, revision int64, title string, changes market.Changes, declaredPrices []string, blanks ...map[string][]string) (Draft, error) {
+	if title == "" || utf8.RuneCountInString(title) > 128 {
 		return Draft{}, ErrInvalid
 	}
 	return s.Store.Edit(ctx, id, func(draft *Draft, u UnitOfWork) error {
@@ -50,15 +50,6 @@ func (s *Service) Save(ctx context.Context, actor Actor, id string, revision int
 		if !sameIdentities(draft.Changes, changes) || !rootPresent(*draft, changes) {
 			return ErrInvalid
 		}
-		for _, reportID := range reports {
-			report, err := u.Report(ctx, reportID)
-			if err != nil {
-				return err
-			}
-			if !actor.Admin && report.OwnerID != draft.OwnerID {
-				return ErrNotFound
-			}
-		}
 		for i := range changes.Suppliers {
 			if changes.Suppliers[i].BaseRevision == 0 {
 				changes.Suppliers[i].Value.ContributorID = draft.OwnerID
@@ -66,7 +57,6 @@ func (s *Service) Save(ctx context.Context, actor Actor, id string, revision int
 		}
 		draft.Title = title
 		draft.Changes = changes
-		draft.ReportIDs = append([]string{}, reports...)
 		priorBlanks := draft.PriceBlanks
 		draft.PriceBlanks = map[string][]string{}
 		draft.PendingPrices = []string{}
@@ -115,12 +105,8 @@ func (s *Service) Submit(ctx context.Context, actor Actor, id string, revision i
 		if err != nil {
 			return err
 		}
-		evaluation, err := Evaluate(ctx, actor, *draft, live, u, s.Planner)
-		if err != nil {
+		if _, err := Overlay(*draft, live); err != nil {
 			return err
-		}
-		if !evaluation.Ready {
-			return ErrReports
 		}
 		now := time.Now().UTC()
 		draft.State = "submitted"
@@ -128,7 +114,7 @@ func (s *Service) Submit(ctx context.Context, actor Actor, id string, revision i
 		draft.ReviewReason = ""
 		draft.ReviewedBy = nil
 		advance(draft)
-		return u.Audit(ctx, actor.ID, "submitted", map[string]any{"revision": draft.Revision, "report_count": len(evaluation.Reports)})
+		return u.Audit(ctx, actor.ID, "submitted", map[string]any{"revision": draft.Revision})
 	})
 }
 func (s *Service) Reject(ctx context.Context, actor Actor, id string, revision int64, reason string) (Draft, error) {
@@ -198,12 +184,8 @@ func (s *Service) Approve(ctx context.Context, actor Actor, id string, revision 
 		if err != nil {
 			return err
 		}
-		evaluation, err := Evaluate(ctx, actor, *draft, live, u, s.Planner)
-		if err != nil {
+		if _, err := Overlay(*draft, live); err != nil {
 			return err
-		}
-		if !evaluation.Ready {
-			return ErrReports
 		}
 		for i := range draft.Changes.Suppliers {
 			if draft.Changes.Suppliers[i].BaseRevision == 0 {
@@ -213,18 +195,13 @@ func (s *Service) Approve(ctx context.Context, actor Actor, id string, revision 
 		if err = u.Publish(ctx, actor.ID, draft.Changes); err != nil {
 			return err
 		}
-		for _, report := range evaluation.Reports {
-			if err = u.RecordEvidence(ctx, report); err != nil {
-				return err
-			}
-		}
 		now := time.Now().UTC()
 		draft.State = "publication_pending"
 		draft.PublishedAt = &now
 		draft.ReviewedBy = &actor.ID
 		draft.ReviewReason = reason
 		advance(draft)
-		return u.Audit(ctx, actor.ID, "approved", map[string]any{"revision": draft.Revision, "reason": reason, "report_count": len(evaluation.Reports)})
+		return u.Audit(ctx, actor.ID, "approved", map[string]any{"revision": draft.Revision, "reason": reason})
 	})
 	if err != nil {
 		if !errors.Is(err, ErrCommitUncertain) {
@@ -397,7 +374,7 @@ func newDraft(actor Actor, kind, targetID, title string, c market.Changes) (Draf
 		return Draft{}, err
 	}
 	now := time.Now().UTC()
-	return Draft{ID: id, OwnerID: actor.ID, Title: title, Kind: kind, TargetID: targetID, State: "draft", Revision: 1, Changes: c, ReportIDs: []string{}, TaskIDs: []string{}, CreatedAt: now, UpdatedAt: now}, nil
+	return Draft{ID: id, OwnerID: actor.ID, Title: title, Kind: kind, TargetID: targetID, State: "draft", Revision: 1, Changes: c, CreatedAt: now, UpdatedAt: now}, nil
 }
 
 // Recover completes only already committed publications after a restart. It

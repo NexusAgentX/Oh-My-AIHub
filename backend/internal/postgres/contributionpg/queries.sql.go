@@ -10,73 +10,6 @@ import (
 	"time"
 )
 
-const activeDetectionBindings = `-- name: ActiveDetectionBindings :many
-SELECT b.target_kind,b.target_id,b.target_revision,b.capability_digest
-FROM detection_tasks t JOIN market_report_bindings b ON b.id=t.id
-WHERE t.id=ANY($1::uuid[]) AND t.state IN ('queued','running')
- AND t.metadata->>'execution_active'='true'
-`
-
-type ActiveDetectionBindingsRow struct {
-	TargetKind       string `json:"target_kind"`
-	TargetID         string `json:"target_id"`
-	TargetRevision   int64  `json:"target_revision"`
-	CapabilityDigest string `json:"capability_digest"`
-}
-
-func (q *Queries) ActiveDetectionBindings(ctx context.Context, taskIds []string) ([]ActiveDetectionBindingsRow, error) {
-	rows, err := q.db.Query(ctx, activeDetectionBindings, taskIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ActiveDetectionBindingsRow
-	for rows.Next() {
-		var i ActiveDetectionBindingsRow
-		if err := rows.Scan(
-			&i.TargetKind,
-			&i.TargetID,
-			&i.TargetRevision,
-			&i.CapabilityDigest,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const approvedReportReferences = `-- name: ApprovedReportReferences :many
-SELECT DISTINCT ON (b.target_id) b.id FROM market_report_bindings b
-JOIN market_capability_evidence e ON e.report_id=b.id
-WHERE b.target_id=ANY($1::uuid[])
-ORDER BY b.target_id,b.created_at DESC,b.id DESC
-`
-
-// Evidence appears here only after the same transaction published its object.
-func (q *Queries) ApprovedReportReferences(ctx context.Context, targetIds []string) ([]string, error) {
-	rows, err := q.db.Query(ctx, approvedReportReferences, targetIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getContribution = `-- name: GetContribution :one
 SELECT id, owner_id, kind, target_id, title, state, revision, document, base_document, report_ids, task_ids, price_blanks, pending_prices, review_reason, reviewed_by, submitted_at, published_at, created_at, updated_at FROM market_contributions WHERE id=$1
 `
@@ -109,8 +42,8 @@ func (q *Queries) GetContribution(ctx context.Context, id string) (MarketContrib
 }
 
 const insertContribution = `-- name: InsertContribution :exec
-INSERT INTO market_contributions(id,owner_id,kind,target_id,title,state,revision,document,base_document,report_ids,task_ids,pending_prices,review_reason,reviewed_by,submitted_at,published_at,created_at,updated_at,price_blanks)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+INSERT INTO market_contributions(id,owner_id,kind,target_id,title,state,revision,document,base_document,pending_prices,review_reason,reviewed_by,submitted_at,published_at,created_at,updated_at,price_blanks)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 `
 
 type InsertContributionParams struct {
@@ -123,8 +56,6 @@ type InsertContributionParams struct {
 	Revision      int64      `json:"revision"`
 	Document      []byte     `json:"document"`
 	BaseDocument  []byte     `json:"base_document"`
-	ReportIds     []string   `json:"report_ids"`
-	TaskIds       []string   `json:"task_ids"`
 	PendingPrices []string   `json:"pending_prices"`
 	ReviewReason  string     `json:"review_reason"`
 	ReviewedBy    *string    `json:"reviewed_by"`
@@ -146,8 +77,6 @@ func (q *Queries) InsertContribution(ctx context.Context, arg InsertContribution
 		arg.Revision,
 		arg.Document,
 		arg.BaseDocument,
-		arg.ReportIds,
-		arg.TaskIds,
 		arg.PendingPrices,
 		arg.ReviewReason,
 		arg.ReviewedBy,
@@ -172,7 +101,7 @@ func (q *Queries) LinkedChannelCount(ctx context.Context, groupIds []string) (in
 }
 
 const listContributions = `-- name: ListContributions :many
-SELECT id,title,kind,state,revision,created_at,updated_at FROM market_contributions
+SELECT id,title,kind,target_id,state,revision,review_reason,created_at,updated_at FROM market_contributions
 WHERE (($1::boolean AND state IN ('submitted','publication_pending')) OR (NOT $1::boolean AND owner_id=$2))
  AND ($3::timestamptz IS NULL OR (created_at,id)<($3::timestamptz,$4::uuid))
 ORDER BY created_at DESC,id DESC LIMIT $5
@@ -187,13 +116,15 @@ type ListContributionsParams struct {
 }
 
 type ListContributionsRow struct {
-	ID        string    `json:"id"`
-	Title     string    `json:"title"`
-	Kind      string    `json:"kind"`
-	State     string    `json:"state"`
-	Revision  int64     `json:"revision"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID           string    `json:"id"`
+	Title        string    `json:"title"`
+	Kind         string    `json:"kind"`
+	TargetID     string    `json:"target_id"`
+	State        string    `json:"state"`
+	Revision     int64     `json:"revision"`
+	ReviewReason string    `json:"review_reason"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 func (q *Queries) ListContributions(ctx context.Context, arg ListContributionsParams) ([]ListContributionsRow, error) {
@@ -215,8 +146,10 @@ func (q *Queries) ListContributions(ctx context.Context, arg ListContributionsPa
 			&i.ID,
 			&i.Title,
 			&i.Kind,
+			&i.TargetID,
 			&i.State,
 			&i.Revision,
+			&i.ReviewReason,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -261,26 +194,28 @@ func (q *Queries) LockContribution(ctx context.Context, id string) (MarketContri
 	return i, err
 }
 
-const publishEvidence = `-- name: PublishEvidence :exec
-INSERT INTO market_capability_evidence(report_id,capability,layer,state,reason)
-SELECT $1::uuid,x.capability,x.layer,x.state,x.reason
-FROM jsonb_to_recordset($2::jsonb) AS x(capability text,layer text,state text,reason text)
-ON CONFLICT(report_id,capability,layer) DO NOTHING
+const pendingContribution = `-- name: PendingContribution :one
+SELECT id FROM market_contributions
+WHERE kind=$1 AND target_id=$2 AND state IN ('submitted','publication_pending')
+ORDER BY created_at DESC,id DESC LIMIT 1
 `
 
-type PublishEvidenceParams struct {
-	ReportID string `json:"report_id"`
-	Evidence []byte `json:"evidence"`
+type PendingContributionParams struct {
+	Kind     string `json:"kind"`
+	TargetID string `json:"target_id"`
 }
 
-func (q *Queries) PublishEvidence(ctx context.Context, arg PublishEvidenceParams) error {
-	_, err := q.db.Exec(ctx, publishEvidence, arg.ReportID, arg.Evidence)
-	return err
+// Same-entity proposals cannot be submitted twice while one is awaiting review.
+func (q *Queries) PendingContribution(ctx context.Context, arg PendingContributionParams) (string, error) {
+	row := q.db.QueryRow(ctx, pendingContribution, arg.Kind, arg.TargetID)
+	var id string
+	err := row.Scan(&id)
+	return id, err
 }
 
 const updateContribution = `-- name: UpdateContribution :execrows
-UPDATE market_contributions SET title=$2,state=$3,revision=$4,document=$5,base_document=$6,report_ids=$7,task_ids=$8,review_reason=$9,reviewed_by=$10,submitted_at=$11,published_at=$12,updated_at=$13,pending_prices=$14,price_blanks=$15
-WHERE id=$1 AND revision=$16
+UPDATE market_contributions SET title=$2,state=$3,revision=$4,document=$5,base_document=$6,review_reason=$7,reviewed_by=$8,submitted_at=$9,published_at=$10,updated_at=$11,pending_prices=$12,price_blanks=$13
+WHERE id=$1 AND revision=$14
 `
 
 type UpdateContributionParams struct {
@@ -290,8 +225,6 @@ type UpdateContributionParams struct {
 	Revision      int64      `json:"revision"`
 	Document      []byte     `json:"document"`
 	BaseDocument  []byte     `json:"base_document"`
-	ReportIds     []string   `json:"report_ids"`
-	TaskIds       []string   `json:"task_ids"`
 	ReviewReason  string     `json:"review_reason"`
 	ReviewedBy    *string    `json:"reviewed_by"`
 	SubmittedAt   *time.Time `json:"submitted_at"`
@@ -310,8 +243,6 @@ func (q *Queries) UpdateContribution(ctx context.Context, arg UpdateContribution
 		arg.Revision,
 		arg.Document,
 		arg.BaseDocument,
-		arg.ReportIds,
-		arg.TaskIds,
 		arg.ReviewReason,
 		arg.ReviewedBy,
 		arg.SubmittedAt,

@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/contribution"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 )
 
@@ -47,13 +46,23 @@ func (s *apiReviewStore) Get(_ context.Context, id string) (contribution.Draft, 
 	}
 	return reviewClone(d), nil
 }
+func (s *apiReviewStore) Pending(_ context.Context, kind, targetID string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, d := range s.drafts {
+		if d.Kind == kind && d.TargetID == targetID && (d.State == "submitted" || d.State == "publication_pending") {
+			return d.ID, nil
+		}
+	}
+	return "", nil
+}
 func (s *apiReviewStore) List(_ context.Context, actor contribution.Actor, queue bool, cursor *contribution.Cursor, limit int) ([]contribution.Summary, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := []contribution.Summary{}
 	for _, d := range s.drafts {
 		if (queue && (d.State == "submitted" || d.State == "publication_pending") || !queue && d.OwnerID == actor.ID) && (cursor == nil || d.CreatedAt.Before(cursor.At) || d.CreatedAt.Equal(cursor.At) && d.ID < cursor.ID) {
-			out = append(out, contribution.Summary{ID: d.ID, Title: d.Title, Kind: d.Kind, State: d.State, Revision: d.Revision, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt})
+			out = append(out, contribution.Summary{ID: d.ID, Title: d.Title, Kind: d.Kind, TargetID: d.TargetID, State: d.State, Revision: d.Revision, ReviewReason: d.ReviewReason, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt})
 		}
 	}
 	slices.SortFunc(out, func(a, b contribution.Summary) int {
@@ -100,29 +109,17 @@ type apiReviewUnit struct {
 func (u apiReviewUnit) Directory(context.Context) (market.Directory, error) {
 	return reviewClone(u.s.live), nil
 }
-func (u apiReviewUnit) Report(context.Context, string) (detection.Job, error) {
-	return detection.Job{}, detection.ErrNotFound
-}
-func (u apiReviewUnit) ApprovedReports(context.Context, []string) ([]string, error) {
-	return []string{}, nil
-}
 func (u apiReviewUnit) Publish(_ context.Context, _ string, c market.Changes) error {
-	d, _, err := contribution.Overlay(contribution.Draft{OwnerID: u.s.drafts[u.id].OwnerID, Changes: c}, u.s.live)
+	d, err := contribution.Overlay(contribution.Draft{OwnerID: u.s.drafts[u.id].OwnerID, Changes: c}, u.s.live)
 	u.s.live = d
 	return err
 }
-func (apiReviewUnit) RecordEvidence(context.Context, detection.Job) error         { return nil }
 func (apiReviewUnit) Audit(context.Context, string, string, map[string]any) error { return nil }
 
-type apiReviewPlanner struct{}
-
-func (apiReviewPlanner) Plan(detection.Target) (detection.Plan, error) {
-	return detection.Plan{Items: []detection.Planned{{ID: "pending.fixture", Implemented: false}}}, nil
-}
 func TestContributionAPIPrivateReviewRevisionAndSchema(t *testing.T) {
 	store := newAPIReviewStore()
 	runtime := contribution.NewRuntime(store, nil)
-	service := &contribution.Service{Store: store, Live: store, Planner: apiReviewPlanner{}, Publisher: runtime}
+	service := &contribution.Service{Store: store, Live: store, Publisher: runtime}
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
 			_, _ = w.Write([]byte(`<link rel="icon" href="/favicon.png">`))
@@ -149,11 +146,12 @@ func TestContributionAPIPrivateReviewRevisionAndSchema(t *testing.T) {
 	v := changes["suppliers"].([]any)[0].(map[string]any)["value"].(map[string]any)
 	v["name"] = "合成供应商"
 	v["website_url"] = "https://synthetic.example"
-	save := map[string]any{"revision": d["revision"], "title": "合成贡献", "changes": changes, "report_ids": []string{}}
+	save := map[string]any{"revision": d["revision"], "title": "合成贡献", "changes": changes}
 	d = owner.expect(t, 200, "PUT", path, save)["draft"].(map[string]any)
 	owner.expect(t, 409, "PUT", path, save)
 	owner.expect(t, 403, "POST", "/api/admin/contributions/"+id+"/approve", map[string]any{"revision": d["revision"]})
 	d = owner.expect(t, 200, "POST", path+"/submit", map[string]any{"revision": d["revision"]})["draft"].(map[string]any)
+	owner.expect(t, 409, "POST", "/api/contributions", map[string]any{"kind": "supplier", "target_id": d["target_id"], "action": "edit"})
 	admin.expect(t, 200, "GET", "/api/admin/contributions", nil)
 	d = admin.expect(t, 200, "POST", "/api/admin/contributions/"+id+"/reject", map[string]any{"revision": d["revision"], "reason": "请补充资料"})["draft"].(map[string]any)
 	d = owner.expect(t, 200, "POST", path+"/submit", map[string]any{"revision": d["revision"]})["draft"].(map[string]any)

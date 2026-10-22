@@ -65,8 +65,6 @@ type contributionDraft struct {
 	Revision      int64               `json:"revision"`
 	Changes       contributionChanges `json:"changes"`
 	Base          contributionChanges `json:"base"`
-	ReportIDs     []string            `json:"report_ids"`
-	TaskIDs       []string            `json:"task_ids"`
 	PendingPrices []string            `json:"pending_prices"`
 	ReviewReason  string              `json:"review_reason"`
 	ReviewedBy    *string             `json:"reviewed_by"`
@@ -108,7 +106,7 @@ func changesJSON(c market.Changes, pending []string, blanks ...map[string][]stri
 	return out
 }
 func draftJSON(d contribution.Draft) contributionDraft {
-	return contributionDraft{ID: d.ID, OwnerID: d.OwnerID, Title: d.Title, Kind: d.Kind, TargetID: d.TargetID, State: d.State, Revision: d.Revision, Changes: changesJSON(d.Changes, d.PendingPrices, d.PriceBlanks), Base: changesJSON(d.Base, nil), ReportIDs: append([]string{}, d.ReportIDs...), TaskIDs: append([]string{}, d.TaskIDs...), PendingPrices: append([]string{}, d.PendingPrices...), ReviewReason: d.ReviewReason, ReviewedBy: d.ReviewedBy, SubmittedAt: d.SubmittedAt, PublishedAt: d.PublishedAt, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
+	return contributionDraft{ID: d.ID, OwnerID: d.OwnerID, Title: d.Title, Kind: d.Kind, TargetID: d.TargetID, State: d.State, Revision: d.Revision, Changes: changesJSON(d.Changes, d.PendingPrices, d.PriceBlanks), Base: changesJSON(d.Base, nil), PendingPrices: append([]string{}, d.PendingPrices...), ReviewReason: d.ReviewReason, ReviewedBy: d.ReviewedBy, SubmittedAt: d.SubmittedAt, PublishedAt: d.PublishedAt, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
 }
 func (c contributionChanges) domain() (market.Changes, []string, error) {
 	out := market.Changes{Suppliers: c.Suppliers, Groups: c.Groups, Addresses: c.Addresses, GroupAddresses: c.GroupAddresses, Models: c.Models, Governance: c.Governance, Quotes: []market.Quote{}}

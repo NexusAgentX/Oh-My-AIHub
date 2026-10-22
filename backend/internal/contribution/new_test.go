@@ -39,7 +39,7 @@ func TestNewStarterAllocatesAllObjectIDsBeforeAnyDetection(t *testing.T) {
 }
 func TestEmergencyDisableDoesNotDependOnCurrentUpstreamReachability(t *testing.T) {
 	s, repo, _ := metadataService(t)
-	live, _, err := Overlay(starterDraft(), market.Directory{})
+	live, err := Overlay(starterDraft(), market.Directory{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestEmergencyDisableDoesNotDependOnCurrentUpstreamReachability(t *testing.T
 
 func TestReusingApprovedAddressDoesNotCopyOrRepriceIt(t *testing.T) {
 	s, repo, _ := metadataService(t)
-	live, _, err := Overlay(starterDraft(), market.Directory{})
+	live, err := Overlay(starterDraft(), market.Directory{})
 	if err != nil {
 		t.Fatal(err)
 	}

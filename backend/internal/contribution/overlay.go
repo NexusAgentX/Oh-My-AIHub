@@ -4,19 +4,18 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"unicode/utf8"
 )
 
 // Overlay validates a proposal against its live bases and constructs only its
-// private view. It is shared by draft detection and transactional approval;
-// no unapproved value is installed in the live directory.
-func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.Target, error) {
+// private view. It is shared by draft preview and transactional approval; no
+// unapproved value is installed in the live directory.
+func Overlay(draft Draft, live market.Directory) (market.Directory, error) {
 	c := draft.Changes
 	if len(c.Governance)+len(c.Suppliers)+len(c.Groups)+len(c.Addresses)+len(c.GroupAddresses)+len(c.Models)+len(c.Quotes) > 1024 {
-		return market.Directory{}, nil, ErrInvalid
+		return market.Directory{}, ErrInvalid
 	}
 	suppliers := map[string]market.Supplier{}
 	groups := map[string]market.Group{}
@@ -54,15 +53,15 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.
 		v := change.Value
 		prior, exists := suppliers[v.ID]
 		if err := check(v.ID, change.BaseRevision, prior.Revision, exists); err != nil {
-			return market.Directory{}, nil, err
+			return market.Directory{}, err
 		}
 		if market.ValidateSupplier(v) != nil {
-			return market.Directory{}, nil, ErrInvalid
+			return market.Directory{}, ErrInvalid
 		}
 		if v.DeletedAt != nil {
 			for _, group := range live.Groups {
 				if group.SupplierID == v.ID && group.DeletedAt == nil {
-					return market.Directory{}, nil, market.ErrHasGroups
+					return market.Directory{}, market.ErrHasGroups
 				}
 			}
 		}
@@ -78,11 +77,11 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.
 		v := change.Value
 		prior, exists := groups[v.ID]
 		if err := check(v.ID, change.BaseRevision, prior.Revision, exists); err != nil {
-			return market.Directory{}, nil, err
+			return market.Directory{}, err
 		}
 		parent, ok := suppliers[v.SupplierID]
 		if !ok || parent.DeletedAt != nil || (exists && prior.SupplierID != v.SupplierID) || market.ValidateGroup(v) != nil {
-			return market.Directory{}, nil, ErrInvalid
+			return market.Directory{}, ErrInvalid
 		}
 		v.Revision = change.BaseRevision + 1
 		v.CapabilityDigest = market.GroupCapabilityDigest(v)
@@ -93,11 +92,11 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.
 		v := change.Value
 		prior, exists := addresses[v.ID]
 		if err := check(v.ID, change.BaseRevision, prior.Revision, exists); err != nil {
-			return market.Directory{}, nil, err
+			return market.Directory{}, err
 		}
 		parent, ok := suppliers[v.SupplierID]
 		if !ok || parent.DeletedAt != nil || (exists && prior.SupplierID != v.SupplierID) || v.BaseURL == "" {
-			return market.Directory{}, nil, ErrInvalid
+			return market.Directory{}, ErrInvalid
 		}
 		v.Revision = change.BaseRevision + 1
 		addresses[v.ID] = v
@@ -107,7 +106,7 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.
 	for _, set := range c.GroupAddresses {
 		group, ok := groups[set.GroupID]
 		if !ok || setSeen[set.GroupID] || !changedGroups[set.GroupID] || group.DeletedAt != nil || len(set.Links) > 32 {
-			return market.Directory{}, nil, ErrInvalid
+			return market.Directory{}, ErrInvalid
 		}
 		setSeen[set.GroupID] = true
 		links = slices.DeleteFunc(links, func(link market.GroupAddress) bool { return link.GroupID == set.GroupID })
@@ -115,7 +114,7 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.
 		for i, link := range set.Links {
 			address, ok := addresses[link.AddressID]
 			if !ok || address.DeletedAt != nil || address.SupplierID != group.SupplierID || link.SupplierID != group.SupplierID || link.GroupID != group.ID || link.ID == "" || seen[link.AddressID] {
-				return market.Directory{}, nil, ErrInvalid
+				return market.Directory{}, ErrInvalid
 			}
 			seen[link.AddressID] = true
 			link.Position = int32(i)
@@ -126,7 +125,7 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.
 		v := change.Value
 		prior, exists := models[v.ID]
 		if err := check(v.ID, change.BaseRevision, prior.Revision, exists); err != nil {
-			return market.Directory{}, nil, err
+			return market.Directory{}, err
 		}
 		if v.UpstreamModel == "" {
 			v.UpstreamModel = v.ModelID
@@ -136,7 +135,7 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.
 		}
 		group, ok := groups[v.GroupID]
 		if !ok || group.DeletedAt != nil || (exists && prior.GroupID != v.GroupID) || market.ValidateGroupModel(v) != nil {
-			return market.Directory{}, nil, ErrInvalid
+			return market.Directory{}, ErrInvalid
 		}
 		v.Revision = change.BaseRevision + 1
 		v.CapabilityDigest = market.ModelCapabilityDigest(group.CapabilityDigest, v)
@@ -147,7 +146,7 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.
 	for _, quote := range c.Quotes {
 		model, ok := models[quote.GroupModelID]
 		if !ok || !changedModels[quote.GroupModelID] || quoteSeen[quote.GroupModelID] || quote.ID == "" || model.DeletedAt != nil || market.ValidateQuote(quote) != nil || (quote.BillingUnit == "per_successful_image" && model.ModelType != "image") {
-			return market.Directory{}, nil, ErrInvalid
+			return market.Directory{}, ErrInvalid
 		}
 		quoteSeen[quote.GroupModelID] = true
 		if prior, exists := quotes[model.ID]; exists {
@@ -169,10 +168,10 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.
 			}
 		}
 		if !gatewaycontract.ValidModelID(v.ModelID) || utf8.RuneCountInString(v.Reason) > 1000 {
-			return market.Directory{}, nil, ErrInvalid
+			return market.Directory{}, ErrInvalid
 		}
 		if err := check("rule:"+v.ModelID, change.BaseRevision, prior, index >= 0); err != nil {
-			return market.Directory{}, nil, err
+			return market.Directory{}, err
 		}
 		v.Revision = change.BaseRevision + 1
 		if index < 0 {
@@ -201,20 +200,6 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.
 			out.GroupAddresses = append(out.GroupAddresses, v)
 		}
 	}
-	targets := []detection.Target{}
-	for _, group := range out.Groups {
-		if changedGroups[group.ID] {
-			priorExists := false
-			for _, change := range c.Groups {
-				if change.Value.ID == group.ID && change.BaseRevision > 0 {
-					priorExists = true
-				}
-			}
-			if group.Enabled || !priorExists {
-				targets = append(targets, detection.Target{GroupID: group.ID, Binding: market.EvidenceBinding{TargetKind: "group", TargetID: group.ID, TargetRevision: group.Revision, CapabilityDigest: group.CapabilityDigest}})
-			}
-		}
-	}
 	for _, v := range models {
 		group, ok := groups[v.GroupID]
 		if !ok || group.DeletedAt != nil || v.DeletedAt != nil {
@@ -226,18 +211,9 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.
 			v.QuoteID = &quoteID
 			out.Quotes = append(out.Quotes, quote)
 		} else if changedModels[v.ID] {
-			return market.Directory{}, nil, ErrInvalid
+			return market.Directory{}, ErrInvalid
 		}
 		out.Models = append(out.Models, v)
-		if changedModels[v.ID] || changedGroups[v.GroupID] {
-			existing := false
-			for _, old := range live.Models {
-				existing = existing || old.ID == v.ID
-			}
-			if (v.Enabled && (group.Enabled || !changedGroups[group.ID])) || !existing {
-				targets = append(targets, detection.Target{GroupID: group.ID, Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: v.ID, TargetRevision: v.Revision, CapabilityDigest: v.CapabilityDigest}, ModelType: v.ModelType, Model: v.UpstreamModel})
-			}
-		}
 	}
 	modelTypes := map[string]string{}
 	references := map[string]bool{}
@@ -245,21 +221,21 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.
 		if model.IsReference {
 			group := groups[model.GroupID]
 			if suppliers[group.SupplierID].Kind != "official_api" {
-				return market.Directory{}, nil, ErrInvalid
+				return market.Directory{}, ErrInvalid
 			}
 		}
 		if !model.Enabled {
 			continue
 		}
 		if prior, exists := modelTypes[model.ModelID]; exists && prior != model.ModelType {
-			return market.Directory{}, nil, ErrConflict
+			return market.Directory{}, ErrConflict
 		}
 		modelTypes[model.ModelID] = model.ModelType
 		if model.IsReference && model.Enabled {
 			group := groups[model.GroupID]
 			supplier := suppliers[group.SupplierID]
 			if supplier.Kind != "official_api" || references[model.ModelID] {
-				return market.Directory{}, nil, ErrConflict
+				return market.Directory{}, ErrConflict
 			}
 			references[model.ModelID] = true
 		}
@@ -269,13 +245,5 @@ func Overlay(draft Draft, live market.Directory) (market.Directory, []detection.
 	sort.Slice(out.Addresses, func(i, j int) bool { return out.Addresses[i].ID < out.Addresses[j].ID })
 	sort.Slice(out.Models, func(i, j int) bool { return out.Models[i].ID < out.Models[j].ID })
 	sort.Slice(out.Quotes, func(i, j int) bool { return out.Quotes[i].GroupModelID < out.Quotes[j].GroupModelID })
-	sort.Slice(targets, func(i, j int) bool { return targets[i].Binding.TargetID < targets[j].Binding.TargetID })
-	for i, target := range targets {
-		resolved, err := detection.ResolveDirectory(out, target)
-		if err != nil {
-			return market.Directory{}, nil, err
-		}
-		targets[i] = resolved.Target
-	}
-	return out, targets, nil
+	return out, nil
 }

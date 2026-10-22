@@ -4,6 +4,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { errorMessage } from '../api/query'
 import type { components } from '../api/schema.gen'
 import { FormatTags } from '../calls'
+import { ContributionDialog } from '../contributions/Editor'
 import { MarkdownContent } from '../markdown/MarkdownContent'
 import { DetectionObservations } from '../detection/Observations'
 import { RoutingEditor } from '../models/RoutingEditor'
@@ -80,7 +81,7 @@ export function MarketModelGrid({ groupID, supplierID }: { groupID?: string; sup
     <QueryBoundary query={query} errorFallback="模型目录加载失败">{data => <>
       <p className="muted-copy" role="status">共 {data.total} 个模型 · 能力和费用来自符合筛选的候选</p>
       {data.price_sort_fallback && <Notice tone="info">报价的计量单位不同，当前按模型 ID 排序。</Notice>}
-      {data.items.length ? <div className="model-grid">{data.items.map(model => <ModelCard key={model.id} model={model} search={search.toString()} />)}</div> : <EmptyState title="没有符合条件的模型" action={<ButtonLink to="/contributions">贡献供应商分组</ButtonLink>} />}
+      {data.items.length ? <div className="model-grid">{data.items.map(model => <ModelCard key={model.id} model={model} search={search.toString()} />)}</div> : <EmptyState title="没有符合条件的模型" />}
       <div className="form-actions"><Button variant="quiet" disabled={!params.get('cursor')} onClick={() => update('cursor', '')}>回到第一页</Button><Button variant="secondary" disabled={!data.next_cursor} onClick={() => setParams(current => { const next = new URLSearchParams(current); next.set('cursor', data.next_cursor ?? ''); return next })}>下一页</Button></div>
     </>}</QueryBoundary>
   </>
@@ -121,7 +122,7 @@ export function MarketModelDetailPage() {
     {detail.offers.map(offer => {
       const group = detail.groups.find(g => g.id === offer.group_id), supplier = detail.suppliers.find(s => s.id === group?.supplier_id)
       const channels = detail.channels.filter(c => c.group_model_id === offer.id)
-      return <Card key={offer.id} title={group?.name ?? '分组'}>
+      return <Card key={offer.id} title={group?.name ?? '分组'} actions={<ContributionDialog create={{ kind: 'group_model', target_id: offer.id, action: 'edit' }} label="编辑报价" title="编辑模型报价" />}>
         <div className="sharing-line"><Link to={`/suppliers/${supplier?.id}`}>{supplier?.name}</Link><Link to={`/groups/${offer.group_id}`}>分组与检测报告 →</Link>{offer.reference && <Badge tone="info">原厂参考源</Badge>}</div>
         {offer.display_name && offer.display_name !== offer.model_id && <p className="muted-copy">本报价显示名：{offer.display_name}</p>}
         <p>声明上下文 {bounds(offer.declared_context)} · 声明最大输出 {bounds(offer.declared_output)}</p>
@@ -152,7 +153,7 @@ function CodexSetup({ model }: { model: string }) {
 
 export function MarketSuppliersPage() {
   const query = useMarketSuppliers(), [params, setParams] = useSearchParams()
-  return <><PageHeader title="供应商" actions={<ButtonLink to="/contributions">贡献供应商</ButtonLink>} /><Toolbar><SearchInput label="搜索供应商" value={params.get('q') ?? ''} onChange={e => setParams(p => { const n = new URLSearchParams(p); n.set('q', e.target.value); return n })} /><SelectField label="供应商分类" value={params.get('kind') ?? ''} onChange={e => setParams(p => { const n = new URLSearchParams(p); n.set('kind', e.target.value); return n })}><option value="">全部</option>{Object.entries(kinds).map(([k, label]) => <option value={k} key={k}>{label}</option>)}</SelectField></Toolbar>
+  return <><PageHeader title="供应商" actions={<ContributionDialog create={{ kind: 'supplier', starter: true }} label="贡献供应商" title="新增供应商" variant="primary" />} /><Toolbar><SearchInput label="搜索供应商" value={params.get('q') ?? ''} onChange={e => setParams(p => { const n = new URLSearchParams(p); n.set('q', e.target.value); return n })} /><SelectField label="供应商分类" value={params.get('kind') ?? ''} onChange={e => setParams(p => { const n = new URLSearchParams(p); n.set('kind', e.target.value); return n })}><option value="">全部</option>{Object.entries(kinds).map(([k, label]) => <option value={k} key={k}>{label}</option>)}</SelectField></Toolbar>
     <QueryBoundary query={query} errorFallback="供应商加载失败">{data => {
       const rows = data.items.filter(s => (!params.get('kind') || s.kind === params.get('kind')) && `${s.name} ${s.summary}`.toLowerCase().includes((params.get('q') ?? '').toLowerCase()))
       return rows.length ? <div className="sharing-grid">{rows.map(s => <Card key={s.id}><div className="sharing-title"><SupplierIcon supplier={s} /><h2><Link to={`/suppliers/${s.id}`}>{s.name}</Link></h2><Badge>{kinds[s.kind]}</Badge></div><p>{s.summary}</p><p className="muted-copy">{s.groups.length} 个分组</p></Card>)}</div> : <EmptyState title="暂无符合条件的供应商" />
@@ -163,7 +164,7 @@ export function MarketSupplierDetailPage() {
   return <QueryBoundary query={query} errorFallback="供应商加载失败">{data => {
     const s = data.items.find(s => s.id === id)
     if (!s) return <EmptyState title="供应商不存在或已停用" />
-    return <><PageHeader title={s.name} back={{ to: '/suppliers', label: '供应商' }} /><Card><div className="sharing-title"><SupplierIcon supplier={s} /><Badge>{kinds[s.kind]}</Badge></div><p>{s.summary}</p><MarkdownContent value={s.description} /><div className="sharing-line">{s.website_url && <a href={s.website_url} target="_blank" rel="noopener noreferrer">官网 ↗</a>}{s.docs_url && <a href={s.docs_url} target="_blank" rel="noopener noreferrer">文档 ↗</a>}{s.icon_source && <a href={s.icon_source} target="_blank" rel="noopener noreferrer">图标来源 ↗</a>}</div></Card><Card title="分组">{data.groups.filter(g => g.supplier_id === id).map(g => <div className="market-channel" key={g.id}><Link to={`/groups/${g.id}`}>{g.name}</Link><p className="muted-copy">{g.model_ids.length} 个模型</p></div>)}</Card><MarketModelGrid supplierID={id} /><MarketQualitySection key={id} kind="supplier" id={id} /></>
+    return <><PageHeader title={s.name} back={{ to: '/suppliers', label: '供应商' }} actions={<><ContributionDialog create={{ kind: 'supplier', target_id: s.id, action: 'edit' }} label="编辑资料" title="编辑供应商" /><ContributionDialog create={{ kind: 'group', parent_id: s.id }} label="新增分组" title="新增分组" /></>} /><Card><div className="sharing-title"><SupplierIcon supplier={s} /><Badge>{kinds[s.kind]}</Badge></div><p>{s.summary}</p><MarkdownContent value={s.description} /><div className="sharing-line">{s.website_url && <a href={s.website_url} target="_blank" rel="noopener noreferrer">官网 ↗</a>}{s.docs_url && <a href={s.docs_url} target="_blank" rel="noopener noreferrer">文档 ↗</a>}{s.icon_source && <a href={s.icon_source} target="_blank" rel="noopener noreferrer">图标来源 ↗</a>}</div></Card><Card title="分组">{data.groups.filter(g => g.supplier_id === id).map(g => <div className="market-channel" key={g.id}><Link to={`/groups/${g.id}`}>{g.name}</Link><p className="muted-copy">{g.model_ids.length} 个模型</p></div>)}</Card><MarketModelGrid supplierID={id} /><MarketQualitySection key={id} kind="supplier" id={id} /></>
   }}</QueryBoundary>
 }
 export function MarketGroupPage() {
