@@ -16,7 +16,6 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
@@ -27,9 +26,8 @@ import (
 
 // newGroupEnv runs the same database/auth/settlement infrastructure as the old
 // integration fixture, using approved group quotes and the real group-channel
-// handlers. It never seeds models or channel_models. The explicit synthetic
-// stream and capacity facts below exercise forwarding mechanics, not provider
-// detection: no report/evidence rows are published or accepted as real proof.
+// handlers. It never seeds models or channel_models, and it publishes no
+// report or evidence rows: the synthetic quotes below are the only facts.
 func newGroupEnv(t *testing.T) *env { return newGroupEnvWith(t, nil) }
 
 func newGroupEnvWith(t *testing.T, configure func(*gateway.Dependencies)) *env {
@@ -41,7 +39,6 @@ func newGroupEnvWith(t *testing.T, configure func(*gateway.Dependencies)) *env {
 type groupIntegrationEvidence struct {
 	snapshot.Loader
 	Prices *groupIntegrationPriceSource
-	Proofs *groupFixtureProofs
 }
 
 func (l groupIntegrationEvidence) LoadCandidates(ctx context.Context) ([]gateway.CandidateRecord, error) {
@@ -50,13 +47,6 @@ func (l groupIntegrationEvidence) LoadCandidates(ctx context.Context) ([]gateway
 	comparisons := &groupComparisonSnapshot{values: map[groupComparisonKey]money.Amount{}}
 	for i := range rows {
 		c := &rows[i].Candidate
-		c.Evidence = map[string]bool{}
-		l.Proofs.copyInto(c.ChannelID, c.Evidence)
-		c.VerifiedCapacity = map[string]int64{}
-		for _, protocol := range []string{"openai-chat-completions", "openai-responses", "native-messages", "native-generate-content"} {
-			c.Evidence["upstream_protocol/"+protocol+".stream/text_lifecycle"] = true
-			c.VerifiedCapacity[protocol+".length_search@upstream_protocol/max_output"] = 8192
-		}
 		// An explicit 1000-input/500-output synthetic workload is evaluated
 		// off the request path against this immutable CNY quote generation.
 		if c.Quotes != nil {
@@ -214,64 +204,6 @@ type groupIntegrationPriceSource struct {
 }
 
 func (s *groupIntegrationPriceSource) View() gateway.TypicalPriceLookup { return s.current.Load() }
-
-type groupFixtureProofs struct {
-	mu     sync.RWMutex
-	values map[string]map[string]bool
-}
-
-func (p *groupFixtureProofs) copyInto(channel string, out map[string]bool) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	for name, value := range p.values[channel] {
-		out[name] = value
-	}
-}
-
-// Extra capability facts belong only to a named controlled engine in a
-// mechanism test. Validate their pinned manifest names, and never persist them
-// as a detection report or permit them outside this _test.go fixture.
-func (e *env) declareGroupedCapabilities(channel string, names ...string) {
-	e.t.Helper()
-	m, err := gatewaycontract.Load()
-	if err != nil {
-		e.t.Fatal(err)
-	}
-	known := map[string]bool{}
-	for _, suite := range m.Suites {
-		for _, requirement := range suite.Requirements {
-			for _, assertion := range requirement.Assertions {
-				known["upstream_protocol/"+requirement.ID+"/"+assertion] = true
-			}
-			// Setting evidence projects finite native tier subcapabilities in
-			// addition to the requirement's static assertions. These are the
-			// pinned tiers explicitly exercised by the pricing/scan fixtures.
-			for _, tier := range map[string][]string{
-				"openai-chat-completions.cache_tier": {"openai:fast", "openai:flex", "openai:scale"},
-				"openai-responses.cache_tier":        {"openai:fast"},
-				"native-generate-content.cache_tier": {"gemini:priority"},
-			}[requirement.ID] {
-				known["upstream_protocol/"+requirement.ID+"/service_tier/"+tier] = true
-			}
-		}
-	}
-	for _, name := range names {
-		if !known[name] {
-			e.t.Fatal("fixture capability has no retained assertion", name)
-		}
-	}
-	e.groupProofs.mu.Lock()
-	if e.groupProofs.values[channel] == nil {
-		e.groupProofs.values[channel] = map[string]bool{}
-	}
-	for _, name := range names {
-		e.groupProofs.values[channel][name] = true
-	}
-	e.groupProofs.mu.Unlock()
-	if err := e.groups.Refresh(context.Background()); err != nil {
-		e.t.Fatal(err)
-	}
-}
 
 // Revise only this channel's approved group-model quote. It exercises the
 // append-only publication and refresh path, preserving every prior quote.

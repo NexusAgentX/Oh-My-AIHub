@@ -17,13 +17,7 @@ func TestGatewayReadsThePricingMembersOfEveryFormat(t *testing.T) {
 	e := newGroupEnv(t)
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
-	channelID := e.createChannel(sharer, channelSpec{name: "relay", upstream: okUpstream(t), upstreamAs: "gpt-up"})
-	e.declareGroupedCapabilities(channelID,
-		"upstream_protocol/openai-chat-completions.cache_tier/service_tier/openai:fast",
-		"upstream_protocol/openai-chat-completions.cache_tier/service_tier/openai:flex",
-		"upstream_protocol/openai-chat-completions.cache_tier/service_tier/openai:scale",
-		"upstream_protocol/openai-responses.cache_tier/service_tier/openai:fast",
-		"upstream_protocol/native-generate-content.cache_tier/service_tier/gemini:priority")
+	e.createChannel(sharer, channelSpec{name: "relay", upstream: okUpstream(t), upstreamAs: "gpt-up"})
 	_, secret := e.defaultKey(consumer)
 
 	snapshotDetail := func(id string) ledger.UsageDetail {
@@ -75,8 +69,7 @@ func TestGatewayForwardsLargeRequestBodiesUnchanged(t *testing.T) {
 	consumer := e.member("consumer", "100")
 	sharer := e.member("sharer", "0")
 	relay := okUpstream(t)
-	channelID := e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, upstreamAs: "gpt-up"})
-	e.declareGroupedCapabilities(channelID, "upstream_protocol/openai-chat-completions.cache_tier/service_tier/openai:fast")
+	e.createChannel(sharer, channelSpec{name: "relay", upstream: relay, upstreamAs: "gpt-up"})
 	_, secret := e.defaultKey(consumer)
 
 	for _, size := range []int{100, 70_000, 300_000, 2_000_000} {

@@ -151,30 +151,9 @@ paths:
           },
           {
             "in": "query",
-            "name": "features",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
             "name": "cursor",
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "min_context",
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "min_output",
-            "schema": {
-              "type": "integer"
             }
           },
           {
@@ -446,30 +425,9 @@ paths:
           },
           {
             "in": "query",
-            "name": "features",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
             "name": "cursor",
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "min_context",
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "min_output",
-            "schema": {
-              "type": "integer"
             }
           },
           {
@@ -643,30 +601,9 @@ paths:
           },
           {
             "in": "query",
-            "name": "features",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
             "name": "cursor",
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "min_context",
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "min_output",
-            "schema": {
-              "type": "integer"
             }
           },
           {
@@ -6062,30 +5999,6 @@ components:
           "model_ids"
         ]
       }
-    MarketBrowseCapabilities:
-      {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "supported": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "context_lower": {
-            "type": "integer"
-          },
-          "output_lower": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "supported",
-          "context_lower",
-          "output_lower"
-        ]
-      }
     MarketBrowseChannel:
       {
         "type": "object",
@@ -6118,9 +6031,6 @@ components:
           "discount": {
             "type": "string"
           },
-          "capabilities": {
-            "$ref": "#/components/schemas/MarketBrowseCapabilities"
-          },
           "price": {
             "anyOf": [
               {
@@ -6142,7 +6052,6 @@ components:
           "model_id",
           "protocol",
           "discount",
-          "capabilities",
           "price"
         ]
       }

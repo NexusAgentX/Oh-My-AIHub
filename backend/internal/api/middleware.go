@@ -61,6 +61,11 @@ func (a *app) requireSameOrigin(next http.Handler) http.Handler {
 	})
 }
 
+// isExternalGatewayPath lists the paths answered by API-key authentication
+// rather than the web session and same-origin rules. /backend-api/ is retired:
+// it carries no route, and the exemption exists only so every method reaches
+// the 404 unsupported_endpoint answer instead of a misleading cross-origin
+// error.
 func isExternalGatewayPath(path string) bool {
 	return strings.HasPrefix(path, "/v1/") || strings.HasPrefix(path, "/v1beta/") || strings.HasPrefix(path, "/backend-api/")
 }

@@ -55,10 +55,9 @@ func (s *State) ModelState(id string) (known, enabled bool) {
 }
 
 type Runtime struct {
-	Repository      Repository
-	CredentialScope func(Record) (string, error)
-	Removed         func(string)
-	Edited          func(string)
+	Repository Repository
+	Removed    func(string)
+	Edited     func(string)
 	// Ready is the contribution publication barrier; called before management
 	// and inference reads. It does no I/O and must not call back into this loader.
 	Ready     func() error
@@ -125,25 +124,6 @@ func (l *loader) LoadCandidates(ctx context.Context) ([]gateway.CandidateRecord,
 	records, views, err := build(*d, data)
 	if err != nil {
 		return nil, err
-	}
-	if l.r.CredentialScope != nil {
-		byID := map[string]Record{}
-		for _, r := range data.Channels {
-			byID[r.ID] = r
-		}
-		scopes := map[string]string{}
-		for i := range records {
-			cid := records[i].Candidate.ChannelID
-			scope, ok := scopes[cid]
-			if !ok {
-				scope, err = l.r.CredentialScope(byID[cid])
-				if err != nil {
-					return nil, err
-				}
-				scopes[cid] = scope
-			}
-			records[i].Candidate.CredentialScope = scope
-		}
 	}
 	if previous := l.r.state.Load(); previous != nil && l.r.Removed != nil {
 		present := map[string]bool{}

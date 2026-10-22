@@ -235,34 +235,33 @@ func (s approvedListingStore) ModelListCandidates(_ context.Context, f channel.F
 	}
 	return out, nil
 }
-func TestNativeModelListsKeepAliasPermissionsAndConservativeGroupMetadata(t *testing.T) {
+func TestNativeModelListsKeepAliasPermissionsAndNoBorrowedMetadata(t *testing.T) {
 	ctx := context.Background()
 	large := int64(999999)
+	// The global catalog carries bounds this listing must never report: no
+	// approved report is read here, so the model's own limits are unknown.
 	catalogSource := catalog.NewService(listingCatalog{models: []catalog.Model{{ID: "main", DisplayName: "Unrelated global title", ContextWindow: &large, MaxOutputTokens: &large}, {ID: "blocked"}}})
-	makeCandidate := func(id string, context, output int64) Candidate {
-		return Candidate{ChannelID: id, GroupID: "group", GroupModelID: "group-main", Quotes: groupBook(t, "CNY", 1), VerifiedCapacity: map[string]int64{"native-generate-content.length_search@upstream_protocol/context": context, "native-generate-content.length_search@upstream_protocol/max_output": output}, Evidence: map[string]bool{}}
+	makeCandidate := func(id string) Candidate {
+		return Candidate{ChannelID: id, GroupID: "group", GroupModelID: "group-main", Quotes: groupBook(t, "CNY", 1)}
 	}
-	a, b := makeCandidate("a", 8192, 2048), makeCandidate("b", 4096, 0)
+	a, b := makeCandidate("a"), makeCandidate("b")
 	source := approvedListingStore{listingStore: listingStore{online: []OnlineModel{{ID: "main", Formats: []channel.Format{channel.FormatGemini}}, {ID: "blocked", Formats: []channel.Format{channel.FormatGemini}}}}, records: []CandidateRecord{{ModelID: "main", Formats: []channel.Format{channel.FormatGemini}, Candidate: a}, {ModelID: "main", Formats: []channel.Format{channel.FormatGemini}, Candidate: b}}}
 	e := NewEngine(Dependencies{Catalog: catalogSource, Store: source})
 	key := KeyAuth{AllowedModels: []string{"main"}, Aliases: map[string]string{"alias": "main", "main": "blocked"}}
 	names, err := e.availableModels(ctx, key, []channel.Format{channel.FormatGemini})
-	if err != nil || len(names) != 1 || names[0].id != "alias" || names[0].model.DisplayName != "main" || names[0].model.ContextWindow == nil || *names[0].model.ContextWindow != 4096 || names[0].model.MaxOutputTokens != nil {
-		t.Fatal("alias bypass or misleading metadata", names, err)
+	if err != nil || len(names) != 1 || names[0].id != "alias" || names[0].model.DisplayName != "main" || names[0].model.ContextWindow != nil || names[0].model.MaxOutputTokens != nil {
+		t.Fatal("alias bypass or borrowed catalog metadata", names, err)
 	}
 	page, ok := geminiModelPage(names, url.Values{})
 	if !ok {
 		t.Fatal("page rejected")
 	}
 	item := page["models"].([]map[string]any)[0]
+	if _, exists := item["inputTokenLimit"]; exists {
+		t.Fatal("input bound fabricated", item)
+	}
 	if _, exists := item["outputTokenLimit"]; exists || !slices.Equal(item["supportedGenerationMethods"].([]string), []string{"generateContent"}) {
 		t.Fatal("unknown limit or stream support fabricated", item)
-	}
-	source.records[1].Candidate.VerifiedCapacity = nil
-	e.Store = source
-	names, err = e.availableModels(ctx, key, []channel.Format{channel.FormatGemini})
-	if err != nil || names[0].model.ContextWindow != nil {
-		t.Fatal("unknown witness ignored", names, err)
 	}
 }
 func TestNativeListingExcludesRetiredUngroupedCandidates(t *testing.T) {

@@ -98,7 +98,6 @@ func TestEngineUsesOrderedEntrancesWithOneChannelSlotAndGlobalAttemptLimit(t *te
 			store := &entranceStore{candidates: []Candidate{{ChannelID: "a", OwnerID: "provider", BaseURL: up.URL + "/ignored", UpstreamModel: "native", Credential: run.seal("a", "synthetic-a-key"), MultiplierNano: ledger.UnitRate, Advanced: channel.Advanced{ConcurrencyLimit: &one, RPMLimit: &one}, Entrances: []Entrance{{ID: "a1", BaseURL: up.URL + "/a1"}, {ID: "a2", BaseURL: up.URL + "/a2"}}}, {ChannelID: "b", OwnerID: "provider", BaseURL: up.URL + "/b1", UpstreamModel: "native", Credential: run.seal("b", "synthetic-b-key"), MultiplierNano: ledger.UnitRate, Advanced: channel.Advanced{ConcurrencyLimit: &one, RPMLimit: &one}, Entrances: []Entrance{{ID: "b1", BaseURL: up.URL + "/b1"}}}}}
 			for i := range store.candidates {
 				store.candidates[i] = quotedCandidate(t, store.candidates[i], catalog.Model{ID: "gpt-test"})
-				store.candidates[i].Evidence = map[string]bool{"upstream_protocol/openai-chat-completions.stream/text_lifecycle": true}
 			}
 			engine.Store, engine.Keyring = store, run.keyring
 			if tc.occupiedA {
@@ -193,7 +192,6 @@ func TestEntranceTimeoutAndCancellationUseOneCallDeadline(t *testing.T) {
 			e := fixture.engine
 			store := &entranceStore{candidates: []Candidate{{ChannelID: "a", OwnerID: "provider", Name: "A", Credential: run.seal("a", "synthetic-key"), MultiplierNano: ledger.UnitRate, Entrances: []Entrance{{ID: "a1", BaseURL: up.URL + "/a1"}, {ID: "a2", BaseURL: up.URL + "/a2"}}}}}
 			store.candidates[0] = quotedCandidate(t, store.candidates[0], catalog.Model{ID: "gpt-test"})
-			store.candidates[0].Evidence = map[string]bool{"upstream_protocol/openai-chat-completions.stream/text_lifecycle": true}
 			e.Store, e.Keyring = store, run.keyring
 			e.CallTimeLimit = time.Second
 			firstByte := int32(20)

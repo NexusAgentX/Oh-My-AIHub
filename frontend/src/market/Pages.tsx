@@ -12,7 +12,7 @@ import { SupplierIcon } from '../sharing/components'
 import { EstimateCard } from '../typical/Page'
 import { useTypicalCosts } from '../typical/queries'
 import { formatTypicalPrice } from '../typical/format'
-import { Badge, Button, Card, Checkbox, Disclosure, EmptyState, InlineError, Notice, PageHeader, QueryBoundary, SearchInput, SelectField, SuccessMessage, Switch, TextField, Toolbar } from '../ui'
+import { Badge, Button, Card, Disclosure, EmptyState, InlineError, Notice, PageHeader, QueryBoundary, SearchInput, SelectField, SuccessMessage, Switch, Toolbar } from '../ui'
 import { useMarketGroup, useMarketModel, useMarketModels, useMarketSuppliers,useSetMarketRouting } from './queries'
 import './market.css'
 
@@ -20,11 +20,6 @@ type Schema = components['schemas']
 type Model = Schema['MarketBrowseModel']
 type Detail = Schema['MarketBrowseDetail']
 type Price = Schema['MarketBrowsePrice']
-export const featureLabels: Record<string, string> = {
-  'input:text': '文本输入', 'input:image': '图片输入', 'input:audio': '音频输入', 'input:video': '视频输入', 'input:document': '文档输入',
-  'output:text': '文本输出', 'output:image': '图片输出', 'output:audio': '音频输出', tools: '函数工具', strict_json: '严格结构化', json_object: 'JSON 输出',
-  vision_url: '图片 URL', vision_inline: '请求内图片', reasoning: '推理配置', self_contained_replay: '完整推理状态续用',
-}
 const protocols: Record<string, string> = { 'openai-chat-completions': 'OpenAI Chat', 'openai-responses': 'OpenAI Responses', 'native-messages': 'Anthropic Messages', 'native-generate-content': 'Gemini', 'openai-images': '图片' }
 const kinds: Record<string, string> = { official_api: '官方 API', official_subscription: '官方订阅', relay: '中转站' }
 function bounds(value: number | null) { return value && value > 0 ? value.toLocaleString() : '未知' }
@@ -48,7 +43,6 @@ export function MarketModelGrid({ groupID, supplierID }: { groupID?: string; sup
   if (supplierID) effective.set('supplier_id', supplierID)
   const query = useMarketModels(effective)
   const suppliers = useMarketSuppliers()
-  const features = (params.get('features') ?? '').split(',').filter(Boolean)
   const update = (key: string, value: string) => setParams(current => {
     const next = new URLSearchParams(current)
     if (value) next.set(key, value); else next.delete(key)
@@ -64,18 +58,15 @@ export function MarketModelGrid({ groupID, supplierID }: { groupID?: string; sup
       <SelectField label="协议入口" value={params.get('protocol') ?? ''} onChange={e => update('protocol', e.target.value)}><option value="">全部</option>{Object.entries(protocols).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</SelectField>
       <SelectField label="排序" value={params.get('sort') ?? 'id'} onChange={e => update('sort', e.target.value)}><option value="id">模型 ID</option><option value="price">典型费用</option></SelectField>
     </Toolbar></div>
-    <Disclosure title="能力与分组筛选" defaultOpen={features.length > 0}>
+    <Disclosure title="供应商与分组筛选">
       <div className="model-filters">
         {!supplierID && <SelectField label="供应商" value={params.get('supplier_id') ?? ''} onChange={e => update('supplier_id', e.target.value)}><option value="">全部</option>{suppliers.data?.items.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</SelectField>}
         {!groupID && <SelectField label="分组" value={params.get('group_id') ?? ''} onChange={e => update('group_id', e.target.value)}><option value="">全部</option>{suppliers.data?.groups.filter(g => !effective.get('supplier_id') || g.supplier_id === effective.get('supplier_id')).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</SelectField>}
-        <TextField label="最低实测上下文（token）" inputMode="numeric" value={params.get('min_context') ?? ''} onChange={e => update('min_context', e.target.value)} />
-        <TextField label="最低实测输出（token）" inputMode="numeric" value={params.get('min_output') ?? ''} onChange={e => update('min_output', e.target.value)} />
       </div>
-      <fieldset className="model-filter-capabilities"><legend>同一候选同时满足</legend>{Object.entries(featureLabels).map(([id, label]) => <Checkbox key={id} label={label} checked={features.includes(id)} onChange={e => update('features', (e.target.checked ? [...features, id] : features.filter(f => f !== id)).join(','))} />)}</fieldset>
     </Disclosure>
     <div className="model-filter-summary"><Switch label="仅看有在线渠道" checked={params.get('only_online') === 'true'} onChange={v => update('only_online', String(v))} /><Button variant="quiet" onClick={() => setParams({})} disabled={!params.size}>清空筛选</Button></div>
     <QueryBoundary query={query} errorFallback="模型目录加载失败">{data => <>
-      <p className="muted-copy" role="status">共 {data.total} 个模型 · 能力和费用来自符合筛选的候选</p>
+      <p className="muted-copy" role="status">共 {data.total} 个模型 · 费用来自符合筛选的候选</p>
       {data.price_sort_fallback && <Notice tone="info">报价的计量单位不同，当前按模型 ID 排序。</Notice>}
       {data.items.length ? <div className="model-grid">{data.items.map(model => <ModelCard key={model.id} model={model} search={search.toString()} />)}</div> : <EmptyState title="没有符合条件的模型" />}
       <div className="form-actions"><Button variant="quiet" disabled={!params.get('cursor')} onClick={() => update('cursor', '')}>回到第一页</Button><Button variant="secondary" disabled={!data.next_cursor} onClick={() => setParams(current => { const next = new URLSearchParams(current); next.set('cursor', data.next_cursor ?? ''); return next })}>下一页</Button></div>
@@ -123,14 +114,11 @@ export function MarketModelDetailPage() {
         {offer.display_name && offer.display_name !== offer.model_id && <p className="muted-copy">本报价显示名：{offer.display_name}</p>}
         <p>声明上下文 {bounds(offer.declared_context)} · 声明最大输出 {bounds(offer.declared_output)}</p>
         <QuoteDetails offer={offer} />
-        {channels.length ? channels.map(c => <section className="market-channel" key={`${c.id}/${c.protocol}`}><h3><Link to={`/channel-hall/${c.id}`}>{c.name}</Link> · {protocols[c.protocol]}</h3><p>分组折扣 {c.discount}× · 典型费用 <PriceText value={c.price} /></p><CapabilitySummary facts={c.capabilities} /></section>) : <p className="muted-copy">暂无满足本次筛选的在线渠道</p>}
+        {channels.length ? channels.map(c => <section className="market-channel" key={`${c.id}/${c.protocol}`}><h3><Link to={`/channel-hall/${c.id}`}>{c.name}</Link> · {protocols[c.protocol]}</h3><p>分组折扣 {c.discount}× · 典型费用 <PriceText value={c.price} /></p></section>) : <p className="muted-copy">暂无满足本次筛选的在线渠道</p>}
       </Card>
     })}
     <TypicalModelCosts detail={detail} />
   </>}</QueryBoundary>
-}
-function CapabilitySummary({ facts }: { facts: Schema['MarketBrowseCapabilities'] }) {
-  return <><p className="muted-copy">实测上下文下界 {bounds(facts.context_lower)} · 实测输出下界 {bounds(facts.output_lower)}</p><div className="sharing-line">{facts.supported.map(f => <Badge key={f}>{featureLabels[f] ?? f}</Badge>)}</div>{facts.supported.length === 0 && <p className="muted-copy">高级能力缺少当前有效证据</p>}</>
 }
 function QuoteDetails({ offer }: { offer: Schema['MarketBrowseOffer'] }) {
   const q = offer.quote

@@ -55,23 +55,15 @@ type KeyAuth struct {
 type Candidate struct {
 	GroupID            string
 	GroupModelID       string
-	CredentialScope    string
 	ConfigRevision     int64
 	CredentialRevision int64
 	Entrances          []Entrance
-	// Evidence is compiled from current approved reports off the request path.
-	// Keys are proof-layer + "/" + independent capability ID.
-	Evidence         map[string]bool
-	VerifiedCapacity map[string]int64
-	// The minimal Key probe's chosen primary entrance is distinct from wire
-	// format; evidence for one entrance does not prove another.
-	KeyProbeEndpoints map[channel.Format]string
-	TypicalCost       money.Amount
-	TypicalCostKnown  bool
-	TypicalUnit       string
-	TypicalQuantity   int64
-	PricingVersion    string
-	ModelType         string
+	TypicalCost        money.Amount
+	TypicalCostKnown   bool
+	TypicalUnit        string
+	TypicalQuantity    int64
+	PricingVersion     string
+	ModelType          string
 	// Quotes is immutable. A missing group offer never uses a global price.
 	Quotes         *quotepricing.Book
 	ChannelID      string

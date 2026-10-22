@@ -41,7 +41,6 @@ func TestServeCompressedResponsesKeepsOpaqueBytes(t *testing.T) {
 	run := newCredentialRun(t, 200)
 	store := &protocolErrorStore{candidate: Candidate{ChannelID: "upstream", OwnerID: "provider", BaseURL: upstream.URL, UpstreamModel: "upstream-model", MultiplierNano: ledger.UnitRate, Credential: run.seal("upstream", "sk-synthetic-upstream")}, fallbackCredential: run.seal("zz-fallback", "sk-synthetic-upstream")}
 	store.candidate = quotedCandidate(t, store.candidate, catalog.Model{ID: "gpt-test"})
-	store.candidate.Evidence = map[string]bool{"upstream_protocol/codex-special.RL14/public_zstd_request": true, "upstream_protocol/openai-responses.reasoning/complete_opaque_signature_or_encrypted_replay": true}
 	store.candidate.Advanced.HeaderRules.Set = []channel.HeaderSet{{Name: "Content-Encoding", Value: "gzip"}, {Name: "Digest", Value: "stale"}}
 	e := newServeFixture(t, 10, defaultRouting{}).engine
 	e.Store = store

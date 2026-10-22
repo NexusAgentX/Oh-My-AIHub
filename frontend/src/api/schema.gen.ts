@@ -1942,11 +1942,6 @@ export interface components {
             status_url: string;
             model_ids: string[];
         };
-        MarketBrowseCapabilities: {
-            supported: string[];
-            context_lower: number;
-            output_lower: number;
-        };
         MarketBrowseChannel: {
             id: string;
             name: string;
@@ -1957,7 +1952,6 @@ export interface components {
             model_id: string;
             protocol: string;
             discount: string;
-            capabilities: components["schemas"]["MarketBrowseCapabilities"];
             price: components["schemas"]["MarketBrowsePrice"] | null;
         };
         MarketBrowseOffer: {
@@ -4515,10 +4509,7 @@ export interface operations {
                 format?: string;
                 protocol?: string;
                 sort?: string;
-                features?: string;
                 cursor?: string;
-                min_context?: number;
-                min_output?: number;
                 limit?: number;
                 only_online?: boolean;
                 channel_q?: string;
@@ -4681,10 +4672,7 @@ export interface operations {
                 format?: string;
                 protocol?: string;
                 sort?: string;
-                features?: string;
                 cursor?: string;
-                min_context?: number;
-                min_output?: number;
                 limit?: number;
                 only_online?: boolean;
             };
@@ -4770,10 +4758,7 @@ export interface operations {
                 format?: string;
                 protocol?: string;
                 sort?: string;
-                features?: string;
                 cursor?: string;
-                min_context?: number;
-                min_output?: number;
                 limit?: number;
                 only_online?: boolean;
             };

@@ -243,10 +243,10 @@ func (w *snapshotWorld) compare(t *testing.T, label string, cached *storepg.Cach
 
 func (w *snapshotWorld) fresh(t *testing.T, logger *slog.Logger) (*storepg.Cached, snapshot.Loader) {
 	t.Helper()
-	runtime := &groupchannel.Runtime{Repository: w.e.groupStore, CredentialScope: w.e.groups.CredentialScope}
+	runtime := &groupchannel.Runtime{Repository: w.e.groupStore}
 	var source snapshot.Loader
 	fresh := w.e.store.Cached(logger, func(c *snapshot.Config) {
-		source = groupIntegrationEvidence{Loader: runtime.Wrap(c.Loader), Prices: &groupIntegrationPriceSource{}, Proofs: w.e.groupProofs}
+		source = groupIntegrationEvidence{Loader: runtime.Wrap(c.Loader), Prices: &groupIntegrationPriceSource{}}
 		c.Loader = source
 	})
 	runtime.Rebuild = func(ctx context.Context) error {

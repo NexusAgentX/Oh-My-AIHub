@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 )
 
 // The gateway keeps no server-side state, so a request that asks for it is
@@ -96,8 +98,56 @@ func TestObjectScanFindsStatefulFields(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := scan.statefulField(body); got != tc.want {
+		if got := scan.statefulField(body, continuationFields); got != tc.want {
 			t.Fatalf("%s: got %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestObjectScanFindsGeminiCachedContext(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{`{"contents":[],"cachedContent":"cachedContents/owned"}`, "cachedContent"},
+		{`{"cachedContent":"cachedContents/owned","contents":[]}`, "cachedContent"},
+		{`{"CACHEDCONTENT":"cachedContents/owned"}`, "cachedContent"},
+		{`{"cachedContent":""}`, ""},
+		{`{"cachedContent":null}`, ""},
+		{`{"contents":[{"parts":[{"text":"x"}]}]}`, ""},
+		{`{"contents":[],"cached_content":"nested-only"}`, ""},
+	}
+	for _, tc := range cases {
+		body := []byte(tc.in)
+		_, scan, err := ScanRequest(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := scan.statefulField(body, cachedContextFields); got != tc.want {
+			t.Fatalf("%s: got %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestStatefulFieldsFollowTheEntrance(t *testing.T) {
+	const gemini = "/v1beta/models/gemini-2.5-flash"
+	cases := []struct {
+		format channel.Format
+		path   string
+		want   []string
+	}{
+		{channel.FormatGemini, gemini, cachedContextFields},
+		{channel.FormatOpenAIResponses, "/v1/responses", continuationFields},
+		{channel.FormatOpenAIChat, "/v1/chat/completions", continuationFields},
+		{channel.FormatAnthropic, "/v1/messages", nil},
+		{channel.FormatOpenAIResponses, "/v1/images/generations", nil},
+	}
+	for _, tc := range cases {
+		got := statefulFields(tc.format, tc.path)
+		if len(got) != len(tc.want) {
+			t.Fatalf("%s %s: got %v, want %v", tc.format, tc.path, got, tc.want)
+		}
+		for i := range got {
+			if got[i] != tc.want[i] {
+				t.Fatalf("%s %s: got %v, want %v", tc.format, tc.path, got, tc.want)
+			}
 		}
 	}
 }

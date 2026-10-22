@@ -34,7 +34,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/identity"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/metrics"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	storepg "github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
@@ -189,13 +188,12 @@ type person struct {
 }
 
 type env struct {
-	groups      *groupchannel.Runtime
-	groupStore  *groupchannelpg.Store
-	groupPorts  *groupLoopbackPorts
-	groupProofs *groupFixtureProofs
-	t           *testing.T
-	pool        *pgxpool.Pool
-	store       *storepg.Store
+	groups     *groupchannel.Runtime
+	groupStore *groupchannelpg.Store
+	groupPorts *groupLoopbackPorts
+	t          *testing.T
+	pool       *pgxpool.Pool
+	store      *storepg.Store
 	// cached is what the gateway and the services run on (ADR-0040); a test
 	// that changes cached data goes through the env's services, or through
 	// cached.Cache.Invalidate after writing SQL itself.
@@ -244,16 +242,14 @@ func newGroupEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, confi
 	// service that writes the cached data on them (ADR-0040).
 	var groups *groupchannel.Runtime
 	var groupedPrices *groupIntegrationPriceSource
-	var groupedProofs *groupFixtureProofs
 	var repo *groupchannelpg.Store
 	var options []func(*snapshot.Config)
 
 	repo = groupchannelpg.NewStore(pool)
 	groupedPrices = &groupIntegrationPriceSource{}
-	groupedProofs = &groupFixtureProofs{values: map[string]map[string]bool{}}
 	groups = &groupchannel.Runtime{Repository: repo}
 	options = append(options, func(c *snapshot.Config) {
-		c.Loader = groupIntegrationEvidence{Loader: groups.Wrap(c.Loader), Prices: groupedPrices, Proofs: groupedProofs}
+		c.Loader = groupIntegrationEvidence{Loader: groups.Wrap(c.Loader), Prices: groupedPrices}
 	})
 
 	cached := store.Cached(logger, options...)
@@ -291,16 +287,8 @@ func newGroupEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, confi
 	outbound := testOutbound{client: &http.Client{Transport: testTransport}}
 	e := &env{t: t, pool: pool, store: store, cached: cached, logs: logs, service: service, people: map[string]person{}, keyring: keyring}
 	e.groups, e.groupStore = groups, repo
-	e.groupProofs = groupedProofs
 
 	groups.Removed = keyring.ForgetCredential
-	groups.CredentialScope = func(r groupchannel.Record) (string, error) {
-		value, err := keyring.OpenCredential(r.ID, r.Credential)
-		if err != nil {
-			return "", err
-		}
-		return market.CredentialScope(secret, r.GroupID, []byte(value))
-	}
 
 	runtime := gateway.NewRuntime(func(channelID, kind, reason string) {
 		_ = store.Gateway.RecordChannelEvent(context.Background(), channelID, kind, reason)

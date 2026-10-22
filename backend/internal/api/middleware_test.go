@@ -71,10 +71,29 @@ func TestGatewayEntriesSkipSameOriginAndRequireAPIKey(t *testing.T) {
 
 func TestUnsupportedGatewayPathsAnswerNotFound(t *testing.T) {
 	handler := NewHandler(Dependencies{Gateway: gateway.NewEngine(gateway.Dependencies{})})
+	// The retired /backend-api namespace answers the same JSON 404 for every
+	// method and every caller: it holds no route, and a rejection for origin or
+	// permission would misreport a dead endpoint as an authorization problem.
+	for _, tc := range []struct{ name, method, origin string }{
+		{"cross site write", http.MethodPost, "https://elsewhere.example"},
+		{"write without origin", http.MethodPost, ""},
+		{"same origin write", http.MethodPost, "http://example.com"},
+		{"read", http.MethodGet, ""},
+		{"head", http.MethodHead, ""},
+	} {
+		request := httptest.NewRequest(tc.method, "/backend-api/codex/responses", strings.NewReader(`{}`))
+		if tc.origin != "" {
+			request.Header.Set("Origin", tc.origin)
+		}
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+		if recorder.Code != http.StatusNotFound || !strings.Contains(recorder.Body.String(), `"code":"unsupported_endpoint"`) {
+			t.Fatalf("%s: %s /backend-api/codex/responses = %d %s", tc.name, tc.method, recorder.Code, recorder.Body.String())
+		}
+	}
 	for _, target := range []struct{ method, path string }{
 		{http.MethodPost, "/v1/embeddings"}, {http.MethodPost, "/v1/files"}, {http.MethodGet, "/v1/containers"},
 		{http.MethodPost, "/v1beta/other"},
-		{http.MethodPost, "/backend-api/codex/responses"}, {http.MethodGet, "/backend-api/wham/accounts/check"},
 		{http.MethodGet, "/v1/user-auth-credential/whoami"},
 	} {
 		recorder := httptest.NewRecorder()

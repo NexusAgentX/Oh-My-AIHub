@@ -21,13 +21,6 @@ var ErrFilter = errors.New("invalid catalog filter")
 var ErrCursor = errors.New("invalid catalog cursor")
 var ErrPageChanged = errors.New("catalog scope changed; reload first page")
 
-// Facts are already projected from current independent assertions of ONE
-// protocol on ONE group model. The builder owns that projection; Select cannot
-// make a positive capability from declarations, prices or another offering.
-type Facts struct {
-	Supported                 map[string]bool
-	ContextLower, OutputLower int64
-}
 type Price struct {
 	Amount      money.Amount `json:"amount"`
 	Unit        string       `json:"unit"`
@@ -47,7 +40,6 @@ func (p Price) MarshalJSON() ([]byte, error) {
 type Channel struct {
 	ID, OwnerID                string
 	Visible, Enabled, Routable bool
-	Facts                      Facts
 	Price                      *Price
 }
 type Offering struct {
@@ -55,25 +47,22 @@ type Offering struct {
 	ModelID, GroupModelID, GroupID, SupplierID, ModelType string
 	Visible, Enabled                                      bool
 	Format                                                channel.Format
-	Facts                                                 Facts
 	Channels                                              []Channel
 }
 type Query struct {
-	ModelID               string         `json:"model_id"`
-	SupplierID            string         `json:"supplier_id"`
-	GroupID               string         `json:"group_id"`
-	Protocol              string         `json:"protocol"`
-	Search                string         `json:"search"`
-	ModelType             string         `json:"model_type"`
-	Format                channel.Format `json:"format"`
-	Features              []string       `json:"features"`
-	MinContext, MinOutput int64
-	OnlyOnline            bool   `json:"only_online"`
-	Sort                  string `json:"sort"`
+	ModelID    string         `json:"model_id"`
+	SupplierID string         `json:"supplier_id"`
+	GroupID    string         `json:"group_id"`
+	Protocol   string         `json:"protocol"`
+	Search     string         `json:"search"`
+	ModelType  string         `json:"model_type"`
+	Format     channel.Format `json:"format"`
+	OnlyOnline bool           `json:"only_online"`
+	Sort       string         `json:"sort"`
 }
 type Scope struct {
-	// Version must cover the approved offering/candidate/evidence/price
-	// snapshot generation. The caller also changes it when publication fails.
+	// Version must cover the approved offering/candidate/price snapshot
+	// generation. The caller also changes it when publication fails.
 	Version       string
 	ActorID       string
 	KeyID         string
@@ -112,19 +101,14 @@ func (q Query) validate() bool {
 	if q.ModelID != "" && !gatewaycontract.ValidModelID(q.ModelID) || len(q.SupplierID) > 128 || len(q.GroupID) > 128 {
 		return false
 	}
-	if q.Protocol != "" && !slices.Contains([]string{"openai-chat-completions", "openai-responses", "native-messages", "native-generate-content", "openai-images", "codex-special"}, q.Protocol) {
+	if q.Protocol != "" && !slices.Contains([]string{"openai-chat-completions", "openai-responses", "native-messages", "native-generate-content", "openai-images"}, q.Protocol) {
 		return false
 	}
-	if len(q.Search) > 256 || q.ModelType != "" && q.ModelType != "text" && q.ModelType != "image" || q.MinContext < 0 || q.MinOutput < 0 || q.Sort != "" && q.Sort != "id" && q.Sort != "price" || len(q.Features) > 16 {
+	if len(q.Search) > 256 || q.ModelType != "" && q.ModelType != "text" && q.ModelType != "image" || q.Sort != "" && q.Sort != "id" && q.Sort != "price" {
 		return false
 	}
 	if q.Format != "" && !q.Format.Valid() && q.Format != channel.FormatOpenAIImages {
 		return false
-	}
-	for _, f := range q.Features {
-		if !slices.Contains([]string{"input:text", "input:image", "input:audio", "input:video", "input:document", "output:text", "output:image", "output:audio", "tools", "strict_json", "json_object", "vision_url", "vision_inline", "reasoning", "self_contained_replay", "codex_cli_basic"}, f) {
-			return false
-		}
 	}
 	return true
 }
@@ -143,21 +127,8 @@ func validProtocol(protocol string, format channel.Format) bool {
 		return format == channel.FormatGemini
 	case "openai-images":
 		return format == channel.FormatOpenAIImages
-	case "codex-special":
-		return format == channel.FormatOpenAIResponses || format == channel.FormatOpenAIImages
 	}
 	return false
-}
-func matches(f Facts, q Query) bool {
-	if q.MinContext > 0 && f.ContextLower < q.MinContext || q.MinOutput > 0 && f.OutputLower < q.MinOutput {
-		return false
-	}
-	for _, name := range q.Features {
-		if !f.Supported[name] {
-			return false
-		}
-	}
-	return true
 }
 func validPrice(p *Price) bool {
 	return p != nil && p.Amount >= 0 && !p.SelfNetZero && p.Unit != "" && p.Quantity > 0
@@ -172,9 +143,9 @@ func priceLess(a, b *Price) bool {
 	return a.Amount < b.Amount
 }
 
-// Select filters permissions, governance, protocol and ALL requested features
-// on each witness before grouping, counting, sorting or pagination. No union of
-// unrelated groups, protocols or channels can create a matching witness.
+// Select filters permissions, governance and protocol on each witness before
+// grouping, counting, sorting or pagination. No union of unrelated groups,
+// protocols or channels can create a matching witness.
 func Select(offers []Offering, scope Scope, q Query, after string, limit int) (Page, error) {
 	if limit < 1 || limit > 100 {
 		return Page{Items: []Model{}}, ErrFilter
@@ -194,9 +165,6 @@ func selectPage(offers []Offering, scope Scope, q Query, after string, limit int
 		return page, ErrFilter
 	}
 	q.Search = strings.TrimSpace(q.Search)
-	q.Features = slices.Clone(q.Features)
-	slices.Sort(q.Features)
-	q.Features = slices.Compact(q.Features)
 	allowed := slices.Clone(scope.AllowedModels)
 	slices.Sort(allowed)
 	raw, _ := json.Marshal(struct {
@@ -231,13 +199,13 @@ func selectPage(offers []Offering, scope Scope, q Query, after string, limit int
 		if q.ModelID != "" && q.ModelID != offer.ModelID || q.SupplierID != "" && q.SupplierID != offer.SupplierID || q.GroupID != "" && q.GroupID != offer.GroupID {
 			continue
 		}
-		if !offer.Visible || !offer.Enabled || !validProtocol(offer.Protocol, offer.Format) || offer.GroupModelID == "" || offer.GroupID == "" || offer.SupplierID == "" || offer.ModelType != "text" && offer.ModelType != "image" || !gatewaycontract.ValidModelID(offer.ModelID) || len(allowed) > 0 && !slices.Contains(allowed, offer.ModelID) || q.ModelType != "" && offer.ModelType != q.ModelType || q.Format != "" && offer.Format != q.Format || q.Protocol != "" && offer.Protocol != q.Protocol || slices.Contains(q.Features, "codex_cli_basic") && offer.Protocol != "codex-special" || q.Search != "" && !strings.Contains(strings.ToLower(offer.ModelID), strings.ToLower(q.Search)) {
+		if !offer.Visible || !offer.Enabled || !validProtocol(offer.Protocol, offer.Format) || offer.GroupModelID == "" || offer.GroupID == "" || offer.SupplierID == "" || offer.ModelType != "text" && offer.ModelType != "image" || !gatewaycontract.ValidModelID(offer.ModelID) || len(allowed) > 0 && !slices.Contains(allowed, offer.ModelID) || q.ModelType != "" && offer.ModelType != q.ModelType || q.Format != "" && offer.Format != q.Format || q.Protocol != "" && offer.Protocol != q.Protocol || q.Search != "" && !strings.Contains(strings.ToLower(offer.ModelID), strings.ToLower(q.Search)) {
 			continue
 		}
 		w := Witness{GroupModelID: offer.GroupModelID, GroupID: offer.GroupID, SupplierID: offer.SupplierID, Format: offer.Format, Protocol: offer.Protocol, ChannelIDs: []string{}, OnlineChannelIDs: []string{}}
 		var prices []*Price
 		for _, c := range offer.Channels {
-			if !c.Visible || !c.Enabled || c.ID == "" || offer.Format == "" || !matches(c.Facts, q) {
+			if !c.Visible || !c.Enabled || c.ID == "" || offer.Format == "" {
 				continue
 			}
 			w.ChannelIDs = append(w.ChannelIDs, c.ID)
@@ -253,7 +221,7 @@ func selectPage(offers []Offering, scope Scope, q Query, after string, limit int
 				prices = append(prices, &p)
 			}
 		}
-		if q.OnlyOnline && len(w.OnlineChannelIDs) == 0 || len(w.ChannelIDs) == 0 && !matches(offer.Facts, q) {
+		if q.OnlyOnline && len(w.OnlineChannelIDs) == 0 {
 			continue
 		}
 		a := models[offer.ModelID]

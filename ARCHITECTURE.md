@@ -65,7 +65,6 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 | `channelprobe` | 渠道基础探针的纯协议校验：原生回复结构、SSE 终止与图片产物 |
 | `nativeencoding` | zstd 解码、字节替换与重新编码（Codex 请求） |
 | `codexprobe` | Codex 模型探测 |
-| `codexsession` | Codex 会话命名空间隔离（按账号/平台 Key 分隔编号） |
 | `audit`、`money`、`localtime`、`ids`、`secretguard` | 审计读取；九位定点金额；Asia/Shanghai 记账日历；UUID；凭据精确匹配与抹除（ADR-0041） |
 
 ## API 约定
@@ -88,13 +87,13 @@ internal/postgres/<domain>pg（queries.sql + sqlc 生成代码 + Store，ADR-001
 
 配置中的 null 继承、明确空请求头块和价格 0 分别保存。连接版本与能力摘要独立：地址/报价/显示信息变化不改变探针结论，UA/请求头或模型能力输入变化会更新依赖摘要，并使旧的基础探针结果失效。
 
-`market_protected_keys` 仅保存已有密钥环封装的用途专用根密钥；F3 已接入统一启动校验，并在用途根密钥加载时重新封装到活动加密 Key；后续状态索引/Codex 接入复用该机制，不能以当前加密 key ID 重建会话命名空间。选择原因见 [ADR-0044](docs/adr/0044-group-market-contract.md)。
+市场不再保存用途专用根密钥，也不再把上游凭据归纳成跨渠道可比较的凭据范围；两者随显式缓存与资源索引一起退役。启动时仍由 `keyringcheck` 统一校验可读的历史密文（渠道凭据、平台 Key、C2C 支付方式），只验证不重加密。选择原因见 [ADR-0044](docs/adr/0044-group-market-contract.md)。
 
 ### F0 发现阶段边界
 
 `backend/api/openapi.yaml` 的 `x-aihub-gateway-contract` 保存版本化的目标端点、认证/模型上下文/状态/重放与计费归属。它位于 `paths` 之外，不登记正式路由；现有路由与 OpenAPI 一致性门禁保持。
 
-网关不保存任何上游资源状态：会话、响应、条目、缓存与后台任务都不登记归属，相关入口已退役并回答 `unsupported_endpoint`。Codex history/notes 的账号/Key 访问隔离与路由绑定分开；用户显式开启平台 Key 的 codex_notes 时才建立独立会话路由绑定，自包含 encrypted reasoning、签名和完整压缩窗口不进入远端资源归属索引。模型别名只解析一次，再检查权限；模型 ID 精确匹配，原生命名空间在路径中按段编码。原型不放宽当前线上目录的校验。
+网关不保存任何上游资源状态：会话、响应、条目、缓存与后台任务都不登记归属，相关入口已退役并回答 `unsupported_endpoint`。请求体里引用上游会话或缓存的顶层成员（`previous_response_id`、`conversation`、Gemini `cachedContent`）在转发前返回 400 `stateful_request_unsupported`，空值或不携带时原样转发。Codex history/notes 的账号/Key 访问隔离与路由绑定分开；用户显式开启平台 Key 的 codex_notes 时才建立独立会话路由绑定，自包含 encrypted reasoning、签名和完整压缩窗口不进入远端资源归属索引。模型别名只解析一次，再检查权限；模型 ID 精确匹配，原生命名空间在路径中按段编码。原型不放宽当前线上目录的校验。
 
 OpenAI 的 `store: true`、`previous_response_id` 与 `conversation` 不再建立远端归属：网关不读取也不登记上游资源。Codex 会话编号按维护者确认做账号/平台 Key 命名空间隔离，作为有限转发例外；不存正文来补隔离；来源粘性只由用户的 codex_notes 声明启用。原型中的 lookup fixture 不能直接作为生产存储；客户端启用 notes 的证据也不代替隔离验收。受保护会话编号的精确字段与根密钥生命周期以 OpenAPI 契约扩展为准；新会话在命名空间隔离后初始化，不从共享上游先读再认领。
 

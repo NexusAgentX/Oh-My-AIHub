@@ -54,24 +54,12 @@ func (a *app) marketSnapshot(w http.ResponseWriter, r *http.Request) (*marketbro
 func marketQuery(r *http.Request) (marketbrowse.Query, int, error) {
 	v := r.URL.Query()
 	q := marketbrowse.Query{ModelID: v.Get("model_id"), SupplierID: v.Get("supplier_id"), GroupID: v.Get("group_id"), Search: v.Get("q"), ModelType: v.Get("model_type"), Format: channel.Format(v.Get("format")), Protocol: v.Get("protocol"), Sort: v.Get("sort")}
-	if value := v.Get("features"); value != "" {
-		q.Features = strings.Split(value, ",")
-	}
 	if value := v.Get("only_online"); value != "" {
 		b, err := strconv.ParseBool(value)
 		if err != nil {
 			return q, 0, marketbrowse.ErrFilter
 		}
 		q.OnlyOnline = b
-	}
-	for key, dest := range map[string]*int64{"min_context": &q.MinContext, "min_output": &q.MinOutput} {
-		if value := v.Get(key); value != "" {
-			n, err := strconv.ParseInt(value, 10, 64)
-			if err != nil {
-				return q, 0, marketbrowse.ErrFilter
-			}
-			*dest = n
-		}
 	}
 	limit := 50
 	if value := v.Get("limit"); value != "" {

@@ -242,7 +242,7 @@ func (e *Engine) availableModels(ctx context.Context, key KeyAuth, formats []cha
 		return nil, err
 	}
 	onlineSet := map[string]bool{}
-	witnesses, err := e.nativeModelWitnesses(ctx, formats)
+	witnessed, err := e.nativeModelWitnesses(ctx, formats)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +253,7 @@ func (e *Engine) availableModels(ctx context.Context, key KeyAuth, formats []cha
 		if !slices.ContainsFunc(model.Formats, func(format channel.Format) bool { return slices.Contains(formats, format) }) {
 			continue
 		}
-		if len(witnesses[model.ID]) == 0 {
+		if !witnessed[model.ID] {
 			continue
 		}
 		onlineSet[model.ID] = true
@@ -281,18 +281,10 @@ func (e *Engine) availableModels(ctx context.Context, key KeyAuth, formats []cha
 	}
 	result = result[:0]
 	for _, name := range byName {
-		if entries := witnesses[name.model.ID]; len(entries) > 0 {
-			name = conservativeListedModel(name, entries)
-		}
-		result = append(result, name)
+		result = append(result, conservativeListedModel(name))
 	}
 	sort.SliceStable(result, func(i, j int) bool { return result[i].id < result[j].id })
 	return result, nil
-}
-
-type nativeModelWitness struct {
-	format    channel.Format
-	candidate Candidate
 }
 
 // ModelListSource includes approved inference candidates in the current snapshot.
@@ -302,8 +294,8 @@ type ModelListSource interface {
 
 // Only current, callable group offers witness model availability. A missing
 // index cannot fall back to unverified directory or shared provider metadata.
-func (e *Engine) nativeModelWitnesses(ctx context.Context, formats []channel.Format) (map[string][]nativeModelWitness, error) {
-	out := map[string][]nativeModelWitness{}
+func (e *Engine) nativeModelWitnesses(ctx context.Context, formats []channel.Format) (map[string]bool, error) {
+	out := map[string]bool{}
 	source, ok := e.Store.(ModelListSource)
 	if !ok {
 		return out, nil
@@ -317,40 +309,18 @@ func (e *Engine) nativeModelWitnesses(ctx context.Context, formats []channel.For
 			if !slices.Contains(row.Formats, format) || !row.Candidate.ValidOffering(row.ModelID) {
 				continue
 			}
-			out[row.ModelID] = append(out[row.ModelID], nativeModelWitness{format, row.Candidate})
+			out[row.ModelID] = true
 		}
 	}
 	return out, nil
 }
-func conservativeListedModel(name listedModel, entries []nativeModelWitness) listedModel {
-	// The model ID is the aggregate title. An optional bound is present only
-	// when every eligible witness on these endpoint formats proves it.
+
+// conservativeListedModel reports only what the current callable witnesses
+// prove: the model ID is its own title and the entrance generates content.
+// Catalog bounds and other formats' metadata are not this model's.
+func conservativeListedModel(name listedModel) listedModel {
 	name.model = catalog.Model{ID: name.model.ID, DisplayName: name.model.ID, Enabled: true}
-	context, output := int64(0), int64(0)
-	contextKnown, outputKnown, stream := true, true, true
-	for _, v := range entries {
-		prefix := nativeProtocol(v.format) + ".length_search@upstream_protocol/"
-		c, o := v.candidate.VerifiedCapacity[prefix+"context"], v.candidate.VerifiedCapacity[prefix+"max_output"]
-		contextKnown = contextKnown && c > 0
-		outputKnown = outputKnown && o > 0
-		if c > 0 && (context == 0 || c < context) {
-			context = c
-		}
-		if o > 0 && (output == 0 || o < output) {
-			output = o
-		}
-		stream = stream && v.candidate.Evidence["upstream_protocol/"+nativeProtocol(v.format)+".stream/text_lifecycle"]
-	}
-	if contextKnown {
-		name.model.ContextWindow = &context
-	}
-	if outputKnown {
-		name.model.MaxOutputTokens = &output
-	}
 	name.generationMethods = []string{"generateContent"}
-	if stream {
-		name.generationMethods = append(name.generationMethods, "streamGenerateContent")
-	}
 	return name
 }
 
