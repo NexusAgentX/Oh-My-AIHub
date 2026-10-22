@@ -118,6 +118,11 @@ func (s Store) Inspect(ctx context.Context, before *cutover.Manifest) (cutover.M
 	for _, rule := range rules {
 		table, ok := existing(tables, rule.Table)
 		if !ok {
+			// A retired table disappears by design; its pre-upgrade digest is
+			// simply absent afterwards instead of making evidence incomplete.
+			if cutover.Retired(rule.Table) {
+				continue
+			}
 			return out, cutover.ErrIncomplete
 		}
 		for _, c := range rule.Columns {

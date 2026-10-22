@@ -1,13 +1,16 @@
 package database
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"io/fs"
+	"log"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -70,8 +73,9 @@ func legacyCutoverDatabase(t *testing.T, version int64) (*sql.DB, string, *goose
 func TestFinalCutoverRejectsPendingWorkAndPreservesHistoryOnUpgradeAndRetry(t *testing.T) {
 	// The last documented operations baseline v0.18.2 ends at 0010; it is
 	// not a claim about the current target. v0.21.0 ends at 0014. Also exercise
-	// an integrated group schema and direct SQL authorization enforcement.
-	for _, version := range []int64{10, 14, 25} {
+	// an integrated group schema, a retired background response and direct SQL
+	// authorization enforcement.
+	for _, version := range []int64{10, 14, 21} {
 		t.Run(fmt.Sprint(version), func(t *testing.T) {
 			db, target, provider := legacyCutoverDatabase(t, version)
 			ctx := context.Background()
@@ -109,8 +113,10 @@ func TestFinalCutoverRejectsPendingWorkAndPreservesHistoryOnUpgradeAndRetry(t *t
 			exec("INSERT INTO route_pref_channels(route_pref_id,channel_id,position,excluded) SELECT id,$1,0,false FROM route_prefs WHERE account_id=$2", cid, owner)
 			exec("INSERT INTO api_keys(id,owner_id,name,key_hash,prefix,key_ciphertext,key_nonce,key_key_id,allowed_models,model_aliases) VALUES($1,$2,'Historical key',decode(repeat('01',32),'hex'),'sk-aih-test',$3,$4,$5,ARRAY['old-model'],'{\"alias\":\"old-model\"}')", key, owner, sealedKey.Ciphertext, sealedKey.Nonce, sealedKey.KeyID)
 			exec("INSERT INTO calls(id,account_id,api_key_id,requested_model,model_id,format,final_channel_id,outcome,price_snapshot,completed_at) VALUES($1,$2,$3,'old-model','old-model','openai_responses',$4,'upstream_failed','{\"legacy_price\":7}',now())", call, owner, key, cid)
-			// The gateway no longer writes background jobs, so the only pending
-			// work this upgrade test can create is an unfinished call.
+			if version >= 14 {
+				// An unsettled retired job must be abandoned, not block the upgrade.
+				exec("INSERT INTO gateway_background_jobs(call_id,account_id,key_id,channel_id,response_id,metadata,deadline_at) VALUES($1,$2,$3,$4,'resp_abandoned','{}',now()+interval '1 hour')", call, owner, key, cid)
+			}
 			snapshot := func() string {
 				t.Helper()
 				var value string
@@ -142,7 +148,7 @@ func TestFinalCutoverRejectsPendingWorkAndPreservesHistoryOnUpgradeAndRetry(t *t
 			if snapshot() != beforeAuth {
 				t.Fatal("authorization rejection changed data")
 			}
-			if version == 25 {
+			if version == 21 {
 				if _, err := provider.Up(ctx); err == nil {
 					t.Fatal("direct SQL migration bypassed authorization")
 				}
@@ -165,8 +171,16 @@ func TestFinalCutoverRejectsPendingWorkAndPreservesHistoryOnUpgradeAndRetry(t *t
 			if err != nil {
 				t.Fatal("pre-upgrade evidence", err)
 			}
-			if err := MigrateWithOptions(ctx, target, MigrationOptions{AllowLegacyConfigCleanup: true}); err != nil {
+			// The abandoned remainder must be visible in the operator's log.
+			var migrationLog bytes.Buffer
+			log.SetOutput(&migrationLog)
+			err = MigrateWithOptions(ctx, target, MigrationOptions{AllowLegacyConfigCleanup: true})
+			log.SetOutput(os.Stderr)
+			if err != nil {
 				t.Fatal(err)
+			}
+			if version >= 14 && !strings.Contains(migrationLog.String(), "abandoning 1 unsettled background response") {
+				t.Fatal("upgrade log did not report the abandoned background response", migrationLog.String())
 			}
 			for range 2 {
 				after, err := reader.Inspect(ctx, &before)
@@ -177,20 +191,19 @@ func TestFinalCutoverRejectsPendingWorkAndPreservesHistoryOnUpgradeAndRetry(t *t
 				if err != nil || len(differences) != 0 {
 					t.Fatal("protected history changed", differences, err)
 				}
-				if after.MigrationVersion != 27 {
+				if after.MigrationVersion != 23 {
 					t.Fatal("wrong final migration", after.MigrationVersion)
 				}
 				if err := Migrate(ctx, target); err != nil {
 					t.Fatal("repeated migration", err)
 				}
 			}
-			var notesEnabled bool
-			if err := db.QueryRowContext(ctx, "SELECT codex_notes FROM api_keys WHERE id=$1", key).Scan(&notesEnabled); err != nil || notesEnabled {
-				t.Fatal("upgrade silently enabled notes affinity on an existing Key", err)
-			}
-			var absent, deleted bool
+			var absent, deleted, jobsRetired bool
 			if err := db.QueryRowContext(ctx, "SELECT to_regclass('models') IS NULL AND to_regclass('model_price_tiers') IS NULL AND to_regclass('channel_models') IS NULL AND to_regclass('suppliers') IS NULL AND to_regclass('supplier_endpoints') IS NULL").Scan(&absent); err != nil || !absent {
 				t.Fatal("legacy tables survived", err)
+			}
+			if err := db.QueryRowContext(ctx, "SELECT to_regclass('gateway_background_jobs') IS NULL").Scan(&jobsRetired); err != nil || !jobsRetired {
+				t.Fatal("retired background responses survived", err)
 			}
 			if err := db.QueryRowContext(ctx, "SELECT deleted_at IS NOT NULL AND status='unlisted' FROM channels WHERE id=$1", cid).Scan(&deleted); err != nil || !deleted {
 				t.Fatal("legacy identity remained routable", err)

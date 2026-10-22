@@ -551,9 +551,9 @@ func TestGroupKeyProbesPersistNativeFormatsWithoutBilling(t *testing.T) {
 	if len(model["formats"].([]any)) != 2 {
 		t.Fatal("unsupported formats remained routable", model)
 	}
-	var calls, reports int
-	if err := e.pool.QueryRow(context.Background(), `SELECT (SELECT count(*) FROM calls),(SELECT count(*) FROM detection_reports)`).Scan(&calls, &reports); err != nil || calls != 0 || reports != 0 {
-		t.Fatal("Key probes must not create billed calls or capability reports", calls, reports, err)
+	var calls int
+	if err := e.pool.QueryRow(context.Background(), `SELECT count(*) FROM calls`).Scan(&calls); err != nil || calls != 0 {
+		t.Fatal("Key probes must not create billed calls", calls, err)
 	}
 }
 

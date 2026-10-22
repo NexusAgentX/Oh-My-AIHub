@@ -189,36 +189,6 @@ CREATE TABLE market_search_settings (
  CHECK (low<high AND high<=hard_maximum),
  CHECK (precision_mode<>'relative' OR precision<=1)
 );
--- Columns retained for immutable provenance; no protocol/request body columns.
-CREATE TABLE market_report_bindings (
- id uuid PRIMARY KEY,
- owner_id uuid NOT NULL REFERENCES accounts(id),
- target_kind text NOT NULL CHECK (target_kind IN ('group','group_model')),
- target_id uuid NOT NULL,
- target_revision bigint NOT NULL CHECK (target_revision>0),
- capability_digest text NOT NULL CHECK (capability_digest ~ '^[a-f0-9]{64}$'),
- manifest_version text NOT NULL,
- code_version text NOT NULL,
- parameter_version text NOT NULL,
- credential_scope text NOT NULL,
- created_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE TABLE market_capability_evidence (
- report_id uuid NOT NULL REFERENCES market_report_bindings(id),
- capability text NOT NULL CHECK (char_length(capability) BETWEEN 1 AND 200),
- layer text NOT NULL CHECK (layer IN ('upstream_protocol','gateway_proxy','official_cli')),
- state text NOT NULL CHECK (state IN ('supported','unsupported','unknown','unobserved','invalidated')),
- reason text NOT NULL DEFAULT '' CHECK (char_length(reason)<=1000),
- PRIMARY KEY (report_id,capability,layer)
-);
-CREATE TABLE market_protected_keys (
- purpose text PRIMARY KEY CHECK (purpose IN ('codex-context-root-v1','cursor-root-v1','credential-scope-root-v1')),
- encryption_key_id text NOT NULL,
- credential_version bigint NOT NULL CHECK (credential_version>0),
- nonce bytea NOT NULL CHECK (octet_length(nonce)=12),
- ciphertext bytea NOT NULL CHECK (octet_length(ciphertext)>16),
- created_at timestamptz NOT NULL DEFAULT now()
-);
 ALTER TABLE channels ADD COLUMN market_group_id uuid REFERENCES market_groups(id);
 CREATE INDEX channels_market_group ON channels(market_group_id) WHERE deleted_at IS NULL;
 
@@ -307,7 +277,6 @@ CREATE TRIGGER market_group_version AFTER INSERT OR UPDATE ON market_groups FOR 
 CREATE TRIGGER market_model_version AFTER INSERT OR UPDATE ON market_group_models FOR EACH ROW EXECUTE FUNCTION market_archive_version('group_model');
 CREATE TRIGGER market_address_version AFTER INSERT OR UPDATE ON market_addresses FOR EACH ROW EXECUTE FUNCTION market_archive_version('address');
 CREATE TRIGGER market_versions_immutable BEFORE UPDATE OR DELETE ON market_object_versions FOR EACH ROW EXECUTE FUNCTION market_append_only();
-CREATE TRIGGER market_report_binding_immutable BEFORE UPDATE OR DELETE ON market_report_bindings FOR EACH ROW EXECUTE FUNCTION market_append_only();
 CREATE TRIGGER market_search_setting_immutable BEFORE UPDATE OR DELETE ON market_search_settings FOR EACH ROW EXECUTE FUNCTION market_append_only();
 CREATE TRIGGER market_group_no_delete BEFORE DELETE ON market_groups FOR EACH ROW EXECUTE FUNCTION market_append_only();
 CREATE TRIGGER market_address_no_delete BEFORE DELETE ON market_addresses FOR EACH ROW EXECUTE FUNCTION market_append_only();
@@ -318,13 +287,13 @@ CREATE TRIGGER market_group_address_no_delete BEFORE DELETE ON market_group_addr
 -- Only additive configuration is removed; protected pre-existing tables stay.
 -- +goose StatementBegin
 DO $$ BEGIN
- IF EXISTS(SELECT 1 FROM market_suppliers) OR EXISTS(SELECT 1 FROM market_quotes) OR EXISTS(SELECT 1 FROM market_protected_keys) THEN
+ IF EXISTS(SELECT 1 FROM market_suppliers) OR EXISTS(SELECT 1 FROM market_quotes) THEN
   RAISE EXCEPTION 'populated market metadata cannot be downgraded; restore an authorized backup';
  END IF;
 END $$;
 -- +goose StatementEnd
 ALTER TABLE channels DROP COLUMN market_group_id;
-DROP TABLE market_capability_evidence, market_report_bindings, market_search_settings, market_model_governance, market_protected_keys;
+DROP TABLE market_search_settings, market_model_governance;
 ALTER TABLE market_group_models DROP CONSTRAINT market_current_quote_owner;
 DROP TABLE market_quote_tier_token_prices, market_quote_unit_prices, market_quote_tiers, market_quote_token_prices, market_quotes;
 DROP TABLE market_group_models, market_group_addresses, market_addresses, market_groups, market_suppliers;

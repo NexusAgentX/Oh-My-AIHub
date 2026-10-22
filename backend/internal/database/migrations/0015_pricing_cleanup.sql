@@ -2,16 +2,8 @@
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '60s';
 
--- The old binary must finish its frozen-price jobs before these rules change.
-LOCK TABLE gateway_background_jobs IN SHARE MODE;
--- +goose StatementBegin
-DO $$
-BEGIN
- IF EXISTS (SELECT 1 FROM gateway_background_jobs WHERE settled_at IS NULL) THEN
-  RAISE EXCEPTION 'finish pending background responses with the previous version before upgrading pricing';
- END IF;
-END $$;
--- +goose StatementEnd
+-- Pending background responses do not block the upgrade: the retired job
+-- table is dropped with the abandoned remainder reported in 0023.
 
 -- Removing a predicate must not broaden the affected price tier.
 DELETE FROM model_price_tiers WHERE thinking_mode <> '';

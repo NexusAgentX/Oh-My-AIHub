@@ -9,7 +9,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/cutover"
 )
 
-const legacyCleanupVersion int64 = 26
+const legacyCleanupVersion int64 = 22
 
 var ErrCleanupAuthorization = errors.New("legacy configuration cleanup requires an explicitly selected cutover environment")
 
