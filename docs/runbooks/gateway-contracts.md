@@ -22,7 +22,7 @@ mise run generate   # 重新生成 frontend/src/api/schema.gen.ts，提交前确
 
 - `TestManifestTraceabilityAndScope` 要求四个协议的来源编号完整（Chat 51、Responses 80、Messages 68、GenerateContent 80），并拒绝文件、上传、向量库、容器类资源路径重新进入端点表。
 - `TestManifestRejectsBrokenHandoffs` 要求缺失端点、重复 ID、缺失来源、错误 Feature、聚合环等破坏都无法通过校验。
-- `TestGatewayF7EveryNativeEndpointUsesRealEntryAndScope` 逐个契约端点走真实入口：平台 Key 换渠道上游 Key、图片 multipart 只替换模型字段、Gemini 路径解析 `{model}:{operation}`、未实现的 operation 回答 `unsupported_endpoint`。
+- `TestGatewayF7EveryNativeEndpointUsesRealEntryAndScope` 逐个 F7 推理/图片端点走真实入口：平台 Key 换渠道上游 Key、图片 multipart 只替换模型字段、Gemini 路径解析 `{model}:{operation}`、未实现的 operation 回答 `unsupported_endpoint`。
 - `TestRetiredGatewayEndpointsAnswerNotFound` 与 `TestGatewayForwardsWithoutServerSideState` 固定退役路径与请求边界；`TestBackgroundResponseIsRejected` 固定后台请求的拒绝。
 - `internal/gateway` 的 `stateless` 用例固定 `store` 剥离、`previous_response_id`/`conversation`/`cachedContent` 识别与零复制路径。
 
