@@ -110,17 +110,7 @@ func RequestReferences(protocol string, body []byte) ([]Reference, error) {
 		return nil
 	}
 	switch protocol {
-	case "openai-responses", "codex-special":
-		if protocol == "codex-special" {
-			var images []map[string]json.RawMessage
-			if value := object["images"]; len(value) > 0 && json.Unmarshal(value, &images) == nil {
-				for _, image := range images {
-					if err := appendString("file", image["file_id"]); err != nil {
-						return nil, err
-					}
-				}
-			}
-		}
+	case "openai-responses":
 		if err := appendString("response", object["previous_response_id"]); err != nil {
 			return nil, err
 		}

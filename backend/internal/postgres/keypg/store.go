@@ -39,7 +39,7 @@ func decodeAliases(raw []byte) map[string]string {
 func toKey(row ApiKey) apikey.Key {
 	return apikey.Key{
 		ID: row.ID, OwnerID: row.OwnerID, Name: row.Name, Prefix: row.Prefix, Status: apikey.Status(row.Status),
-		CodexNotes: row.CodexNotes, ExpiresAt: row.ExpiresAt, AllowedModels: nonNil(row.AllowedModels), BudgetDaily: row.BudgetDailyNano,
+		ExpiresAt: row.ExpiresAt, AllowedModels: nonNil(row.AllowedModels), BudgetDaily: row.BudgetDailyNano,
 		BudgetMonthly: row.BudgetMonthlyNano, BudgetTotal: row.BudgetTotalNano, ModelAliases: decodeAliases(row.ModelAliases),
 		RoutedModels: []string{}, LastUsedAt: row.LastUsedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}
@@ -103,7 +103,7 @@ func insert(ctx context.Context, q *Queries, sealed apikey.Sealed) error {
 		KeyCiphertext: sealed.Credential.Ciphertext, KeyNonce: sealed.Credential.Nonce, KeyKeyID: sealed.Credential.KeyID,
 		Status: string(sealed.Status), ExpiresAt: sealed.ExpiresAt, AllowedModels: nonNil(sealed.AllowedModels),
 		BudgetDailyNano: sealed.BudgetDaily, BudgetMonthlyNano: sealed.BudgetMonthly, BudgetTotalNano: sealed.BudgetTotal,
-		CodexNotes: sealed.CodexNotes, ModelAliases: aliases,
+		ModelAliases: aliases,
 	})
 }
 
@@ -203,9 +203,6 @@ func (s *Store) Update(ctx context.Context, ownerID, id string, update apikey.Up
 			return err
 		}
 		key := toKey(row)
-		if update.CodexNotes != nil {
-			key.CodexNotes = *update.CodexNotes
-		}
 		if update.Name != nil {
 			key.Name = *update.Name
 		}
@@ -237,7 +234,7 @@ func (s *Store) Update(ctx context.Context, ownerID, id string, update apikey.Up
 		if err := q.UpdateKey(ctx, UpdateKeyParams{
 			OwnerID: ownerID, ID: id, Name: key.Name, Status: string(key.Status), ExpiresAt: key.ExpiresAt,
 			AllowedModels: nonNil(key.AllowedModels), BudgetDailyNano: key.BudgetDaily, BudgetMonthlyNano: key.BudgetMonthly,
-			CodexNotes: key.CodexNotes, BudgetTotalNano: key.BudgetTotal, ModelAliases: aliases,
+			BudgetTotalNano: key.BudgetTotal, ModelAliases: aliases,
 		}); err != nil {
 			return err
 		}

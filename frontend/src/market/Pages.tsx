@@ -24,9 +24,9 @@ type Price = Schema['MarketBrowsePrice']
 export const featureLabels: Record<string, string> = {
   'input:text': '文本输入', 'input:image': '图片输入', 'input:audio': '音频输入', 'input:video': '视频输入', 'input:document': '文档输入',
   'output:text': '文本输出', 'output:image': '图片输出', 'output:audio': '音频输出', tools: '函数工具', strict_json: '严格结构化', json_object: 'JSON 输出',
-  vision_url: '图片 URL', vision_inline: '请求内图片', reasoning: '推理配置', self_contained_replay: '完整推理状态续用', codex_cli_basic: 'Codex CLI 基本调用',
+  vision_url: '图片 URL', vision_inline: '请求内图片', reasoning: '推理配置', self_contained_replay: '完整推理状态续用',
 }
-const protocols: Record<string, string> = { 'openai-chat-completions': 'OpenAI Chat', 'openai-responses': 'OpenAI Responses', 'native-messages': 'Anthropic Messages', 'native-generate-content': 'Gemini', 'openai-images': '图片', 'codex-special': 'Codex 专项兼容' }
+const protocols: Record<string, string> = { 'openai-chat-completions': 'OpenAI Chat', 'openai-responses': 'OpenAI Responses', 'native-messages': 'Anthropic Messages', 'native-generate-content': 'Gemini', 'openai-images': '图片' }
 const kinds: Record<string, string> = { official_api: '官方 API', official_subscription: '官方订阅', relay: '中转站' }
 const states: Record<string, string> = { pass: '通过', fail: '未通过', partial: '部分支持', unsupported: '不支持', inconclusive: '无法确认', unobserved: '未观测', untested: '未执行', finished: '已结束' }
 const reasons: Record<string, string> = { ok: '已核验', unsupported: '上游不支持', not_observed: '条件未出现', prerequisite_failed: '前置未通过', client_disabled: '客户端未启用或未调用', platform_unavailable: '平台入口不可用', detector_error: '检测器异常', external_error: '上游或网络异常', assertion_failed: '断言未通过' }
@@ -41,7 +41,7 @@ function ModelCard({ model, search }: { model: Model; search: string }) {
     <span className="model-card-meta">{model.model_types.map(t => t === 'image' ? '图片生成' : '文本推理').join(' · ')}</span>
     <dl className="model-card-prices"><div><dt>匹配候选的典型费用</dt><dd className="num"><PriceText value={model.price} /></dd></div><div><dt>在线渠道</dt><dd className="num">{model.online_channels}</dd></div></dl>
     <FormatTags formats={model.formats} />
-    <span className="model-card-meta">{new Set(model.offers.map(o => o.group_id)).size} 个分组{model.protocols.includes('codex-special') && ' · 含 Codex 专项报告'}</span>
+    <span className="model-card-meta">{new Set(model.offers.map(o => o.group_id)).size} 个分组</span>
   </Link>
 }
 
@@ -131,7 +131,6 @@ export function MarketModelDetailPage() {
       </Card>
     })}
     <TypicalModelCosts detail={detail} />
-    {detail.model.protocols.includes('codex-special') && <CodexSetup model={detail.model.id} />}
   </>}</QueryBoundary>
 }
 function CapabilitySummary({ facts }: { facts: Schema['MarketBrowseCapabilities'] }) {
@@ -146,9 +145,6 @@ function QuoteDetails({ offer }: { offer: Schema['MarketBrowseOffer'] }) {
     {q.tiers.map((tier, i) => <div className="market-channel" key={i}><strong>{tier.name}</strong><p>输入 {tier.prices.input} · 输出 {tier.prices.output} · 缓存写 {tier.prices.cache_write} · 读 {tier.prices.cache_read}</p><pre className="market-code">{JSON.stringify(tier.conditions, null, 2)}</pre></div>)}
     {q.unit_prices.map((u, i) => <p key={i}>{[u.unit, u.tool, u.image_size, u.image_quality, u.image_background, u.service_tier].filter(Boolean).join(' · ')}：{u.price}</p>)}
   </Disclosure>
-}
-function CodexSetup({ model }: { model: string }) {
-  return <Disclosure title="Codex 0.163.0 接入"><p>在独立 CODEX_HOME 的 auth.json 填入自己的平台 Key：</p><pre className="market-code">{'{"personal_access_token":"<PLATFORM_API_KEY>"}'}</pre><p>config.toml：</p><pre className="market-code">{`model = ${JSON.stringify(model)}\nmodel_provider = "openai"\nopenai_base_url = "https://<GATEWAY_HOST>/backend-api/codex"\nchatgpt_base_url = "https://<GATEWAY_HOST>/backend-api/"\n\n[features.token_budget]\nenabled = true\nuse_history_notes_extension = true`}</pre><p>启动时设置 CODEX_AUTHAPI_BASE_URL=https://&lt;GATEWAY_HOST&gt;。notes/history 等能力请分别查阅分组报告。</p><p className="muted-copy">客户端会将平台身份归类为 ChatGPT，套餐显示未知 aihub；官方订阅暂仅保留分类。</p></Disclosure>
 }
 
 export function MarketSuppliersPage() {

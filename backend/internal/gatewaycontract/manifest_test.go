@@ -34,7 +34,6 @@ func TestManifestTraceabilityAndScope(t *testing.T) {
 		"openai-responses":        {"R": 8, "O": 8, "S": 13, "T": 10, "C": 8, "F": 8, "M": 9, "A": 8, "E": 8},
 		"native-messages":         {"A-B": 9, "A-O": 10, "A-S": 13, "A-T": 10, "A-F": 8, "A-M": 9, "A-E": 9},
 		"native-generate-content": {"G-B": 9, "G-O": 10, "G-S": 11, "G-T": 12, "G-F": 10, "G-M": 10, "G-C": 9, "G-E": 9},
-		"codex-special":           {"RL": 26},
 	} {
 		for prefix, last := range ranges {
 			for i := 1; i <= last; i++ {
@@ -47,7 +46,7 @@ func TestManifestTraceabilityAndScope(t *testing.T) {
 	}
 	for protocol, want := range map[string]int{
 		"openai-chat-completions": 51, "openai-responses": 80,
-		"native-messages": 68, "native-generate-content": 80, "codex-special": 26,
+		"native-messages": 68, "native-generate-content": 80,
 	} {
 		if got := counts[protocol]; got != want {
 			t.Errorf("%s: trace IDs %d want %d", protocol, got, want)
@@ -57,16 +56,6 @@ func TestManifestTraceabilityAndScope(t *testing.T) {
 		for _, resource := range []string{"/files", "/uploads", "/vector_stores", "/containers"} {
 			if strings.Contains(e.Path, resource) {
 				t.Errorf("scope restored by endpoint %s", e.ID)
-			}
-		}
-		if e.ID == "identity.whoami" || e.ID == "identity.accounts" {
-			if e.Model != "none_local" || e.Billing != "none" {
-				t.Errorf("identity must be local: %+v", e)
-			}
-		}
-		if strings.HasPrefix(e.ID, "codex.notes.") || strings.HasPrefix(e.ID, "codex.history.") {
-			if e.Scope != "context_acl_only" {
-				t.Errorf("context acquired stickiness: %s", e.ID)
 			}
 		}
 	}

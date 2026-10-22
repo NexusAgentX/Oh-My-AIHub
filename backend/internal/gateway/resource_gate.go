@@ -48,12 +48,6 @@ func supportsAll(c Candidate, required []CapabilityRequirement) bool {
 }
 
 func keyProbeMatchesEndpoint(c Candidate, format channel.Format, path string) bool {
-	if format == channel.FormatOpenAIResponses && path == "/v1/responses" && c.KeyProbeEndpoints[format] == "codex.responses" {
-		return c.Evidence["upstream_protocol/openai-responses.base/accepted_native_message_shapes"]
-	}
-	if format == channel.FormatOpenAIImages && path == "/v1/images/generations" && c.KeyProbeEndpoints[format] == "codex.images" {
-		return c.Evidence["upstream_protocol/images.generations/native_json_or_multipart"]
-	}
 	return true
 }
 func (e *Engine) prepareResources(ctx context.Context, call *callState, body []byte, path string) error {

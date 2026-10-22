@@ -128,10 +128,6 @@ func newCodexBridge(s *Session, upstreamModel string, bootstrap []string) (*code
 	}
 	defer clear(seed)
 	token := "sk-aih-probe-" + hex.EncodeToString(seed[64:])
-	namespace, err := gatewaycontract.NewContextNamespace(seed[:32])
-	if err != nil {
-		return nil, err
-	}
 	keyring, err := channel.ParseKeyring("probe="+base64.StdEncoding.EncodeToString(seed[32:64]), "probe")
 	if err != nil {
 		return nil, err
@@ -194,13 +190,13 @@ func newCodexBridge(s *Session, upstreamModel string, bootstrap []string) (*code
 	c := gateway.Candidate{GroupID: "probe-group", GroupModelID: "probe-offering", ChannelID: "probe-channel", CredentialScope: "probe-scope", CredentialRevision: 1, OwnerID: "probe-provider", BaseURL: base.String(), UpstreamModel: upstreamModel, Credential: sealed, Quotes: book, MultiplierNano: ledger.UnitRate, Evidence: proof, Advanced: advanced}
 	store := &codexProbeStore{hash: apikey.Hash(token), key: gateway.KeyAuth{OwnerID: "probe-consumer", KeyID: s.jobID, Enabled: true, AccountActive: true, AllowedModels: []string{codexProbeModel}}, row: gateway.CandidateRecord{ModelID: codexProbeModel, Formats: formats, Candidate: c}, finished: map[string]bool{}}
 	b := &codexBridge{parent: s, store: store, token: token, base: base, entry: s.entry, separated: true, bootstrap: slices.Clone(bootstrap), observed: map[string]int{}, callIDs: map[string]bool{}, contextOutputs: map[[32]byte]map[string]bool{}, contextContinued: map[string]bool{}, reasoningCiphers: map[[32]byte]bool{}, imageOutputs: map[[32]byte]bool{}, activity: codexProbeActivity{changed: make(chan struct{})}, slots: make(chan struct{}, 2), handlers: make(chan struct{}, 4)}
-	b.engine = gateway.NewEngine(gateway.Dependencies{Store: store, Catalog: store, Settings: settings.NewService(codexProbeSettings{}), Routing: codexProbeRouting{}, Keyring: keyring, Outbound: codexProbeOutbound{Outbound: s.outbound, bridge: b}, ContextNamespace: namespace, Resources: codexProbeResources{}, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), CallTimeLimit: s.limits.RequestTimeout})
+	b.engine = gateway.NewEngine(gateway.Dependencies{Store: store, Catalog: store, Settings: settings.NewService(codexProbeSettings{}), Routing: codexProbeRouting{}, Keyring: keyring, Outbound: codexProbeOutbound{Outbound: s.outbound, bridge: b}, Resources: codexProbeResources{}, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), CallTimeLimit: s.limits.RequestTimeout})
 	b.replayShapes = map[string]uint8{}
 	b.mux = http.NewServeMux()
+	// Codex compatibility is gone from the gateway (Epic #550), so the bridge
+	// only still exposes the public Responses entrance it can proxy today.
 	for _, endpoint := range manifest.Endpoints {
-		if h := b.engine.CodexHandler(endpoint); h != nil {
-			b.mux.HandleFunc(endpoint.Method+" "+endpoint.Path, h)
-		} else if endpoint.ID == "responses.create" {
+		if endpoint.ID == "responses.create" {
 			b.mux.HandleFunc(endpoint.Method+" "+endpoint.Path, func(w http.ResponseWriter, r *http.Request) {
 				b.engine.Serve(w, r, channel.FormatOpenAIResponses, "", false)
 			})

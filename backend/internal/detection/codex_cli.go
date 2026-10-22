@@ -426,10 +426,6 @@ func runCodexCLIProfileWithTier(ctx context.Context, s *Session, profile, tier, 
 	return proof
 }
 
-func codexObservedPhases(phases []codexprobe.Phase, executions []codexContextExecution, start, end int64) (map[string]map[string]int, bool) {
-	return codexObservedPhasesFor(phases, executions, start, end, []string{"notes_primary", "notes_isolation", "notes_reopen"})
-}
-
 func codexObservedPhasesFor(phases []codexprobe.Phase, executions []codexContextExecution, start, end int64, kinds []string) (map[string]map[string]int, bool) {
 	counts := map[string]map[string]int{}
 	if len(phases) != len(kinds) || start <= 0 || end < start {

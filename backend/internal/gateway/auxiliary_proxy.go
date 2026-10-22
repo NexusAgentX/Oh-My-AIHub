@@ -26,7 +26,7 @@ func protocolFormat(protocol string) channel.Format {
 	switch protocol {
 	case "openai-chat-completions":
 		return channel.FormatOpenAIChat
-	case "openai-responses", "codex-special":
+	case "openai-responses":
 		return channel.FormatOpenAIResponses
 	case "native-messages":
 		return channel.FormatAnthropic
@@ -38,13 +38,8 @@ func protocolFormat(protocol string) channel.Format {
 	return ""
 }
 func endpointRequirement(id string) []CapabilityRequirement {
-	if required := codexContextRequirements(id); len(required) > 0 {
-		return required
-	}
 	cap := ""
 	switch {
-	case id == "codex.models":
-		cap = "codex-special.RL15/native_catalog"
 	case strings.HasPrefix(id, "chat."):
 		cap = "openai-chat-completions.stored/owned_list_get_metadata_messages_delete"
 	case id == "conversations.get" || id == "conversations.update":
@@ -164,44 +159,10 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 		fail(transportError(err))
 		return
 	}
-	contextBody := body
-	if len(contextBody) == 0 && ep.Protocol == "codex-special" {
-		contextBody = []byte("{}")
-	}
-	if len(contextBody) > 0 {
-		_, scan, scanErr := ScanRequest(contextBody)
-		if scanErr == nil {
-			var mappedBody []byte
-			r, mappedBody, _, err = e.isolateCodexRequest(r, contextBody, scan, protocolFormat(ep.Protocol), key)
-			if err != nil {
-				if errors.Is(err, errContextNamespaceUnavailable) {
-					fail(transportError(err))
-				} else {
-					fail(400, "invalid_context", "会话标识或元数据无效")
-				}
-				return
-			}
-			if len(body) > 0 {
-				body = mappedBody
-			}
-		}
-	}
 	var object map[string]json.RawMessage
 	if len(body) > 0 && json.Unmarshal(body, &object) != nil {
 		fail(400, "invalid_request", "请求体不是合法 JSON 对象")
 		return
-	}
-	if ep.Scope == "context_acl_only" && !validCodexAuxiliaryContext(object) {
-		fail(400, "invalid_context", "请求需要有效的会话编号和代理名称")
-		return
-	}
-	var notes *notesSession
-	if key.CodexNotes && ep.Scope == "context_acl_only" {
-		notes, err = e.loadNotesSession(r.Context(), r, body, key)
-		if err != nil {
-			fail(notesSessionError(err))
-			return
-		}
 	}
 	refs, parent := endpointPathRef(ep, r)
 	pathRefs := append([]gatewaycontract.Reference(nil), refs...)
@@ -211,11 +172,7 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 		if ep.ID == "conversations.items.create" {
 			inputKey = "items"
 		}
-		protocol := ep.Protocol
-		if protocol == "codex-special" {
-			protocol = "openai-responses"
-		}
-		more, e := nativeReferences(protocol, body, inputKey)
+		more, e := nativeReferences(ep.Protocol, body, inputKey)
 		if e != nil {
 			fail(400, "invalid_request", "请求包含无效资源引用")
 			return
@@ -324,9 +281,6 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 	}
 	records = filtered
 	selection := AuxiliarySelection{ModelID: model, Format: protocolFormat(ep.Protocol), AllowedModels: key.AllowedModels, Preference: pref, Required: append(endpointRequirement(ep.ID), referenceRequirements(explicitRefs)...)}
-	if notes != nil {
-		selection.Required = append(selection.Required, notesRequirements()...)
-	}
 	if encoding != "" {
 		selection.Required = append(selection.Required, nativeZstdRequirement(r.URL.Path))
 	}
@@ -393,7 +347,7 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 	}
 	candidates := make([]Candidate, 0, len(selected))
 	for _, v := range selected {
-		if !notesMatch(v.Candidate, notes) || !resourceMatch(v.Candidate, owned) || !resourceMatch(v.Candidate, listBoundary) {
+		if !resourceMatch(v.Candidate, owned) || !resourceMatch(v.Candidate, listBoundary) {
 			continue
 		}
 		state, _ := e.Runtime.Check(v.Candidate.ChannelID, EffectiveLimits(v.Candidate.Advanced, defaults), e.Now())
@@ -442,11 +396,6 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 		fail(500, "internal_error", "无法创建操作标识")
 		return
 	}
-	candidates, err = e.claimNotesSession(r.Context(), notes, candidates)
-	if err != nil {
-		fail(notesSessionError(err))
-		return
-	}
 	for slot := range e.reservations(candidates, budget, defaults) {
 		c := slot.candidate
 		if ep.ID == "responses.get" && r.URL.Query().Get("stream") == "true" && target != nil {
@@ -463,10 +412,7 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 			payload, response, err = e.ownedResourcePage(ctx, r, ep, c, key, location, policy, defaults, pref, parent, cursorScope, cursorNative, target, &budget)
 		} else {
 			payload, response, err = e.auxiliaryExchange(ctx, r, ep, c, location, policy, defaults, pref, body, &budget)
-			if err == nil && response.StatusCode == 200 && ep.ID == "codex.models" {
-				payload, err = filterCodexCatalog(payload, records, c, key)
-			}
-			if err == nil && response.StatusCode >= 200 && response.StatusCode < 300 && ep.Scope != "context_acl_only" && ep.ID != "codex.models" {
+			if err == nil && response.StatusCode >= 200 && response.StatusCode < 300 {
 				err = e.observeAuxiliary(ctx, ep, c, key, model, operationID, parent, payload, target)
 			}
 		}
@@ -485,13 +431,6 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 		}
 		for name, values := range ClientResponseHeaders(response.Header, response.Uncompressed) {
 			w.Header()[name] = values
-		}
-		if ep.Scope == "context_acl_only" || ep.ID == "codex.models" {
-			w.Header().Set("Cache-Control", "no-store")
-		}
-		if ep.ID == "codex.models" {
-			w.Header().Del("ETag")
-			w.Header().Del("Last-Modified")
 		}
 		w.Header().Del("Content-Length")
 		w.Header().Set("X-AIHub-Request-Id", operationID)
@@ -575,15 +514,7 @@ func (e *Engine) auxiliaryExchange(ctx context.Context, r *http.Request, ep gate
 			return nil, nil, err
 		}
 		request.Header = UpstreamHeaders(r.Header, location, secret, c.Advanced)
-		if ep.ID == "codex.models" {
-			request.Header.Del("If-None-Match")
-			request.Header.Del("If-Modified-Since")
-		}
-		mapped, _ := r.Context().Value(codexNamespaceApplied{}).(bool)
-		if mapped {
-			contextWireHeaders(request.Header, r.Header)
-		}
-		if encoding != "" || mapped {
+		if encoding != "" {
 			requestWireHeaders(request.Header, encoding)
 		}
 		*budget--
@@ -597,9 +528,6 @@ func (e *Engine) auxiliaryExchange(ctx context.Context, r *http.Request, ep gate
 			continue
 		}
 		readLimit := maxRequestBytes
-		if ep.ID == "codex.models" {
-			readLimit = 4 << 20
-		}
 		if isResourceList(ep.ID) {
 			readLimit = gatewaycontract.MaxPageBytes
 		}

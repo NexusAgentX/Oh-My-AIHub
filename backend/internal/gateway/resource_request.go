@@ -97,7 +97,7 @@ func nativeReferences(protocol string, body []byte, inputKey string) ([]gatewayc
 	root := scratch.objectOf(body)
 	unique(root, "previous_response_id", "conversation", inputKey, "messages", "contents", "cachedContent", "tools", "container", "images", "mask")
 	switch protocol {
-	case "openai-responses", "codex-special":
+	case "openai-responses":
 		add("response", root.get("previous_response_id"))
 		if v := root.get("conversation"); len(v) > 0 && v[0] == '{' {
 			object(v, func(c jsonObject) {
@@ -138,9 +138,6 @@ func nativeReferences(protocol string, body []byte, inputKey string) ([]gatewayc
 				}
 			})
 		})
-		if protocol == "codex-special" {
-			eachElement(root.get("images"), func(raw []byte) { object(raw, func(i jsonObject) { add("file", i.get("file_id")) }) })
-		}
 	case "native-generate-content":
 		add("cache", root.get("cachedContent"))
 		messages(root.get("contents"), "parts")

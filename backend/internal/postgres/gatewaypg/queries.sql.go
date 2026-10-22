@@ -366,7 +366,7 @@ func (q *Queries) KeySpend(ctx context.Context, arg KeySpendParams) (KeySpendRow
 
 const listAllKeys = `-- name: ListAllKeys :many
 SELECT k.key_hash, k.id, k.owner_id, k.name, k.prefix, k.status, k.expires_at, k.allowed_models,
-       k.budget_daily_nano, k.budget_monthly_nano, k.budget_total_nano, k.model_aliases, k.codex_notes,
+       k.budget_daily_nano, k.budget_monthly_nano, k.budget_total_nano, k.model_aliases,
        a.status AS account_status
 FROM api_keys k
 JOIN accounts a ON a.id = k.owner_id
@@ -386,7 +386,6 @@ type ListAllKeysRow struct {
 	BudgetMonthlyNano *money.Amount
 	BudgetTotalNano   *money.Amount
 	ModelAliases      []byte
-	CodexNotes        bool
 	AccountStatus     string
 }
 
@@ -414,7 +413,6 @@ func (q *Queries) ListAllKeys(ctx context.Context) ([]ListAllKeysRow, error) {
 			&i.BudgetMonthlyNano,
 			&i.BudgetTotalNano,
 			&i.ModelAliases,
-			&i.CodexNotes,
 			&i.AccountStatus,
 		); err != nil {
 			return nil, err
@@ -589,7 +587,7 @@ func (q *Queries) LookupBackground(ctx context.Context, arg LookupBackgroundPara
 
 const lookupKey = `-- name: LookupKey :one
 SELECT k.id, k.owner_id, k.name, k.prefix, k.status, k.expires_at, k.allowed_models,
-       k.budget_daily_nano, k.budget_monthly_nano, k.budget_total_nano, k.model_aliases, k.codex_notes,
+       k.budget_daily_nano, k.budget_monthly_nano, k.budget_total_nano, k.model_aliases,
        a.status AS account_status
 FROM api_keys k
 JOIN accounts a ON a.id = k.owner_id
@@ -608,7 +606,6 @@ type LookupKeyRow struct {
 	BudgetMonthlyNano *money.Amount
 	BudgetTotalNano   *money.Amount
 	ModelAliases      []byte
-	CodexNotes        bool
 	AccountStatus     string
 }
 
@@ -627,7 +624,6 @@ func (q *Queries) LookupKey(ctx context.Context, keyHash []byte) (LookupKeyRow, 
 		&i.BudgetMonthlyNano,
 		&i.BudgetTotalNano,
 		&i.ModelAliases,
-		&i.CodexNotes,
 		&i.AccountStatus,
 	)
 	return i, err

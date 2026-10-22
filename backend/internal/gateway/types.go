@@ -48,7 +48,6 @@ type KeyAuth struct {
 	BudgetTotal   *money.Amount
 	Aliases       map[string]string
 	AccountActive bool
-	CodexNotes    bool
 }
 
 // Candidate is one channel offering the requested model in the requested
@@ -65,7 +64,7 @@ type Candidate struct {
 	Evidence         map[string]bool
 	VerifiedCapacity map[string]int64
 	// The minimal Key probe's chosen primary entrance is distinct from wire
-	// format. A native-only Codex probe cannot prove the public primary API.
+	// format; evidence for one entrance does not prove another.
 	KeyProbeEndpoints map[channel.Format]string
 	TypicalCost       money.Amount
 	TypicalCostKnown  bool

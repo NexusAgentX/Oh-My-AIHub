@@ -7,8 +7,8 @@ SELECT count(*)::int FROM api_keys WHERE owner_id = $1 AND deleted_at IS NULL;
 -- name: InsertKey :exec
 INSERT INTO api_keys (
     id, owner_id, name, prefix, key_hash, key_ciphertext, key_nonce, key_key_id, status, expires_at,
-    allowed_models, budget_daily_nano, budget_monthly_nano, budget_total_nano, model_aliases, codex_notes
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);
+    allowed_models, budget_daily_nano, budget_monthly_nano, budget_total_nano, model_aliases
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15);
 
 -- Sets the default-key marker once; returns a row only for the first caller.
 -- name: MarkDefaultKeyCreated :one
@@ -29,7 +29,7 @@ SELECT * FROM api_keys WHERE owner_id = $1 AND id = $2 AND deleted_at IS NULL FO
 UPDATE api_keys SET
     name = $3, status = $4, expires_at = $5, allowed_models = $6,
     budget_daily_nano = $7, budget_monthly_nano = $8, budget_total_nano = $9,
-    model_aliases = $10, codex_notes = $11, updated_at = now()
+    model_aliases = $10, updated_at = now()
 WHERE owner_id = $1 AND id = $2 AND deleted_at IS NULL;
 
 -- name: SoftDeleteKey :execrows

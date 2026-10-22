@@ -16,9 +16,6 @@ func normalizeModelMetricKey(key modelMetricKey) modelMetricKey {
 	return key
 }
 func validMetricProtocol(protocol string, format channel.Format) bool {
-	if protocol == "codex-special" {
-		return format == channel.FormatOpenAIResponses || format == channel.FormatOpenAIImages
-	}
 	return protocol != "" && protocol == nativeProtocol(format)
 }
 func callMetricProtocol(call *callState) string {

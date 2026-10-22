@@ -8,7 +8,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/quotepricing"
 )
 
-// ObserveNativeImage is shared by generic and Codex native image endpoints.
+// ObserveNativeImage is shared by the native image endpoints.
 // It keeps only counts and reliable usage. Requested n is never a product
 // count and no image, URL or revised prompt is retained or fetched.
 func ObserveNativeImage(body []byte) (Observation, quotepricing.Facts) {

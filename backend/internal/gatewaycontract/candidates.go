@@ -39,9 +39,9 @@ type Selection struct {
 }
 
 // Candidates filters one candidate against every hard requirement. There is no
-// address capability, invented price/speed or source mapping for Codex context.
-// F5/F10 apply model-aware ranking after this filter; model-less automatic
-// requests use stable channel IDs, manual requests only their explicit order.
+// address capability or invented price/speed. F5/F10 apply model-aware ranking
+// after this filter; model-less automatic requests use stable channel IDs,
+// manual requests only their explicit order.
 func Candidates(request Selection, candidates []Candidate) ([]Candidate, error) {
 	positions := map[string]int{}
 	for i, id := range request.Order {

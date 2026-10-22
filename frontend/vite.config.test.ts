@@ -19,7 +19,7 @@ describe('gateway proxy log safety', () => {
 	})
 
 	it('proxies every contracted gateway endpoint in the development server', () => {
-		expect(gatewayPaths.length).toBeGreaterThan(40)
+		expect(gatewayPaths.length).toBeGreaterThan(20)
 		const patterns = Object.keys(config.server?.proxy ?? {}).filter((key) => key.startsWith('^')).map((key) => new RegExp(key))
 		for (const path of gatewayPaths) expect(patterns.some((pattern) => pattern.test(path)), path).toBe(true)
 	})
@@ -32,8 +32,8 @@ describe('gateway proxy log safety', () => {
 		expect(response.req.url).not.toContain('oma_live_query')
   })
 
-	it('redacts Codex auxiliary query and path details in proxy errors', () => {
-		const response = { req: { url: '/backend-api/codex/alpha/notes/v2/read_file?session_id=private-session&path=private-note' } }
+	it('redacts retired namespace query and path details in proxy errors', () => {
+		const response = { req: { url: '/backend-api/unknown/path?session_id=private-session&path=private-note' } }
 		sanitizeProxyErrorResponse(response)
 		expect(response.req.url).toBe('/backend-api')
 	})

@@ -13,18 +13,26 @@ func layeredManifest(t *testing.T) (gatewaycontract.Manifest, *gatewaycontract.R
 	if err != nil {
 		t.Fatal(err)
 	}
-	for si := range m.Suites {
-		for ri := range m.Suites[si].Requirements {
-			r := &m.Suites[si].Requirements[ri]
-			if r.ID == "codex-special.RL13" {
-				r.Assertions = []string{"upstream_auth", "platform_auth", "cli_activation"}
-				r.AssertionLayers = map[string][]string{AssertionID(r.ID, 0): {"upstream_protocol"}, AssertionID(r.ID, 1): {"gateway_proxy"}, AssertionID(r.ID, 2): {"official_cli"}}
-				return m, r
-			}
-		}
+	// Only the upstream_protocol layer remains in the published manifest, so a
+	// three-layer suite is built here instead of borrowing a retired entry.
+	m.Suites = append(m.Suites, gatewaycontract.Suite{
+		ID: "layered-fixture", Protocol: "openai-responses", Target: "group", Feature: "F4",
+		EvidenceLayers: []string{"upstream_protocol", "gateway_proxy", "official_cli"},
+		Requirements: []gatewaycontract.Requirement{{
+			ID: "layered-fixture.proof", Endpoints: []string{"chat.create"}, SourceIDs: []string{"L01"},
+			Assertions: []string{"upstream_auth", "platform_auth", "cli_activation"},
+		}},
+	})
+	req := &m.Suites[len(m.Suites)-1].Requirements[0]
+	req.AssertionLayers = map[string][]string{
+		AssertionID(req.ID, 0): {"upstream_protocol"},
+		AssertionID(req.ID, 1): {"gateway_proxy"},
+		AssertionID(req.ID, 2): {"official_cli"},
 	}
-	t.Fatal("missing fixed Codex prerequisite")
-	return m, nil
+	if err := m.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	return m, req
 }
 
 func TestProofLayersKeepTheirOwnAssertionsAndOriginalIDs(t *testing.T) {
