@@ -167,15 +167,6 @@ func TestCapabilityHeaderPreconditionsUseEffectiveOutgoingRules(t *testing.T) {
 	}
 }
 
-func TestServiceTierEvidenceCannotCrossNativeSurfaces(t *testing.T) {
-	public := compileNativeRequirements(channel.FormatOpenAIResponses, []byte(`{"service_tier":"priority"}`), false, "/v1/responses")
-	native := compileNativeRequirements(channel.FormatOpenAIResponses, []byte(`{"service_tier":"priority"}`), false, "/backend-api/codex/responses")
-	c := Candidate{GroupID: "group", Evidence: map[string]bool{"upstream_protocol/openai-responses.cache_tier/service_tier/openai:fast": true}}
-	if missingRequestCapability(c, public, nil) != "" || missingRequestCapability(c, native, nil) == "" {
-		t.Fatal("public and Codex tier evidence were merged")
-	}
-}
-
 func TestInlineImageClassificationDoesNotDecodeOrRetainLargeData(t *testing.T) {
 	for _, prefix := range []string{`"data:`, `"\u0064ata:`} {
 		if !requestDataURL([]byte(prefix + strings.Repeat("x", 1<<20) + `"`)) {

@@ -80,14 +80,6 @@ func (a *app) registerGatewayRoutes(r *router) {
 		a.gatewayEndpoints[id] = true
 	}
 	for _, endpoint := range manifest.Endpoints {
-		if endpoint.Feature == "F8" {
-			handler := a.gateway.CodexHandler(endpoint)
-			if handler != nil {
-				r.implement("497", endpoint.Method+" "+endpoint.Path, accessGatewayKey, handler)
-				a.gatewayEndpoints[endpoint.ID] = true
-			}
-			continue
-		}
 		if endpoint.Feature != "F7" || existing[endpoint.ID] {
 			continue
 		}

@@ -14,7 +14,6 @@ func TestOwnershipAndIndependentReferenceConflicts(t *testing.T) {
 		{"response", "same-id", "", "account-b", "key-b", b, "upstream-b", "creation-b"},
 		{"conversation", "conv-b", "", "account-a", "key-a", b, "upstream-b", "creation-c"},
 		{"item", "item-a", "conv-a", "account-a", "key-a", a, "upstream-a", "creation-d"},
-		{"codex_note", "session/path", "", "account-a", "key-a", Binding{}, "", ""},
 	}
 	lookup := func(Reference) ([]Resource, error) { return rows, nil }
 	got, err := ResolveReferences(actor, []Reference{{Kind: "response", ID: "same-id"}}, lookup)
@@ -46,26 +45,6 @@ func TestOwnershipAndIndependentReferenceConflicts(t *testing.T) {
 	rows = append(rows, Resource{"response", "same-id", "", "account-a", "key-a", b, "upstream-b", "creation-e"})
 	if _, err := ResolveReferences(actor, []Reference{{Kind: "response", ID: "same-id"}}, lookup); !errors.Is(err, ErrAmbiguous) {
 		t.Fatal("ambiguous bare ID routed arbitrarily", err)
-	}
-}
-
-func TestCodexOwnershipDoesNotConstrainChannel(t *testing.T) {
-	actor := Principal{"a", "k", true}
-	lookup := func(r Reference) ([]Resource, error) {
-		return []Resource{{Kind: r.Kind, ID: r.ID, AccountID: "a", KeyID: "k"}}, nil
-	}
-	for _, kind := range []string{"codex_session", "codex_note", "codex_window", "codex_item"} {
-		bound, err := ResolveReferences(actor, []Reference{{Kind: kind, ID: "opaque-owned-id"}}, lookup)
-		if err != nil || bound != nil {
-			t.Fatalf("%s acquired source binding: %v %v", kind, bound, err)
-		}
-	}
-	bound, err := ResolveReferences(actor, nil, func(Reference) ([]Resource, error) {
-		t.Fatal("self-contained content performed lookup")
-		return nil, nil
-	})
-	if err != nil || bound != nil {
-		t.Fatal(bound, err)
 	}
 }
 
@@ -146,18 +125,6 @@ func TestCreationCollisionWithSharedCredentialQuarantinesBothOwners(t *testing.T
 		}
 		if CheckRemoteCreation(a, invalid, nil) == nil {
 			t.Errorf("%s created an ownership record", change)
-		}
-	}
-}
-
-func TestContextCollisionCannotBecomeOwnerOrSourceBinding(t *testing.T) {
-	rows := []Resource{
-		{Kind: "codex_note", ID: "session/notes/path", AccountID: "a", KeyID: "ka"},
-		{Kind: "codex_note", ID: "session/notes/path", AccountID: "b", KeyID: "kb"},
-	}
-	for _, actor := range []Principal{{"a", "ka", true}, {"b", "kb", true}} {
-		if _, err := ResolveReferences(actor, []Reference{{Kind: "codex_note", ID: rows[0].ID}}, func(Reference) ([]Resource, error) { return rows, nil }); !errors.Is(err, ErrAmbiguous) {
-			t.Fatal("duplicate context ID trusted a client's ownership claim", err)
 		}
 	}
 }

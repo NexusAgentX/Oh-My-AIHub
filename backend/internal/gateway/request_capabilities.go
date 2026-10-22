@@ -81,13 +81,7 @@ func compileNativeRequirements(format channel.Format, body []byte, stream bool, 
 	root := scratch.objectOf(body)
 	if tier := requestTag(root.get("service_tier")); format != channel.FormatOpenAIImages && tier != "" && tier != "auto" && actualMetricTier(format, tier) != "unknown" {
 		id := out.protocol + ".cache_tier/service_tier/" + actualMetricTier(format, tier)
-		if strings.HasPrefix(path, "/backend-api/codex/") {
-			id = "codex-special.RL24/service_tier/" + actualMetricTier(format, tier)
-		}
 		out.capabilities = append(out.capabilities, CapabilityRequirement{Layer: "upstream_protocol", ID: id})
-	}
-	if strings.HasPrefix(path, "/backend-api/codex/") {
-		return out
 	}
 	add := func(family, label string) {
 		id := out.protocol + "." + family + "/" + label

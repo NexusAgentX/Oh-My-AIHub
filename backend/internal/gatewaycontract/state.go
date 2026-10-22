@@ -16,7 +16,7 @@ type Principal struct {
 }
 
 // Binding identifies an engine and credential scope, never a particular CF/CDN
-// address. Self-contained opaque contents and Codex context IDs have no Binding.
+// address. Self-contained opaque contents have no Binding.
 type Binding struct {
 	GroupID           string
 	ChannelID         string
@@ -33,7 +33,7 @@ type Resource struct {
 	// CredentialScope is a protected, stable equality tag for the real upstream
 	// credential within the group. It must not be channel-local: two channels
 	// sharing the same upstream Key share this collision domain. Never return it
-	// to consumers. Codex context ownership has neither this tag nor Binding.
+	// to consumers. Context-only ownership has neither this tag nor Binding.
 	CredentialScope string
 	CreationID      string
 }
@@ -49,15 +49,6 @@ type Reference struct {
 // A client-supplied session/path/ID is not an ownership record.
 type Lookup func(Reference) ([]Resource, error)
 
-func contextOnly(kind string) bool {
-	switch kind {
-	case "codex_session", "codex_note", "codex_window", "codex_item":
-		return true
-	default:
-		return false
-	}
-}
-
 func remoteResource(kind string) bool {
 	switch kind {
 	case "response", "conversation", "item", "stored_chat", "cache", "audio", "container":
@@ -67,8 +58,7 @@ func remoteResource(kind string) bool {
 	}
 }
 
-// ResolveReferences checks current access and all independent references. A
-// non-nil result constrains routing; Codex context ownership alone never does.
+// ResolveReferences checks current access and all independent references.
 // Complete encrypted reasoning/signatures/compaction must not be passed here.
 func ResolveReferences(actor Principal, refs []Reference, lookup Lookup) (*Binding, error) {
 	if !actor.Active || actor.AccountID == "" || actor.KeyID == "" {
@@ -79,7 +69,7 @@ func ResolveReferences(actor Principal, refs []Reference, lookup Lookup) (*Bindi
 	}
 	var selected *Binding
 	for _, ref := range refs {
-		if ref.ID == "" || (!remoteResource(ref.Kind) && !contextOnly(ref.Kind)) {
+		if ref.ID == "" || !remoteResource(ref.Kind) {
 			return nil, ErrNotFound
 		}
 		rows, err := lookup(ref)
@@ -102,17 +92,6 @@ func ResolveReferences(actor Principal, refs []Reference, lookup Lookup) (*Bindi
 		}
 		if match == nil {
 			return nil, ErrNotFound
-		}
-		if contextOnly(ref.Kind) {
-			if match.Binding != (Binding{}) || match.CredentialScope != "" {
-				return nil, ErrConflict
-			}
-			for _, r := range rows {
-				if r.Kind == ref.Kind && r.ID == ref.ID && r.ParentID == ref.ParentID && (r.AccountID != match.AccountID || r.KeyID != match.KeyID) {
-					return nil, ErrAmbiguous
-				}
-			}
-			continue
 		}
 		b := match.Binding
 		if b.GroupID == "" || b.ChannelID == "" || b.CredentialVersion == "" || match.CredentialScope == "" || match.CreationID == "" || (selected != nil && *selected != b) {

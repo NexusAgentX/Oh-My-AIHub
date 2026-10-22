@@ -74,6 +74,8 @@ func TestUnsupportedGatewayPathsAnswerNotFound(t *testing.T) {
 	for _, target := range []struct{ method, path string }{
 		{http.MethodPost, "/v1/embeddings"}, {http.MethodPost, "/v1/files"}, {http.MethodGet, "/v1/containers"},
 		{http.MethodPost, "/v1beta/other"},
+		{http.MethodPost, "/backend-api/codex/responses"}, {http.MethodGet, "/backend-api/wham/accounts/check"},
+		{http.MethodGet, "/v1/user-auth-credential/whoami"},
 	} {
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, httptest.NewRequest(target.method, target.path, strings.NewReader(`{}`)))

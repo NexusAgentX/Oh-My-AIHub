@@ -101,8 +101,8 @@ type OwnedPage struct {
 // ReadOwnedPage demonstrates bounded server-side filtering. Four native pages
 // may yield an empty page with a continuation; the client can continue without
 // an unbounded scan or exposure of another owner's IDs, counts or cursor.
-// Standard-resource scopes keep Binding; Codex context scopes leave it empty,
-// so a continuation cannot create source-channel stickiness.
+// Scopes keep their Binding, so a continuation cannot create source-channel
+// stickiness.
 func ReadOwnedPage(ctx context.Context, actor Principal, scope CursorScope, token string, limit int,
 	codec *CursorCodec, fetch FetchPage, lookup Lookup) (OwnedPage, error) {
 	if err := scope.Authorize(actor, scope); err != nil {
@@ -111,9 +111,8 @@ func ReadOwnedPage(ctx context.Context, actor Principal, scope CursorScope, toke
 	if codec == nil || fetch == nil || lookup == nil || limit < 1 || limit > MaxPageItems || scope.Kind == "" || scope.QueryDigest == "" {
 		return OwnedPage{}, ErrPage
 	}
-	if (!remoteResource(scope.Kind) && !contextOnly(scope.Kind)) ||
-		(remoteResource(scope.Kind) && (scope.Binding.GroupID == "" || scope.Binding.ChannelID == "" || scope.Binding.CredentialVersion == "")) ||
-		(contextOnly(scope.Kind) && scope.Binding != (Binding{})) {
+	if !remoteResource(scope.Kind) ||
+		scope.Binding.GroupID == "" || scope.Binding.ChannelID == "" || scope.Binding.CredentialVersion == "" {
 		return OwnedPage{}, ErrConflict
 	}
 	native := ""

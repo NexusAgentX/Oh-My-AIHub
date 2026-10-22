@@ -41,11 +41,6 @@ function KeyAdvancedFields({ form, onChange }: { form: KeyForm; onChange: (form:
   return (
     <>
       <fieldset className="form-section">
-        <legend>Codex 笔记与历史</legend>
-        <Switch checked={form.codexNotes} label="使用笔记与历史工具" onChange={(codexNotes) => set({ codexNotes })} />
-        <p className="muted-copy">开启后，同一会话固定使用原渠道及凭据。更改后请使用新会话，已有历史不会迁移。</p>
-      </fieldset>
-      <fieldset className="form-section">
         <legend>可用模型</legend>
         <Segmented
           label="可用模型"

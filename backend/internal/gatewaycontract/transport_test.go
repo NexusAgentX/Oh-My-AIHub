@@ -124,7 +124,6 @@ func TestUnauthorizedResourceFailsBeforeUpstreamAndContextCanMove(t *testing.T) 
 	first := gatewaycontract.Binding{GroupID: "g", ChannelID: "a", CredentialVersion: "original"}
 	rows := []gatewaycontract.Resource{
 		{Kind: "response", ID: "resp-a", AccountID: "a", KeyID: "k", Binding: first, CredentialScope: "upstream-key", CreationID: "creation-a"},
-		{Kind: "codex_note", ID: "session/path", AccountID: "a", KeyID: "k"},
 	}
 	lookup := func(gatewaycontract.Reference) ([]gatewaycontract.Resource, error) { return rows, nil }
 	var calls atomic.Int32
@@ -165,10 +164,7 @@ func TestUnauthorizedResourceFailsBeforeUpstreamAndContextCanMove(t *testing.T) 
 			t.Fatal("owned resource inaccessible")
 		}
 	}
-	bound, err := gatewaycontract.ResolveReferences(actor, []gatewaycontract.Reference{{Kind: "codex_note", ID: "session/path"}}, lookup)
-	if err != nil {
-		t.Fatal(err)
-	}
+	var bound *gatewaycontract.Binding
 	all := []gatewaycontract.Candidate{
 		{Binding: first, Enabled: true, Authorized: true, Callable: true},
 		{Binding: gatewaycontract.Binding{GroupID: "other-group", ChannelID: "b", CredentialVersion: "other-key"}, Enabled: true, Authorized: true, Callable: true},
@@ -253,7 +249,7 @@ func TestSameGroupEntryFallbackKeepsScopeAndDoesNotReplayUnknownWrites(t *testin
 	}
 }
 
-func TestUnregisteredContextCannotBeClaimedByReadingItFirst(t *testing.T) {
+func TestUnregisteredResourceCannotBeClaimedByReadingItFirst(t *testing.T) {
 	var reached atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reached.Add(1)
@@ -261,16 +257,16 @@ func TestUnregisteredContextCannotBeClaimedByReadingItFirst(t *testing.T) {
 	}))
 	defer upstream.Close()
 	for _, actor := range []gatewaycontract.Principal{{AccountID: "a", KeyID: "ka", Active: true}, {AccountID: "b", KeyID: "kb", Active: true}} {
-		bound, err := gatewaycontract.ResolveReferences(actor, []gatewaycontract.Reference{{Kind: "codex_session", ID: "unknown-shared-session"}}, func(gatewaycontract.Reference) ([]gatewaycontract.Resource, error) { return nil, nil })
+		bound, err := gatewaycontract.ResolveReferences(actor, []gatewaycontract.Reference{{Kind: "response", ID: "unknown-shared-response"}}, func(gatewaycontract.Reference) ([]gatewaycontract.Resource, error) { return nil, nil })
 		if err == nil {
-			res, err := http.Get(upstream.URL + "/backend-api/codex/alpha/notes/v2/thread_hint")
+			res, err := http.Get(upstream.URL + "/v1/responses/unknown-shared-response")
 			if err == nil {
 				_ = res.Body.Close()
 			}
-			t.Fatal("unregistered shared session acquired an owner", bound)
+			t.Fatal("unregistered shared resource acquired an owner", bound)
 		}
 	}
 	if reached.Load() != 0 {
-		t.Fatal("an ownership guess reached shared upstream context")
+		t.Fatal("an ownership guess reached the shared upstream resource")
 	}
 }

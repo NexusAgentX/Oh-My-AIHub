@@ -328,16 +328,6 @@ func newGroupEnvOn(t *testing.T, pool *pgxpool.Pool, store *storepg.Store, confi
 	if err != nil {
 		t.Fatal(err)
 	}
-	contextRoot, err := store.Market.ProtectedRoot(ctx, keyring, "codex-context-root-v1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	dependencies.ContextNamespace, err = gatewaycontract.NewContextNamespace(contextRoot)
-	clear(contextRoot)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	if configure != nil {
 		configure(&dependencies)
 	}

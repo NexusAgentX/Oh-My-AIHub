@@ -215,18 +215,15 @@ func TestFinalManifestCannotDisappearWhenNoSuitesAreRegistered(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, target := range []Target{{Binding: market.EvidenceBinding{TargetKind: "group", TargetID: "g"}}, {Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: "m"}, ModelType: "text"}, {Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: "i"}, ModelType: "image"}, {Binding: market.EvidenceBinding{TargetKind: "gateway", TargetID: "platform"}}} {
+	// The published manifest no longer declares gateway-target evidence, so only
+	// group and group_model plans exist.
+	for _, target := range []Target{{Binding: market.EvidenceBinding{TargetKind: "group", TargetID: "g"}}, {Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: "m"}, ModelType: "text"}, {Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: "i"}, ModelType: "image"}} {
 		plan, err := r.Plan(target)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(plan.Items) == 0 || !HasPending(plan) {
 			t.Fatal("missing implementation masquerades as complete")
-		}
-		for _, item := range plan.Items {
-			if slices.Contains(item.Requirements, "codex-special.RL11") {
-				t.Fatal("excluded WebSocket counted")
-			}
 		}
 	}
 }
@@ -747,31 +744,5 @@ func TestNewCredentialForksProvenanceAndReusesEngineEvidence(t *testing.T) {
 	snapshot, err := service.GetReport(context.Background(), Actor{ID: "owner"}, *old.ReportID)
 	if err != nil || snapshot.Usage.HTTP != 2 {
 		t.Fatal("continuation rewrote original immutable report")
-	}
-}
-
-func TestCodexImageEvidenceUsesTheImageModelTarget(t *testing.T) {
-	manifest, err := gatewaycontract.Load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	r, err := NewRegistry(manifest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, kind := range []string{"text", "image"} {
-		plan, err := r.Plan(Target{Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: "offering"}, ModelType: kind})
-		if err != nil {
-			t.Fatal(err)
-		}
-		count := 0
-		for _, item := range plan.Items {
-			if slices.Contains(item.Requirements, "codex-special.RL25") {
-				count++
-			}
-		}
-		if (kind == "text" && count != 0) || (kind == "image" && count != 3) {
-			t.Fatalf("RL25 %s target has %d layers", kind, count)
-		}
 	}
 }

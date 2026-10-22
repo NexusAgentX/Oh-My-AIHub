@@ -72,7 +72,7 @@ mise run down                 # 停止 Compose 栈
 
 ```text
 .
-├── backend/         Go 后端（cmd/ 多进程：server、migrate、detection-codex、detection-sdk、cutover-check；internal/ 按领域分包）
+├── backend/         Go 后端（cmd/ 多进程：server、migrate、detection-sdk、cutover-check；internal/ 按领域分包）
 ├── frontend/        React 单页应用（src/ 按业务域分目录）
 ├── scripts/         任务开工收尾、备份恢复、迁移与 CI 守卫脚本
 ├── docs/adr/        架构决策记录

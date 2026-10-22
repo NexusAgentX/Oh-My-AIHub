@@ -168,28 +168,3 @@ func TestOwnedPaginationRejectsMalformedOrUnboundedPages(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
-func TestContextPaginationDoesNotPinSourceChannel(t *testing.T) {
-	codec, actor, scope := cursorFixture(t)
-	scope.Kind, scope.Binding = "codex_item", Binding{}
-	lookup := func(r Reference) ([]Resource, error) {
-		return []Resource{{Kind: r.Kind, ID: r.ID, AccountID: "a", KeyID: "k"}}, nil
-	}
-	first, err := ReadOwnedPage(t.Context(), actor, scope, "", 1, codec, func(context.Context, string, int) (NativePage, error) {
-		return NativePage{Items: []ListedResource{{Reference: Reference{Kind: "codex_item", ID: "item-1"}, Raw: json.RawMessage(`{"id":"item-1"}`)}}, Next: "portable-context-token"}, nil
-	}, lookup)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// A different capability-qualified channel supplies this second page. No
-	// source mapping exists in scope or lookup; only platform ACL remains.
-	second, err := ReadOwnedPage(t.Context(), actor, scope, first.Next, 1, codec, func(_ context.Context, next string, _ int) (NativePage, error) {
-		if next != "portable-context-token" {
-			t.Fatal("native context token changed")
-		}
-		return NativePage{Items: []ListedResource{{Reference: Reference{Kind: "codex_item", ID: "item-2"}, Raw: json.RawMessage(`{"id":"item-2"}`)}}}, nil
-	}, lookup)
-	if err != nil || len(second.Items) != 1 || second.Next != "" {
-		t.Fatal("context acquired source binding", second, err)
-	}
-}

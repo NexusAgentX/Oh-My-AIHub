@@ -55,7 +55,7 @@ func (s *fakeKeyStore) insert(sealed apikey.Sealed, isDefault bool) apikey.Key {
 	}
 	key := apikey.Key{
 		ID: sealed.ID, OwnerID: sealed.OwnerID, Name: sealed.Name, Prefix: sealed.Prefix, Status: sealed.Status, IsDefault: isDefault,
-		CodexNotes: sealed.CodexNotes, ExpiresAt: sealed.ExpiresAt, AllowedModels: nonNilStrings(sealed.AllowedModels), BudgetDaily: sealed.BudgetDaily,
+		ExpiresAt: sealed.ExpiresAt, AllowedModels: nonNilStrings(sealed.AllowedModels), BudgetDaily: sealed.BudgetDaily,
 		BudgetMonthly: sealed.BudgetMonthly, BudgetTotal: sealed.BudgetTotal, ModelAliases: aliases, RoutedModels: []string{},
 		CreatedAt: s.clock, UpdatedAt: s.clock,
 	}
@@ -130,9 +130,6 @@ func (s *fakeKeyStore) Update(_ context.Context, ownerID, id string, update apik
 	key, err := s.find(ownerID, id)
 	if err != nil {
 		return apikey.Key{}, err
-	}
-	if update.CodexNotes != nil {
-		key.CodexNotes = *update.CodexNotes
 	}
 	if update.Name != nil {
 		key.Name = *update.Name

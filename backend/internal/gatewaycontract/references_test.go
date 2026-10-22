@@ -18,7 +18,6 @@ func TestNativeContentsRoundTripWithoutResourceRegistration(t *testing.T) {
 		{"openai-responses", `{"model":"alias","store":false,"input":[{"type":"reasoning","id":"unregistered","encrypted_content":"opaque"},{"type":"compaction","id":"also-unregistered","encrypted_content":"opaque-window"},{"role":"user","content":[{"type":"input_file","filename":"synthetic.pdf","file_data":"data:application/pdf;base64,fixture"},{"type":"input_image","image_url":"https://example.invalid/synthetic.png"}]}],"unknown":{"previous_response_id":"extension-must-not-be-interpreted"}}`},
 		{"native-messages", `{"model":"alias","messages":[{"role":"assistant","content":[{"type":"thinking","thinking":"synthetic","signature":"opaque-signature"}]},{"role":"user","content":[{"type":"document","source":{"type":"base64","media_type":"application/pdf","data":"fixture"}}]}]}`},
 		{"native-generate-content", `{"model":"alias","contents":[{"role":"user","parts":[{"inlineData":{"mimeType":"audio/wav","data":"fixture"}},{"fileData":{"mimeType":"video/mp4","fileUri":"https://example.invalid/synthetic.mp4"}},{"text":"fixture","thoughtSignature":"opaque-signature"}]}]}`},
-		{"codex-special", `{"model":"alias","prompt":"synthetic edit","images":[{"image_url":"data:image/png;base64,fixture"}],"background":"opaque","quality":"auto","size":"auto"}`},
 	} {
 		t.Run(tc.protocol, func(t *testing.T) {
 			input := []byte(tc.input)
@@ -54,7 +53,7 @@ func TestNativeContentsRoundTripWithoutResourceRegistration(t *testing.T) {
 }
 
 func TestOnlyExplicitStandardReferencesConstrainRouting(t *testing.T) {
-	for _, protocol := range []string{"openai-responses", "codex-special"} {
+	for _, protocol := range []string{"openai-responses"} {
 		refs, err := gatewaycontract.RequestReferences(protocol, []byte(`{"previous_response_id":"resp-owned","conversation":{"id":"conv-owned"},"input":[{"type":"item_reference","id":"item-owned"},{"type":"reasoning","id":"opaque-id","encrypted_content":"opaque"}]}`))
 		if err != nil || len(refs) != 3 || refs[0].Kind != "response" || refs[1].Kind != "conversation" || refs[2].Kind != "item" {
 			t.Fatal(refs, err)
@@ -125,7 +124,6 @@ func TestCompactWindowCanContinueOnAnotherChannelInOrder(t *testing.T) {
 func TestExcludedResourcesDoNotGainSharedCredentialAuthorization(t *testing.T) {
 	for _, tc := range []struct{ protocol, body string }{
 		{"openai-responses", `{"input":[{"type":"input_file","file_id":"file-other"}]}`},
-		{"codex-special", `{"model":"image-model","images":[{"file_id":"file-other"}],"prompt":"synthetic"}`},
 		{"openai-responses", `{"tools":[{"type":"file_search","vector_store_ids":["vs-other"]}]}`},
 		{"openai-responses", `{"tools":[{"type":"code_interpreter","container":"cntr-other"}]}`},
 		{"openai-chat-completions", `{"messages":[{"role":"user","content":[{"type":"file","file":{"file_id":"file-other"}}]}]}`},

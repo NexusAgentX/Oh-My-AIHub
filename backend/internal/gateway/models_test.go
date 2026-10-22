@@ -273,18 +273,3 @@ func TestNativeListingExcludesRetiredUngroupedCandidates(t *testing.T) {
 		t.Fatal("retired candidate entered current model directory", names, err)
 	}
 }
-
-func TestNativeOnlyCodexProbeDoesNotPopulatePublicModelList(t *testing.T) {
-	c := Candidate{ChannelID: "native", GroupID: "group", GroupModelID: "group-main", Quotes: groupBook(t, "CNY", 1), KeyProbeEndpoints: map[channel.Format]string{channel.FormatOpenAIResponses: "codex.responses"}, Evidence: map[string]bool{"upstream_protocol/codex-special.RL01/actual_protocol_marker": true}}
-	s := approvedListingStore{listingStore: listingStore{online: []OnlineModel{{ID: "main", Formats: []channel.Format{channel.FormatOpenAIResponses}}}}, records: []CandidateRecord{{ModelID: "main", Formats: []channel.Format{channel.FormatOpenAIResponses}, Candidate: c}}}
-	e := NewEngine(Dependencies{Catalog: catalog.NewService(listingCatalog{models: []catalog.Model{{ID: "main"}}}), Store: s})
-	names, err := e.availableModels(context.Background(), KeyAuth{Aliases: map[string]string{"alias": "main"}}, listFormats(DialectOpenAI, false))
-	if err != nil || len(names) != 0 {
-		t.Fatal("native probe leaked a public model", names, err)
-	}
-	c.Evidence["upstream_protocol/openai-responses.base/accepted_native_message_shapes"] = true
-	names, err = e.availableModels(context.Background(), KeyAuth{}, listFormats(DialectOpenAI, false))
-	if err != nil || len(names) != 1 || names[0].id != "main" {
-		t.Fatal("independent public proof was lost", names, err)
-	}
-}
