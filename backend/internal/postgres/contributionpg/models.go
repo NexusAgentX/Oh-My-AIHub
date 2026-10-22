@@ -18,8 +18,6 @@ type MarketContribution struct {
 	Revision      int64      `json:"revision"`
 	Document      []byte     `json:"document"`
 	BaseDocument  []byte     `json:"base_document"`
-	ReportIds     []string   `json:"report_ids"`
-	TaskIds       []string   `json:"task_ids"`
 	PriceBlanks   []byte     `json:"price_blanks"`
 	PendingPrices []string   `json:"pending_prices"`
 	ReviewReason  string     `json:"review_reason"`
