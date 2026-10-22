@@ -26,9 +26,8 @@ import (
 
 // newGroupEnv runs the same database/auth/settlement infrastructure as the old
 // integration fixture, using approved group quotes and the real group-channel
-// handlers. It never seeds models or channel_models. The explicit synthetic
-// capacity facts below exercise forwarding mechanics, not provider detection:
-// no report/evidence rows are published or accepted as real proof.
+// handlers. It never seeds models or channel_models, and it publishes no
+// report or evidence rows: the synthetic quotes below are the only facts.
 func newGroupEnv(t *testing.T) *env { return newGroupEnvWith(t, nil) }
 
 func newGroupEnvWith(t *testing.T, configure func(*gateway.Dependencies)) *env {
@@ -48,10 +47,6 @@ func (l groupIntegrationEvidence) LoadCandidates(ctx context.Context) ([]gateway
 	comparisons := &groupComparisonSnapshot{values: map[groupComparisonKey]money.Amount{}}
 	for i := range rows {
 		c := &rows[i].Candidate
-		c.VerifiedCapacity = map[string]int64{}
-		for _, protocol := range []string{"openai-chat-completions", "openai-responses", "native-messages", "native-generate-content"} {
-			c.VerifiedCapacity[protocol+".length_search@upstream_protocol/max_output"] = 8192
-		}
 		// An explicit 1000-input/500-output synthetic workload is evaluated
 		// off the request path against this immutable CNY quote generation.
 		if c.Quotes != nil {

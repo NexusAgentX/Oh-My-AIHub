@@ -58,7 +58,6 @@ type Candidate struct {
 	ConfigRevision     int64
 	CredentialRevision int64
 	Entrances          []Entrance
-	VerifiedCapacity   map[string]int64
 	TypicalCost        money.Amount
 	TypicalCostKnown   bool
 	TypicalUnit        string

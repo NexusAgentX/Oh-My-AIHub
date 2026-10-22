@@ -71,12 +71,27 @@ func TestGatewayEntriesSkipSameOriginAndRequireAPIKey(t *testing.T) {
 
 func TestUnsupportedGatewayPathsAnswerNotFound(t *testing.T) {
 	handler := NewHandler(Dependencies{Gateway: gateway.NewEngine(gateway.Dependencies{})})
-	// The /backend-api namespace has no endpoint left and is not an external
-	// API path: a write is checked for same origin like any other web request.
-	retired := httptest.NewRecorder()
-	handler.ServeHTTP(retired, httptest.NewRequest(http.MethodPost, "/backend-api/codex/responses", strings.NewReader(`{}`)))
-	if retired.Code != http.StatusForbidden || !strings.Contains(retired.Body.String(), `"error":"cross_origin_request"`) {
-		t.Fatalf("POST /backend-api/codex/responses = %d %s", retired.Code, retired.Body.String())
+	// The /backend-api namespace has no endpoint left and is no longer an
+	// external API path: a write passes the ordinary same-origin check first,
+	// then falls through to the unsupported-endpoint answer.
+	for _, tc := range []struct {
+		name, origin string
+		status       int
+		want         string
+	}{
+		{"cross site", "https://elsewhere.example", http.StatusForbidden, `"error":"cross_origin_request"`},
+		{"no origin", "", http.StatusForbidden, `"error":"cross_origin_request"`},
+		{"same origin", "http://example.com", http.StatusNotFound, `"code":"unsupported_endpoint"`},
+	} {
+		request := httptest.NewRequest(http.MethodPost, "/backend-api/codex/responses", strings.NewReader(`{}`))
+		if tc.origin != "" {
+			request.Header.Set("Origin", tc.origin)
+		}
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+		if recorder.Code != tc.status || !strings.Contains(recorder.Body.String(), tc.want) {
+			t.Fatalf("%s: POST /backend-api/codex/responses = %d %s", tc.name, recorder.Code, recorder.Body.String())
+		}
 	}
 	for _, target := range []struct{ method, path string }{
 		{http.MethodPost, "/v1/embeddings"}, {http.MethodPost, "/v1/files"}, {http.MethodGet, "/v1/containers"},
