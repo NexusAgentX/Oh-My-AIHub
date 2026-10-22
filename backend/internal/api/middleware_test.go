@@ -71,32 +71,29 @@ func TestGatewayEntriesSkipSameOriginAndRequireAPIKey(t *testing.T) {
 
 func TestUnsupportedGatewayPathsAnswerNotFound(t *testing.T) {
 	handler := NewHandler(Dependencies{Gateway: gateway.NewEngine(gateway.Dependencies{})})
-	// The /backend-api namespace has no endpoint left and is no longer an
-	// external API path: a write passes the ordinary same-origin check first,
-	// then falls through to the unsupported-endpoint answer.
-	for _, tc := range []struct {
-		name, origin string
-		status       int
-		want         string
-	}{
-		{"cross site", "https://elsewhere.example", http.StatusForbidden, `"error":"cross_origin_request"`},
-		{"no origin", "", http.StatusForbidden, `"error":"cross_origin_request"`},
-		{"same origin", "http://example.com", http.StatusNotFound, `"code":"unsupported_endpoint"`},
+	// The retired /backend-api namespace answers the same JSON 404 for every
+	// method and every caller: it holds no route, and a rejection for origin or
+	// permission would misreport a dead endpoint as an authorization problem.
+	for _, tc := range []struct{ name, method, origin string }{
+		{"cross site write", http.MethodPost, "https://elsewhere.example"},
+		{"write without origin", http.MethodPost, ""},
+		{"same origin write", http.MethodPost, "http://example.com"},
+		{"read", http.MethodGet, ""},
+		{"head", http.MethodHead, ""},
 	} {
-		request := httptest.NewRequest(http.MethodPost, "/backend-api/codex/responses", strings.NewReader(`{}`))
+		request := httptest.NewRequest(tc.method, "/backend-api/codex/responses", strings.NewReader(`{}`))
 		if tc.origin != "" {
 			request.Header.Set("Origin", tc.origin)
 		}
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, request)
-		if recorder.Code != tc.status || !strings.Contains(recorder.Body.String(), tc.want) {
-			t.Fatalf("%s: POST /backend-api/codex/responses = %d %s", tc.name, recorder.Code, recorder.Body.String())
+		if recorder.Code != http.StatusNotFound || !strings.Contains(recorder.Body.String(), `"code":"unsupported_endpoint"`) {
+			t.Fatalf("%s: %s /backend-api/codex/responses = %d %s", tc.name, tc.method, recorder.Code, recorder.Body.String())
 		}
 	}
 	for _, target := range []struct{ method, path string }{
 		{http.MethodPost, "/v1/embeddings"}, {http.MethodPost, "/v1/files"}, {http.MethodGet, "/v1/containers"},
 		{http.MethodPost, "/v1beta/other"},
-		{http.MethodGet, "/backend-api/wham/accounts/check"},
 		{http.MethodGet, "/v1/user-auth-credential/whoami"},
 	} {
 		recorder := httptest.NewRecorder()
