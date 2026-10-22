@@ -74,9 +74,9 @@ gh workflow run release.yml --repo NexusAgentX/Oh-My-AIHub -f tag=vX.Y.Z
 
 ### 0015 定价清理升级
 
-从当前生产的迁移 14 升级时，先让旧版本完成所有未结算 Responses 后台任务，再部署。
-0015 在事务中检查 `gateway_background_jobs.settled_at IS NULL`；存在未结算任务便中止，
-不修改配置或迁移版本。继续由旧版本跟踪、结算这些任务后重试，避免跨版本改变开始时价格。
+从当前生产的迁移 14 升级时不再需要先等未结算 Responses 后台任务结束：0015 不检查
+`gateway_background_jobs`，未结算任务由 0023 连同该表一起放弃，条数写在迁移日志的
+NOTICE 里，不修改配置或迁移版本。已结算的后台调用仍在 `calls` 与账本中按原快照保留。
 
 0015 删除模型及条件档地域倍率、输入/输出的 file 声明，以及含百炼思考条件的整档
 （包括同时带 token 或时间条件的档位，避免移除条件后扩大匹配范围）。仅声明 file 的
