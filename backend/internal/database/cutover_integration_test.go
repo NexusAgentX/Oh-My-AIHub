@@ -109,52 +109,32 @@ func TestFinalCutoverRejectsPendingWorkAndPreservesHistoryOnUpgradeAndRetry(t *t
 			exec("INSERT INTO route_pref_channels(route_pref_id,channel_id,position,excluded) SELECT id,$1,0,false FROM route_prefs WHERE account_id=$2", cid, owner)
 			exec("INSERT INTO api_keys(id,owner_id,name,key_hash,prefix,key_ciphertext,key_nonce,key_key_id,allowed_models,model_aliases) VALUES($1,$2,'Historical key',decode(repeat('01',32),'hex'),'sk-aih-test',$3,$4,$5,ARRAY['old-model'],'{\"alias\":\"old-model\"}')", key, owner, sealedKey.Ciphertext, sealedKey.Nonce, sealedKey.KeyID)
 			exec("INSERT INTO calls(id,account_id,api_key_id,requested_model,model_id,format,final_channel_id,outcome,price_snapshot,completed_at) VALUES($1,$2,$3,'old-model','old-model','openai_responses',$4,'upstream_failed','{\"legacy_price\":7}',now())", call, owner, key, cid)
-			hasBackground := version >= 14
-			if hasBackground {
-				exec("INSERT INTO gateway_background_jobs(call_id,account_id,key_id,channel_id,response_id,metadata,deadline_at,settled_at) VALUES($1,$2,$3,$4,'synthetic-old-response','{\"synthetic_sealed_history\":true}',now(),now())", call, owner, key, cid)
-			}
-			backgroundRows := "NULL"
-			if hasBackground {
-				backgroundRows = "(SELECT jsonb_agg(to_jsonb(v) ORDER BY call_id) FROM gateway_background_jobs v)"
-			}
+			// The gateway no longer writes background jobs, so the only pending
+			// work this upgrade test can create is an unfinished call.
 			snapshot := func() string {
 				t.Helper()
 				var value string
-				err := db.QueryRowContext(ctx, fmt.Sprintf(`SELECT jsonb_build_object(
+				err := db.QueryRowContext(ctx, `SELECT jsonb_build_object(
      'versions',(SELECT jsonb_agg(to_jsonb(v) ORDER BY id) FROM goose_db_version v),
      'calls',(SELECT jsonb_agg(to_jsonb(v) ORDER BY id) FROM calls v),
-     'jobs',%s,
      'channels',(SELECT jsonb_agg(to_jsonb(v) ORDER BY id) FROM channels v),
      'models',(SELECT jsonb_agg(to_jsonb(v) ORDER BY id) FROM models v),
-     'keys',(SELECT jsonb_agg(to_jsonb(v) ORDER BY id) FROM api_keys v))::text`, backgroundRows)).Scan(&value)
+     'keys',(SELECT jsonb_agg(to_jsonb(v) ORDER BY id) FROM api_keys v))::text`).Scan(&value)
 				if err != nil {
 					t.Fatal(err)
 				}
 				return value
 			}
-			for _, kind := range []string{"ordinary", "background"} {
-				if kind == "background" && !hasBackground {
-					continue
-				}
-				if kind == "ordinary" {
-					exec("UPDATE calls SET outcome='in_progress' WHERE id=$1", call)
-				} else {
-					exec("UPDATE gateway_background_jobs SET settled_at=NULL WHERE call_id=$1", call)
-				}
-				before := snapshot()
-				err := MigrateWithOptions(ctx, target, MigrationOptions{AllowLegacyConfigCleanup: true})
-				if !errors.Is(err, cutover.ErrNotDrained) {
-					t.Fatal("pending work did not block preflight", kind, err)
-				}
-				if snapshot() != before {
-					t.Fatal("rejected preflight changed data or migration versions", kind)
-				}
-				// End only these isolated synthetic tasks; no real request is interrupted.
-				exec("UPDATE calls SET outcome='upstream_failed' WHERE id=$1", call)
-				if hasBackground {
-					exec("UPDATE gateway_background_jobs SET settled_at=now() WHERE call_id=$1", call)
-				}
+			exec("UPDATE calls SET outcome='in_progress' WHERE id=$1", call)
+			pending := snapshot()
+			if err := MigrateWithOptions(ctx, target, MigrationOptions{AllowLegacyConfigCleanup: true}); !errors.Is(err, cutover.ErrNotDrained) {
+				t.Fatal("unfinished call did not block preflight", err)
 			}
+			if snapshot() != pending {
+				t.Fatal("rejected preflight changed data or migration versions")
+			}
+			// End only this isolated synthetic call; no real request is interrupted.
+			exec("UPDATE calls SET outcome='upstream_failed' WHERE id=$1", call)
 			beforeAuth := snapshot()
 			if err := Migrate(ctx, target); !errors.Is(err, ErrCleanupAuthorization) {
 				t.Fatal("implicit cleanup was allowed", err)
