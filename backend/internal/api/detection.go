@@ -156,14 +156,6 @@ func (a *app) createDetectionJob(w http.ResponseWriter, r *http.Request) {
 		writeDetectionError(w, err)
 		return
 	}
-	if input.DraftID != "" && a.contributions != nil {
-		if err := a.contributions.TrackTask(r.Context(), contributionActor(r), job); err != nil {
-			// A durable task remains discoverable even if concurrent editing prevented
-			// attaching it. Do not claim that an already running task was rolled back.
-			writeJSON(w, 202, map[string]any{"job": job, "draft_linked": false})
-			return
-		}
-	}
 	writeJSON(w, 202, map[string]any{"job": job})
 }
 func (a *app) getDetectionJob(w http.ResponseWriter, r *http.Request) {
@@ -238,12 +230,6 @@ func (a *app) rerunDetection(w http.ResponseWriter, r *http.Request, partial boo
 	if err != nil {
 		writeDetectionError(w, err)
 		return
-	}
-	if job.Target.DraftID != "" && a.contributions != nil {
-		if err := a.contributions.TrackTask(r.Context(), contributionActor(r), job); err != nil {
-			writeJSON(w, 202, map[string]any{"job": job, "draft_linked": false})
-			return
-		}
 	}
 	writeJSON(w, 202, map[string]any{"job": job})
 }

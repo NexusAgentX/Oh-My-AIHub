@@ -11682,22 +11682,6 @@ components:
           "base": {
             "$ref": "#/components/schemas/ContributionChanges"
           },
-          "report_ids": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "maxItems": 1024
-          },
-          "task_ids": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "maxItems": 1024
-          },
           "pending_prices": {
             "type": "array",
             "items": {
@@ -11762,8 +11746,6 @@ components:
           "revision",
           "changes",
           "base",
-          "report_ids",
-          "task_ids",
           "pending_prices",
           "review_reason",
           "reviewed_by",
@@ -11788,12 +11770,19 @@ components:
           "kind": {
             "type": "string"
           },
+          "target_id": {
+            "type": "string"
+          },
           "state": {
             "type": "string"
           },
           "revision": {
             "type": "integer",
             "minimum": 1
+          },
+          "review_reason": {
+            "type": "string",
+            "maxLength": 1000
           },
           "created_at": {
             "type": "string",
@@ -11808,113 +11797,12 @@ components:
           "id",
           "title",
           "kind",
+          "target_id",
           "state",
           "revision",
+          "review_reason",
           "created_at",
           "updated_at"
-        ],
-        "additionalProperties": false
-      }
-    ContributionReportUse:
-      {
-        "type": "object",
-        "properties": {
-          "report_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "target_kind": {
-            "type": "string"
-          },
-          "target_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "reused": {
-            "type": "boolean"
-          },
-          "finished_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "manifest_version": {
-            "type": "string"
-          },
-          "code_version": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "report_id",
-          "target_kind",
-          "target_id",
-          "reused",
-          "finished_at",
-          "manifest_version",
-          "code_version"
-        ],
-        "additionalProperties": false
-      }
-    ContributionTargetReview:
-      {
-        "type": "object",
-        "properties": {
-          "kind": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "model_id": {
-            "type": "string"
-          },
-          "state": {
-            "type": "string",
-            "enum": [
-              "ready",
-              "report_required",
-              "suite_pending"
-            ]
-          },
-          "report": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ContributionReportUse"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "kind",
-          "id",
-          "model_id",
-          "state",
-          "report"
-        ],
-        "additionalProperties": false
-      }
-    ContributionEvaluation:
-      {
-        "type": "object",
-        "properties": {
-          "ready": {
-            "type": "boolean"
-          },
-          "targets": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ContributionTargetReview"
-            },
-            "maxItems": 1024
-          }
-        },
-        "required": [
-          "ready",
-          "targets"
         ],
         "additionalProperties": false
       }
@@ -11924,9 +11812,6 @@ components:
         "properties": {
           "draft": {
             "$ref": "#/components/schemas/ContributionDraft"
-          },
-          "evaluation": {
-            "$ref": "#/components/schemas/ContributionEvaluation"
           },
           "stage": {
             "type": "string"
@@ -11944,7 +11829,6 @@ components:
         },
         "required": [
           "draft",
-          "evaluation",
           "stage",
           "linked_channels",
           "addresses"
@@ -12052,21 +11936,12 @@ components:
           },
           "changes": {
             "$ref": "#/components/schemas/ContributionChanges"
-          },
-          "report_ids": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "maxItems": 1024
           }
         },
         "required": [
           "revision",
           "title",
-          "changes",
-          "report_ids"
+          "changes"
         ],
         "additionalProperties": false
       }

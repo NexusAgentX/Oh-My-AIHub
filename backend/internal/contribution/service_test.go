@@ -7,7 +7,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 )
 
@@ -15,7 +14,6 @@ type memoryReview struct {
 	mu        sync.Mutex
 	draft     Draft
 	live      market.Directory
-	reports   map[string]detection.Job
 	publishes int
 	audits    []string
 	uncertain bool
@@ -68,18 +66,16 @@ func (m *memoryReview) Edit(ctx context.Context, id string, fn func(*Draft, Unit
 func (m *memoryReview) Directory(context.Context) (market.Directory, error) {
 	return clone(m.live), nil
 }
-func (m *memoryReview) Report(_ context.Context, id string) (detection.Job, error) {
-	r, ok := m.reports[id]
-	if !ok {
-		return detection.Job{}, detection.ErrNotFound
+func (m *memoryReview) Pending(_ context.Context, kind, targetID string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.draft.Kind == kind && m.draft.TargetID == targetID && (m.draft.State == "submitted" || m.draft.State == "publication_pending") {
+		return m.draft.ID, nil
 	}
-	return r, nil
-}
-func (*memoryReview) ApprovedReports(context.Context, []string) ([]string, error) {
-	return []string{}, nil
+	return "", nil
 }
 func (m *memoryReview) Publish(_ context.Context, actor string, c market.Changes) error {
-	next, _, err := Overlay(Draft{OwnerID: m.draft.OwnerID, Changes: c}, m.live)
+	next, err := Overlay(Draft{OwnerID: m.draft.OwnerID, Changes: c}, m.live)
 	if err != nil {
 		return err
 	}
@@ -87,15 +83,10 @@ func (m *memoryReview) Publish(_ context.Context, actor string, c market.Changes
 	m.publishes++
 	return nil
 }
-func (*memoryReview) RecordEvidence(context.Context, detection.Job) error { return nil }
 func (m *memoryReview) Audit(_ context.Context, actor, action string, _ map[string]any) error {
 	m.audits = append(m.audits, action)
 	return nil
 }
-
-type fixturePlanner struct{}
-
-func (fixturePlanner) Plan(detection.Target) (detection.Plan, error) { return detection.Plan{}, nil }
 
 type memoryPublisher struct {
 	blocked, prior, fail bool
@@ -118,9 +109,9 @@ func metadataService(t *testing.T) (*Service, *memoryReview, *memoryPublisher) {
 	starter.State = "draft"
 	starter.Revision = 1
 	starter.Title = "Synthetic metadata"
-	repo := &memoryReview{draft: starter, reports: map[string]detection.Job{}}
+	repo := &memoryReview{draft: starter}
 	publisher := &memoryPublisher{}
-	return &Service{Store: repo, Planner: fixturePlanner{}, Publisher: publisher}, repo, publisher
+	return &Service{Store: repo, Publisher: publisher}, repo, publisher
 }
 func TestCommittedRefreshFailureRetriesWithoutRepublishing(t *testing.T) {
 	s, repo, publisher := metadataService(t)
@@ -179,7 +170,7 @@ func TestConcurrentReviewAndAdminEditCannotOverwriteAnotherRevision(t *testing.T
 	}
 	changes := clone(submitted.Changes)
 	changes.Suppliers[0].Value.Name = "Admin revision"
-	edited, err := s.Save(ctx, Actor{ID: "admin", Admin: true}, "draft", submitted.Revision, "Admin edit", changes, nil, nil)
+	edited, err := s.Save(ctx, Actor{ID: "admin", Admin: true}, "draft", submitted.Revision, "Admin edit", changes, nil)
 	if err != nil || edited.State != "draft" || edited.SubmittedAt != nil {
 		t.Fatal("admin edit retained obsolete submission", err)
 	}
@@ -195,10 +186,10 @@ func TestDraftPermissionsIdentityAndCommitAcknowledgement(t *testing.T) {
 	}
 	changes := clone(repo.draft.Changes)
 	changes.Suppliers[0].Value.ID = "foreign"
-	if _, err := s.Save(ctx, Actor{ID: "member"}, "draft", 1, "Injected", changes, nil, nil); !errors.Is(err, ErrInvalid) {
+	if _, err := s.Save(ctx, Actor{ID: "member"}, "draft", 1, "Injected", changes, nil); !errors.Is(err, ErrInvalid) {
 		t.Fatal("foreign object injected", err)
 	}
-	if _, err := s.Save(ctx, Actor{ID: "member"}, "draft", 1, "Empty", market.Changes{}, nil, nil); !errors.Is(err, ErrInvalid) {
+	if _, err := s.Save(ctx, Actor{ID: "member"}, "draft", 1, "Empty", market.Changes{}, nil); !errors.Is(err, ErrInvalid) {
 		t.Fatal("empty proposal became ready", err)
 	}
 	submitted, err := s.Submit(ctx, Actor{ID: "member"}, "draft", 1)

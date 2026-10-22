@@ -98,8 +98,7 @@ export const appRoutes = createRoutesFromElements(
           <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketGroupPage})} path="/groups/:id" />
           <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketReportPage})} path="/reports/:id" />
           <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelsPage})} path="/channels" />
- <Route lazy={async()=>({Component:(await import("./contributions/Pages")).ContributionsPage})} path="/contributions"/>
- <Route lazy={async()=>({Component:(await import("./contributions/Pages")).ContributionDetailPage})} path="/contributions/:draftID"/>
+ <Route lazy={async()=>({Component:(await import("./contributions/Status")).MyContributionsPage})} path="/contributions"/>
  <Route lazy={async()=>({Component:(await import('./detection/Pages')).DetectionPage})} path="/detection" />
  <Route lazy={async()=>({Component:(await import('./detection/Pages')).DetectionDetailPage})} path="/detection/:taskID" />
  <Route lazy={async()=>({Component:(await import('./detection/Pages')).SavedDetectionReportPage})} path="/detection/reports/:reportID" />

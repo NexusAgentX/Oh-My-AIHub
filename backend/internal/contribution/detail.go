@@ -6,27 +6,24 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 )
 
 type Detail struct {
 	Draft          Draft            `json:"draft"`
-	Evaluation     Evaluation       `json:"evaluation"`
 	Stage          string           `json:"stage"`
 	Addresses      []market.Address `json:"addresses"`
 	LinkedChannels int64            `json:"linked_channels"`
-}
-type activeReader interface {
-	ActiveDetections(context.Context, []string) ([]market.EvidenceBinding, error)
 }
 
 type impactReader interface {
 	AffectedChannels(context.Context, market.Changes) (int64, error)
 }
 
+// Detail exposes a proposal preview without binding it to detection evidence.
+// Stage only reports whether the saved contents can be submitted for review.
 func (s *Service) Detail(ctx context.Context, actor Actor, id string) (Detail, error) {
-	out := Detail{Addresses: []market.Address{}, Evaluation: Evaluation{Targets: []TargetReview{}}}
+	out := Detail{Addresses: []market.Address{}}
 	draft, err := s.Store.Edit(ctx, id, func(d *Draft, u UnitOfWork) error {
 		if !authorized(actor, *d) {
 			return ErrNotFound
@@ -50,17 +47,16 @@ func (s *Service) Detail(ctx context.Context, actor Actor, id string) (Detail, e
 			out.Stage = d.State
 			return nil
 		}
-		out.Evaluation, err = Evaluate(ctx, actor, *d, live, u, s.Planner)
-		if err != nil {
-			if !errors.Is(err, ErrConflict) && !errors.Is(err, ErrInvalid) && !errors.Is(err, market.ErrHasGroups) {
-				return err
-			}
-			out.Stage = "invalid"
-			if errors.Is(err, ErrConflict) {
+		if _, err = Overlay(*d, live); err != nil {
+			switch {
+			case errors.Is(err, ErrConflict):
 				out.Stage = "conflict"
-			}
-			if errors.Is(err, market.ErrHasGroups) {
+			case errors.Is(err, market.ErrHasGroups):
 				out.Stage = "supplier_has_groups"
+			case errors.Is(err, ErrInvalid), errors.Is(err, market.ErrInvalid):
+				out.Stage = "invalid"
+			default:
+				return err
 			}
 		}
 		if r, ok := u.(impactReader); ok {
@@ -69,111 +65,16 @@ func (s *Service) Detail(ctx context.Context, actor Actor, id string) (Detail, e
 				return err
 			}
 		}
-		detecting := false
-		if reader, ok := u.(activeReader); ok && err == nil && !out.Evaluation.Ready && len(d.TaskIDs) > 0 {
-			active, activeErr := reader.ActiveDetections(ctx, d.TaskIDs)
-			if activeErr != nil {
-				return activeErr
-			}
-			_, targets, overlayErr := Overlay(*d, live)
-			if overlayErr != nil {
-				return overlayErr
-			}
-			for _, a := range active {
-				for _, t := range targets {
-					b := t.Binding
-					if a.TargetID == b.TargetID && a.TargetKind == b.TargetKind && a.CapabilityDigest == b.CapabilityDigest && a.TargetRevision <= b.TargetRevision {
-						detecting = true
-					}
-				}
-			}
-		}
 		if out.Stage == "" {
-			out.Stage = d.State
-			if d.State == "draft" || d.State == "rejected" || d.State == "withdrawn" {
-				out.Stage = "draft"
-				if detecting {
-					out.Stage = "detecting"
-				}
-				if len(d.PendingPrices) == 0 && out.Evaluation.Ready {
-					out.Stage = "ready"
-				}
+			out.Stage = "draft"
+			if len(d.PendingPrices) == 0 {
+				out.Stage = "ready"
 			}
 		}
 		return nil
 	})
-	if out.Evaluation.Targets == nil {
-		out.Evaluation.Targets = []TargetReview{}
-	}
 	out.Draft = draft
 	return out, err
-}
-
-// DraftResolver authorizes private proposals independently from published
-// ownership. An explicit draft ID prevents two private edits of one live ID
-// from accidentally measuring each other's configuration.
-type DraftResolver struct {
-	Service  *Service
-	Fallback detection.Resolver
-}
-
-func (r DraftResolver) Resolve(ctx context.Context, actor detection.Actor, input detection.Target) (detection.Resolved, error) {
-	if input.DraftID == "" {
-		if r.Fallback == nil {
-			return detection.Resolved{}, detection.ErrNotFound
-		}
-		return r.Fallback.Resolve(ctx, actor, input)
-	}
-	if r.Service == nil {
-		return detection.Resolved{}, detection.ErrNotFound
-	}
-	d, err := r.Service.Get(ctx, Actor{ID: actor.ID, Admin: actor.Admin}, input.DraftID)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			err = detection.ErrNotFound
-		}
-		return detection.Resolved{}, err
-	}
-	if !slices.Contains([]string{"draft", "submitted", "rejected", "withdrawn"}, d.State) {
-		return detection.Resolved{}, detection.ErrConflict
-	}
-	live, err := r.Service.Live.Snapshot(ctx)
-	if err != nil {
-		return detection.Resolved{}, err
-	}
-	directory, targets, err := Overlay(d, live)
-	if err != nil {
-		return detection.Resolved{}, detection.ErrConflict
-	}
-	if !slices.ContainsFunc(targets, func(t detection.Target) bool {
-		return t.Binding.TargetKind == input.Binding.TargetKind && t.Binding.TargetID == input.Binding.TargetID
-	}) {
-		return detection.Resolved{}, detection.ErrNotFound
-	}
-	return detection.ResolveDirectory(directory, input)
-}
-func (s *Service) TrackTask(ctx context.Context, actor Actor, job detection.Job) error {
-	if job.Target.DraftID == "" {
-		return nil
-	}
-	_, err := s.Store.Edit(ctx, job.Target.DraftID, func(d *Draft, u UnitOfWork) error {
-		if !authorized(actor, *d) || (!actor.Admin && job.OwnerID != d.OwnerID) {
-			return ErrNotFound
-		}
-		if !editable(actor, *d) {
-			return ErrConflict
-		}
-		if slices.Contains(d.TaskIDs, job.ID) {
-			return nil
-		}
-		if len(d.TaskIDs) >= 1024 {
-			return ErrInvalid
-		}
-		d.TaskIDs = append(d.TaskIDs, job.ID)
-		advance(d)
-		return u.Audit(ctx, actor.ID, "detection_linked", map[string]any{"task_id": job.ID, "revision": d.Revision})
-	})
-	return err
 }
 
 type TargetChoice struct {

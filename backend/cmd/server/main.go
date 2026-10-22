@@ -423,14 +423,14 @@ func main() {
 	if err = marketRuntime.Refresh(reviewStartup); err != nil {
 		fatal(logger, "loading approved market failed", err)
 	}
-	contributions := &contribution.Service{Store: reviewStore, Live: reviewMarket, Planner: registry, Publisher: marketRuntime, Outbound: outboundPolicy}
+	contributions := &contribution.Service{Store: reviewStore, Live: reviewMarket, Publisher: marketRuntime, Outbound: outboundPolicy}
 	if err = contributions.Recover(reviewStartup); err != nil {
 		fatal(logger, "recovering committed market publications failed", err)
 	}
 	cancelReviewStartup()
 	detectorStore := detectionpg.NewStore(detectorPool)
 	detectorSettings := settings.NewService(settingspg.NewStore(detectorPool))
-	detector, err := detection.New(backgroundContext, detection.Config{Registry: registry, Store: detectorStore, Settings: detectorStore, Resolver: contribution.DraftResolver{Service: contributions, Fallback: detectionpg.DirectoryResolver{Market: detectorMarket}}, Outbound: outboundPolicy, PrepareEgress: func(ctx context.Context) (channel.Outbound, error) {
+	detector, err := detection.New(backgroundContext, detection.Config{Registry: registry, Store: detectorStore, Settings: detectorStore, Resolver: detectionpg.DirectoryResolver{Market: detectorMarket}, Outbound: outboundPolicy, PrepareEgress: func(ctx context.Context) (channel.Outbound, error) {
 		value, err := detectorSettings.Get(ctx)
 		if err != nil {
 			return nil, err

@@ -9,10 +9,8 @@ import (
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/contribution"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/auditpg"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/detectionpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/marketpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/pgkit"
 	"github.com/jackc/pgx/v5"
@@ -52,7 +50,7 @@ func payload(c market.Changes) ([]byte, error) {
 	return data, nil
 }
 func value(row MarketContribution) (contribution.Draft, error) {
-	d := contribution.Draft{ID: row.ID, OwnerID: row.OwnerID, Title: row.Title, Kind: row.Kind, TargetID: row.TargetID, State: row.State, Revision: row.Revision, ReportIDs: append([]string{}, row.ReportIds...), TaskIDs: append([]string{}, row.TaskIds...), PendingPrices: append([]string{}, row.PendingPrices...), ReviewReason: row.ReviewReason, ReviewedBy: row.ReviewedBy, SubmittedAt: row.SubmittedAt, PublishedAt: row.PublishedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	d := contribution.Draft{ID: row.ID, OwnerID: row.OwnerID, Title: row.Title, Kind: row.Kind, TargetID: row.TargetID, State: row.State, Revision: row.Revision, PendingPrices: append([]string{}, row.PendingPrices...), ReviewReason: row.ReviewReason, ReviewedBy: row.ReviewedBy, SubmittedAt: row.SubmittedAt, PublishedAt: row.PublishedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 	if market.Decode(row.PriceBlanks, &d.PriceBlanks) != nil {
 		return d, contribution.ErrInvalid
 	}
@@ -78,12 +76,22 @@ func (s *Store) Create(ctx context.Context, d contribution.Draft) error {
 		return err
 	}
 	return domainError(pgkit.InTx(ctx, s.pool, func(tx pgx.Tx) error {
-		err := New(tx).InsertContribution(ctx, InsertContributionParams{PriceBlanks: blanks, ID: d.ID, OwnerID: d.OwnerID, Kind: d.Kind, TargetID: d.TargetID, Title: d.Title, State: d.State, Revision: d.Revision, Document: document, BaseDocument: base, ReportIds: append([]string{}, d.ReportIDs...), TaskIds: append([]string{}, d.TaskIDs...), PendingPrices: append([]string{}, d.PendingPrices...), ReviewReason: d.ReviewReason, ReviewedBy: d.ReviewedBy, SubmittedAt: d.SubmittedAt, PublishedAt: d.PublishedAt, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt})
+		err := New(tx).InsertContribution(ctx, InsertContributionParams{PriceBlanks: blanks, ID: d.ID, OwnerID: d.OwnerID, Kind: d.Kind, TargetID: d.TargetID, Title: d.Title, State: d.State, Revision: d.Revision, Document: document, BaseDocument: base, PendingPrices: append([]string{}, d.PendingPrices...), ReviewReason: d.ReviewReason, ReviewedBy: d.ReviewedBy, SubmittedAt: d.SubmittedAt, PublishedAt: d.PublishedAt, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt})
 		if err != nil {
 			return err
 		}
 		return auditpg.Record(ctx, tx, auditpg.Event{ActorID: d.OwnerID, Action: "market.contribution.created", TargetType: "market_contribution", TargetID: d.ID, Detail: map[string]any{"revision": d.Revision, "kind": d.Kind}})
 	}))
+}
+func (s *Store) Pending(ctx context.Context, kind, targetID string) (string, error) {
+	id, err := New(s.pool).PendingContribution(ctx, PendingContributionParams{Kind: kind, TargetID: targetID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", domainError(err)
+	}
+	return id, nil
 }
 func (s *Store) Get(ctx context.Context, id string) (contribution.Draft, error) {
 	row, err := New(s.pool).GetContribution(ctx, id)
@@ -108,7 +116,7 @@ func (s *Store) List(ctx context.Context, actor contribution.Actor, queue bool, 
 	}
 	out := []contribution.Summary{}
 	for _, row := range rows {
-		out = append(out, contribution.Summary{ID: row.ID, Title: row.Title, Kind: row.Kind, State: row.State, Revision: row.Revision, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt})
+		out = append(out, contribution.Summary{ID: row.ID, Title: row.Title, Kind: row.Kind, TargetID: row.TargetID, State: row.State, Revision: row.Revision, ReviewReason: row.ReviewReason, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt})
 	}
 	return out, nil
 }
@@ -164,7 +172,7 @@ func (s *Store) Edit(ctx context.Context, id string, fn func(*contribution.Draft
 		if err != nil {
 			return d, err
 		}
-		count, err := q.UpdateContribution(ctx, UpdateContributionParams{PriceBlanks: blanks, ID: d.ID, BaseRevision: row.Revision, Title: d.Title, State: d.State, Revision: d.Revision, Document: document, BaseDocument: base, ReportIds: append([]string{}, d.ReportIDs...), TaskIds: append([]string{}, d.TaskIDs...), PendingPrices: append([]string{}, d.PendingPrices...), ReviewReason: d.ReviewReason, ReviewedBy: d.ReviewedBy, SubmittedAt: d.SubmittedAt, PublishedAt: d.PublishedAt, UpdatedAt: d.UpdatedAt})
+		count, err := q.UpdateContribution(ctx, UpdateContributionParams{PriceBlanks: blanks, ID: d.ID, BaseRevision: row.Revision, Title: d.Title, State: d.State, Revision: d.Revision, Document: document, BaseDocument: base, PendingPrices: append([]string{}, d.PendingPrices...), ReviewReason: d.ReviewReason, ReviewedBy: d.ReviewedBy, SubmittedAt: d.SubmittedAt, PublishedAt: d.PublishedAt, UpdatedAt: d.UpdatedAt})
 		if err != nil {
 			return d, domainError(err)
 		}
@@ -192,53 +200,12 @@ type unit struct {
 func (u *unit) Directory(ctx context.Context) (market.Directory, error) {
 	return marketpg.Read(ctx, u.tx)
 }
-func (u *unit) Report(ctx context.Context, id string) (detection.Job, error) {
-	return detectionpg.ReadReport(ctx, u.tx, id)
-}
-func (u *unit) ApprovedReports(ctx context.Context, targets []string) ([]string, error) {
-	if len(targets) == 0 {
-		return []string{}, nil
-	}
-	return New(u.tx).ApprovedReportReferences(ctx, targets)
-}
 func (u *unit) Publish(ctx context.Context, actor string, c market.Changes) error {
 	return marketpg.Apply(ctx, u.tx, actor, c)
 }
 func (u *unit) Audit(ctx context.Context, actor, action string, detail map[string]any) error {
 	return auditpg.Record(ctx, u.tx, auditpg.Event{ActorID: actor, Action: "market.contribution." + action, TargetType: "market_contribution", TargetID: u.id, Detail: detail})
 }
-func (u *unit) RecordEvidence(ctx context.Context, report detection.Job) error {
-	if report.ReportID == nil || !report.Complete || !detection.Complete(report) {
-		return contribution.ErrReports
-	}
-	type fact struct {
-		Capability string `json:"capability"`
-		Layer      string `json:"layer"`
-		State      string `json:"state"`
-		Reason     string `json:"reason"`
-	}
-	facts := []fact{}
-	for _, result := range report.Results {
-		for _, assertion := range result.Assertions {
-			state := "unknown"
-			switch assertion.State {
-			case "pass":
-				state = "supported"
-			case "unsupported":
-				state = "unsupported"
-			case "unobserved":
-				state = "unobserved"
-			}
-			facts = append(facts, fact{Capability: assertion.ID, Layer: result.Layer, State: state, Reason: assertion.Reason})
-		}
-	}
-	data, err := json.Marshal(facts)
-	if err != nil {
-		return err
-	}
-	return New(u.tx).PublishEvidence(ctx, PublishEvidenceParams{ReportID: *report.ReportID, Evidence: data})
-}
-
 func (u *unit) AffectedChannels(ctx context.Context, c market.Changes) (int64, error) {
 	groups := []string{}
 	for _, v := range c.Groups {
@@ -271,21 +238,6 @@ func (u *unit) AffectedChannels(ctx context.Context, c market.Changes) (int64, e
 		return 0, nil
 	}
 	return New(u.tx).LinkedChannelCount(ctx, groups)
-}
-
-func (u *unit) ActiveDetections(ctx context.Context, tasks []string) ([]market.EvidenceBinding, error) {
-	out := []market.EvidenceBinding{}
-	if len(tasks) == 0 {
-		return out, nil
-	}
-	rows, err := New(u.tx).ActiveDetectionBindings(ctx, tasks)
-	if err != nil {
-		return nil, err
-	}
-	for _, v := range rows {
-		out = append(out, market.EvidenceBinding{TargetKind: v.TargetKind, TargetID: v.TargetID, TargetRevision: v.TargetRevision, CapabilityDigest: v.CapabilityDigest})
-	}
-	return out, nil
 }
 
 // The key is reserved for market contribution publication in this database.

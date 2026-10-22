@@ -51,8 +51,8 @@ func writeContributionError(w http.ResponseWriter, err error) {
 		writeError(w, 409, "contribution_conflict", "修订或生效版本已变化，请重新载入")
 	case errors.Is(err, market.ErrHasGroups):
 		writeError(w, 409, "supplier_has_groups", "供应商仍有分组，请先逐个处理并删除分组")
-	case errors.Is(err, contribution.ErrReports):
-		writeError(w, 409, "reports_required", "需要当前草稿的完整检测报告；套件待实现或未执行完时不能提交")
+	case errors.Is(err, contribution.ErrPending):
+		writeError(w, 409, "contribution_already_pending", "该实体已有待审提案，请先在“我的贡献”查看")
 	case errors.Is(err, contribution.ErrInvalid), errors.Is(err, market.ErrInvalid):
 		writeError(w, 422, "invalid_contribution", "贡献内容不完整或格式无效，请检查价格及必填信息")
 	default:
@@ -138,7 +138,7 @@ func (a *app) getContribution(w http.ResponseWriter, r *http.Request) {
 		writeContributionError(w, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"draft": draftJSON(detail.Draft), "evaluation": detail.Evaluation, "stage": detail.Stage, "linked_channels": detail.LinkedChannels, "addresses": detail.Addresses})
+	writeJSON(w, 200, map[string]any{"draft": draftJSON(detail.Draft), "stage": detail.Stage, "linked_channels": detail.LinkedChannels, "addresses": detail.Addresses})
 }
 func (a *app) saveContribution(w http.ResponseWriter, r *http.Request) {
 	if !a.contributionReady(w) {
@@ -149,27 +149,20 @@ func (a *app) saveContribution(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input struct {
-		Revision  int64               `json:"revision"`
-		Title     string              `json:"title"`
-		Changes   contributionChanges `json:"changes"`
-		ReportIDs []string            `json:"report_ids"`
+		Revision int64               `json:"revision"`
+		Title    string              `json:"title"`
+		Changes  contributionChanges `json:"changes"`
 	}
 	if decodeJSON(w, r, &input) != nil {
 		writeInvalidJSON(w)
 		return
-	}
-	for _, v := range input.ReportIDs {
-		if !uuidPattern.MatchString(v) {
-			writeContributionError(w, contribution.ErrInvalid)
-			return
-		}
 	}
 	changes, declared, err := input.Changes.domain()
 	if err != nil {
 		writeContributionError(w, err)
 		return
 	}
-	d, err := a.contributions.Save(r.Context(), contributionActor(r), id, input.Revision, input.Title, changes, input.ReportIDs, declared, input.Changes.priceBlanks())
+	d, err := a.contributions.Save(r.Context(), contributionActor(r), id, input.Revision, input.Title, changes, declared, input.Changes.priceBlanks())
 	if err != nil {
 		writeContributionError(w, err)
 		return

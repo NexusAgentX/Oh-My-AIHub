@@ -110,19 +110,6 @@ export function useContributionIcon() {
       }),
   })
 }
-export function useContributionReportChoices(taskID: string, cursor: string) {
-  return useQuery({
-    queryKey: ['contributions', 'reports', taskID, cursor],
-    enabled: !!taskID,
-    staleTime: 0,
-    queryFn: () =>
-      apiGet<'listDetectionReports'>(
-        `/api/detection/jobs/${encodeURIComponent(taskID)}/reports`,
-        { cursor },
-      ),
-  })
-}
-
 export function useReuseContributionAddress(id: string) {
   const client = useQueryClient()
   return useMutation({

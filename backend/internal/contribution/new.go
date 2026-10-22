@@ -28,11 +28,20 @@ func copyChanges(c market.Changes) market.Changes {
 	return copied
 }
 
-// New allocates draft object identities before any detection. Parent and child
-// proposals can therefore be measured and published atomically as one bundle.
+// New allocates draft object identities before review. An entity that already
+// has a proposal awaiting review cannot start a second one.
 func (s *Service) New(ctx context.Context, actor Actor, input NewInput) (Draft, error) {
 	if actor.ID == "" || s.Live == nil || !slices.Contains([]string{"supplier", "group", "group_model", "model_id"}, input.Kind) {
 		return Draft{}, ErrInvalid
+	}
+	if input.TargetID != "" {
+		pending, err := s.Store.Pending(ctx, input.Kind, input.TargetID)
+		if err != nil {
+			return Draft{}, err
+		}
+		if pending != "" {
+			return Draft{}, ErrPending
+		}
 	}
 	if input.Kind == "model_id" && (!actor.Admin || !gatewaycontract.ValidModelID(input.TargetID)) {
 		return Draft{}, ErrInvalid
