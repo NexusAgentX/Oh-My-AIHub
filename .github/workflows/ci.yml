@@ -137,16 +137,6 @@ jobs:
         run: mise exec -- go -C backend vet ./...
       - name: Backend staticcheck
         run: mise run lint-backend
-      - name: Cache pinned official Codex archive
-        uses: actions/cache@v6
-        with:
-          path: backend/bin/codex-archives
-          key: ${{ runner.os }}-codex-probe-${{ hashFiles('backend/scripts/install-codex.sh') }}
-      - name: Build fixed official-Codex probe
-        run: |
-          mise run build-detection-codex
-          echo "AIHUB_TEST_CODEX_BINARY=$GITHUB_WORKSPACE/backend/bin/codex" >> "$GITHUB_ENV"
-          echo "AIHUB_TEST_CODEX_PROBE=$GITHUB_WORKSPACE/backend/bin/aihub-detection-codex" >> "$GITHUB_ENV"
       - name: Backend tests with race detector
         run: mise exec -- go -C backend test -race -timeout 9m ./...
 

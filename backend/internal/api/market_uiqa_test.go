@@ -17,8 +17,6 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
@@ -36,10 +34,8 @@ func TestMarketUIHarness(t *testing.T) {
 		_, err := runtime.Wrap(groupBaseLoader{}).LoadCandidates(ctx)
 		return err
 	}
-	var engine *gateway.Engine
 	p := newPlatform(t, func(d *Dependencies) {
 		d.CookieSecure = false
-		engine = d.Gateway
 		d.GroupChannels = &groupchannel.Service{Runtime: runtime, Repository: repo}
 		d.Keys = apikey.NewService(newFakeKeyStore(), d.Gateway.Keyring, func(context.Context) ([]string, error) {
 			return []string{"fixture/model:2026", "fixture/image:2026", "fixture/unknown:2026"}, nil
@@ -89,9 +85,6 @@ func TestMarketUIHarness(t *testing.T) {
 	d.Models = append(d.Models, market.GroupModel{ID: "f0000000-0000-4000-8000-000000000081", GroupID: d.Groups[0].ID, ModelID: "fixture/unknown:2026", UpstreamModel: "fixture/unknown:2026", ModelType: "text", Enabled: true, Revision: 1, QuoteID: &qid})
 	d.Quotes = append(d.Quotes, market.Quote{ID: qid, GroupModelID: d.Models[3].ID, Version: 1, Currency: "CNY", BillingUnit: "per_million_tokens"})
 	if err := runtime.Install(ctx, d); err != nil {
-		t.Fatal(err)
-	}
-	if err := engine.LoadStats(ctx); err != nil {
 		t.Fatal(err)
 	}
 	// Exercise the actual handler and contract before exposing the fixture.

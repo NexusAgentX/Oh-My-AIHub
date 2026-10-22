@@ -27,7 +27,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/catalog"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/clientip"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/codexsession"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/geolocation"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/ledger"
@@ -75,8 +74,6 @@ type TypicalPriceLookup interface {
 
 type Dependencies struct {
 	TypicalPrices     func() TypicalPriceLookup
-	CodexSessions     *codexsession.Service
-	ContextNamespace  *gatewaycontract.ContextNamespace
 	Resources         resourcestate.Repository
 	ResourceCursors   *gatewaycontract.CursorCodec
 	Ready             func() error
@@ -275,8 +272,6 @@ func EffectiveLimits(advanced channel.Advanced, defaults settings.Settings) Limi
 type callState struct {
 	metricProtocol       string
 	requestEncoding      string
-	notesSession         *notesSession
-	codexContext         bool
 	resourceReferences   []gatewaycontract.Reference
 	auxiliaryEndpoint    *gatewaycontract.Endpoint
 	imageMultipart       *imageMultipart
@@ -398,9 +393,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	defer stopCall()
 	call := &callState{started: started, format: format, tag: sanitizeTag(r.Header.Get("X-AIHub-Tag")), userAgent: truncate(r.UserAgent(), 512), dialect: DialectOf(r)}
 	call.metricProtocol = nativeProtocol(format)
-	if strings.HasPrefix(r.URL.Path, "/backend-api/codex/") {
-		call.metricProtocol = "codex-special"
-	}
 	call.diagnostics = Diagnostics{Stages: []StageTiming{}, Routing: []RouteDecision{}, UsageStatus: "not_observed", Delivery: "not_started", CallTimeoutMS: int(e.CallTimeLimit.Milliseconds()), DrainTimeoutMS: int(e.DrainWindow.Milliseconds())}
 	observed := &observedWriter{ResponseWriter: w}
 	w = observed
@@ -468,22 +460,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	if format == channel.FormatOpenAIImages && strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "multipart/") {
 		facts, scan, call.imageMultipart, scanErr = scanImageMultipart(body, r.Header.Get("Content-Type"))
 	}
-	if scanErr == nil && call.imageMultipart == nil {
-		var mapped bool
-		r, body, mapped, err = e.isolateCodexRequest(r, body, scan, format, key)
-		if err != nil {
-			status, code, message := 400, "invalid_context", "会话标识或元数据无效"
-			if errors.Is(err, errContextNamespaceUnavailable) {
-				status, code, message = transportError(err)
-			}
-			e.reject(w, call, OutcomeRejectedModel, status, code, message)
-			return
-		}
-		call.codexContext = mapped
-		if mapped {
-			facts, scan, scanErr = ScanRequest(body)
-		}
-	}
 	call.requestedServiceTier = facts.ServiceTier
 	if call.imageMultipart == nil {
 		call.hints = scan.billingHints(body, format)
@@ -510,25 +486,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	if err = e.prepareResources(ctx, call, body, r.URL.Path); err != nil {
 		e.reject(w, call, OutcomeRejectedNoChannel, 404, "resource_unavailable", "资源不存在、归属冲突或已不可用")
 		return
-	}
-	if key.CodexNotes && call.codexContext && format == channel.FormatOpenAIResponses {
-		call.notesSession, err = e.loadNotesSession(ctx, r, body, key)
-		if err != nil {
-			status, code, message := notesSessionError(err)
-			e.reject(w, call, OutcomeRejectedNoChannel, status, code, message)
-			return
-		}
-		call.resourceRequired = append(call.resourceRequired, notesRequirements()...)
-	}
-	if required := codexInferenceRequirements(r.URL.Path, body, call.requestEncoding); len(required) > 0 {
-		// Public-image/compact evidence is not proof for a distinct Codex path.
-		kept := call.resourceRequired[:0]
-		for _, requirement := range call.resourceRequired {
-			if !strings.HasPrefix(requirement.ID, "images.") && requirement.ID != "openai-responses.count_compact/native_compact_when_applicable" {
-				kept = append(kept, requirement)
-			}
-		}
-		call.resourceRequired = append(kept, required...)
 	}
 	if call.requestEncoding != "" {
 		call.resourceRequired = append(call.resourceRequired, nativeZstdRequirement(r.URL.Path))
@@ -681,8 +638,6 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		switch {
 		case !candidate.ValidOffering(call.modelID):
 			reason = "missing_group_quote"
-		case !notesMatch(candidate, call.notesSession):
-			reason = "notes_session_scope_unavailable"
 		case !resourceMatch(candidate, call.resourceBinding):
 			reason = "resource_scope_unavailable"
 		case containsString(pref.Excluded, candidate.ChannelID):
@@ -703,7 +658,7 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 		Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: channelStats,
 		Demoted: demoted, ConsumerID: key.OwnerID, Sticky: sticky,
 		Available: func(c Candidate) bool {
-			if !c.ValidOffering(call.modelID) || !notesMatch(c, call.notesSession) || !resourceMatch(c, call.resourceBinding) || call.resourceObserver != nil && c.GroupID == "" {
+			if !c.ValidOffering(call.modelID) || !resourceMatch(c, call.resourceBinding) || call.resourceObserver != nil && c.GroupID == "" {
 				return false
 			}
 			state, _ := e.Runtime.Check(c.ChannelID, EffectiveLimits(c.Advanced, defaults), started)
@@ -725,21 +680,10 @@ func (e *Engine) Serve(w http.ResponseWriter, r *http.Request, format channel.Fo
 	}
 	call.stage("routing", routingAt, e.Now())
 	if len(ordered) == 0 {
-		if call.notesSession != nil && call.notesSession.route != nil {
-			status, code, message := notesSessionError(gatewaycontract.ErrNotFound)
-			e.finishRejected(w, call, OutcomeRejectedNoChannel, status, code, message)
-			return
-		}
 		e.finishRejected(w, call, OutcomeRejectedNoChannel, http.StatusServiceUnavailable, "no_channel_available", "当前没有可用的渠道")
 		return
 	}
 
-	ordered, err = e.claimNotesSession(ctx, call.notesSession, ordered)
-	if err != nil {
-		status, code, message := notesSessionError(err)
-		e.finishRejected(w, call, OutcomeRejectedNoChannel, status, code, message)
-		return
-	}
 	var last *upstreamFailure
 	tried := 0
 	// maxAttempts counts attempts actually made: a candidate whose slot was
@@ -1238,10 +1182,7 @@ func (e *Engine) attempt(ctx context.Context, r *http.Request, call *callState, 
 		return fail(EndConnectError, "bad_upstream_request", "无法构造上游请求", nil)
 	}
 	request.Header = UpstreamHeaders(r.Header, location, secret, candidate.Advanced)
-	if call.codexContext {
-		contextWireHeaders(request.Header, r.Header)
-	}
-	if call.requestEncoding != "" || call.codexContext {
+	if call.requestEncoding != "" {
 		requestWireHeaders(request.Header, call.requestEncoding)
 	}
 	request.ContentLength = int64(len(upstreamBody))

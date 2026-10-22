@@ -18,7 +18,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/codexsession"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/contribution"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/forum"
@@ -234,20 +233,9 @@ func main() {
 	if err != nil {
 		fatal(logger, "initializing resource cursor codec failed", err)
 	}
-	contextRoot, err := store.Market.ProtectedRoot(resourceStartup, credentialKeyring, "codex-context-root-v1")
-	if err != nil {
-		fatal(logger, "opening Codex context root failed", err)
-	}
-	contextNamespace, err := gatewaycontract.NewContextNamespace(contextRoot)
-	clear(contextRoot)
 	stopResourceStartup()
-	if err != nil {
-		fatal(logger, "initializing Codex context namespace failed", err)
-	}
 	engine := gateway.NewEngine(gateway.Dependencies{
-		CodexSessions:    codexsession.New(resourcepg.NewStore(resourcePool)),
-		ContextNamespace: contextNamespace,
-		Resources:        resourcepg.NewStore(resourcePool), ResourceCursors: resourceCursors,
+		Resources: resourcepg.NewStore(resourcePool), ResourceCursors: resourceCursors,
 		TrustedProxyCIDRs: trustedProxyCIDRs, Geo: geo, GatewayLocation: gatewayLocation, LocationSource: geoSource(geoEnabled),
 		Ready: groupRuntime.Check, Jobs: store.Gateway, Store: cached.Gateway, Catalog: cached.Models, Settings: settingsService, Routing: cached.Routing,
 		Keyring: credentialKeyring, Outbound: outboundPolicy, Events: gateway.Publishers{bus, platformMetrics}, Telemetry: platformMetrics, Logger: logger, Runtime: runtime,
