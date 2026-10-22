@@ -20,8 +20,6 @@ type RequestSpec struct {
 	APIKey string
 	// MaxTokens is the output limit the client sets; it only shapes the body.
 	MaxTokens int
-	// PreviousResponseID continues an OpenAI Responses conversation.
-	PreviousResponseID string
 }
 
 // Build returns the request for the given base URL (scheme, host and port).
@@ -42,9 +40,6 @@ func (s RequestSpec) Build(baseURL string) Request {
 	case channel.FormatOpenAIResponses:
 		path = "/v1/responses"
 		body.WriteString(`{"model":"` + model + `","input":"Say hello.","max_output_tokens":` + limit)
-		if s.PreviousResponseID != "" {
-			body.WriteString(`,"previous_response_id":"` + s.PreviousResponseID + `"`)
-		}
 		if s.Stream {
 			body.WriteString(`,"stream":true`)
 		}

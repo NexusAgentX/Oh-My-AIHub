@@ -9,9 +9,9 @@ import (
 
 // The gateway never re-serializes a request body. It scans the JSON text of
 // the top-level object, locates the byte ranges of the few values it needs
-// (model, stream, stream_options, previous_response_id) and splices
-// replacements into the original bytes, so every other byte reaches the
-// upstream exactly as the client sent it.
+// (model, stream, stream_options) and splices replacements into the original
+// bytes, so every other byte reaches the upstream exactly as the client sent
+// it.
 
 var errMalformedJSON = errors.New("malformed JSON object")
 
@@ -219,10 +219,9 @@ func (s objectScan) all(key string) []entry {
 
 // RequestFacts are the top-level values of a request body the gateway reads.
 type RequestFacts struct {
-	Model              string
-	HasModel           bool
-	Stream             bool
-	PreviousResponseID string
+	Model    string
+	HasModel bool
+	Stream   bool
 	// Requested service tier is observed separately from the actual response tier.
 	ServiceTier string
 }
@@ -243,12 +242,6 @@ func ScanRequest(body []byte) (RequestFacts, objectScan, error) {
 	}
 	if member, ok := scan.last("stream"); ok {
 		facts.Stream = string(body[member.start:member.end]) == "true"
-	}
-	if member, ok := scan.last("previous_response_id"); ok {
-		var id string
-		if body[member.start] == '"' && json.Unmarshal(body[member.start:member.end], &id) == nil {
-			facts.PreviousResponseID = id
-		}
 	}
 	facts.ServiceTier = scan.requestedServiceTier(body)
 	return facts, scan, nil

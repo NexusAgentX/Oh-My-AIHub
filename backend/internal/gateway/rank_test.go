@@ -94,17 +94,6 @@ func TestRankManualFollowsOrderAndDropsUnlistedAndUnticked(t *testing.T) {
 	}
 }
 
-func TestRankStickyMovesPreviousChannelToFront(t *testing.T) {
-	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 2), candidate("c", "x", 3)}
-	got := ids(Rank(RankInput{Mode: routing.ModeCheapest, Candidates: candidates, Sticky: "c"}))
-	if got != "cab" {
-		t.Fatalf("order = %s, want cab", got)
-	}
-	if got := ids(Rank(RankInput{Mode: routing.ModeCheapest, Candidates: candidates, Sticky: "gone"})); got != "abc" {
-		t.Fatalf("order = %s, want abc", got)
-	}
-}
-
 func TestRankDropsUnavailableAndExcluded(t *testing.T) {
 	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 2), candidate("c", "x", 3)}
 	got := ids(Rank(RankInput{

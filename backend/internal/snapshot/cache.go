@@ -43,9 +43,6 @@ import (
 // RefreshInterval is how often everything is rebuilt as a safety net.
 const RefreshInterval = 60 * time.Second
 
-// stickyCapacity is how many recent Responses ids the cache remembers.
-const stickyCapacity = 10_000
-
 // Loader reads the full contents of the snapshots from the database. Each
 // method is one consistent read.
 type Loader interface {
@@ -98,7 +95,6 @@ type Cache struct {
 	models *cell[modelSet]
 	fleet  *cell[fleetSet]
 	routes *cell[routeSet]
-	sticky *responseLRU
 
 	balances *balanceBook
 }
@@ -132,7 +128,6 @@ func New(config Config) *Cache {
 			prefs, err := loader.LoadRoutePrefs(ctx)
 			return buildRoutes(prefs), err
 		}),
-		sticky:   newResponseLRU(stickyCapacity),
 		balances: newBalanceBook(loader.LoadPoints),
 	}
 }

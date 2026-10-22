@@ -17,7 +17,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -38,8 +37,8 @@ import (
 // same machine, with nothing else busy, before and after a change.
 
 var (
-	perfScenarios = flag.String("perf.scenarios", "nonstream,stream,concurrent,saturate,budget,sticky,formats,sweep-nonstream,sweep-stream",
-		"comma separated: nonstream, stream, concurrent, saturate, budget, sticky, formats, responses, sweep-nonstream, sweep-stream")
+	perfScenarios = flag.String("perf.scenarios", "nonstream,stream,concurrent,saturate,budget,formats,sweep-nonstream,sweep-stream",
+		"comma separated: nonstream, stream, concurrent, saturate, budget, formats, responses, sweep-nonstream, sweep-stream")
 	perfDuration   = flag.Duration("perf.duration", 30*time.Second, "measured window of a scenario run")
 	perfRepeat     = flag.Int("perf.repeat", 1, "run every scenario this many times (the report shows the median)")
 	perfQuiet      = flag.Float64("perf.quiet", 0, "before every run wait (up to 3 minutes) for the 1-minute load average to fall below this; 0 does not wait")
@@ -79,7 +78,6 @@ type perfScenario struct {
 	// cap bounds the requests in flight of an open load.
 	cap      int
 	budget   bool // use the keys that carry budgets
-	sticky   bool // continue Responses conversations with previous_response_id
 	profiled bool // repeated under the profilers when -perf.out is set
 }
 
@@ -121,7 +119,6 @@ func namedScenarios() map[string]perfScenario {
 		// moves much less with the stalls of the machine's storage.
 		"saturate": {name: "nonstream-saturated", format: channel.FormatOpenAIChat, profile: quickAnswer, workers: 64},
 		"budget":   {name: "key-budget", format: channel.FormatOpenAIChat, profile: quickAnswer, qps: 50, cap: 4000, budget: true},
-		"sticky":   {name: "responses-sticky", format: channel.FormatOpenAIResponses, profile: quickAnswer, qps: 50, cap: 4000, sticky: true},
 	}
 	for key, sc := range scenarios {
 		if sc.workers == 0 && *perfQPS > 0 {
@@ -147,32 +144,9 @@ func formatScenarios() []perfScenario {
 	return out
 }
 
-// conversations remembers the last response of each consumer's conversation.
-type conversations struct {
-	mu   sync.Mutex
-	last []string
-}
-
-func newConversations(n int) *conversations { return &conversations{last: make([]string, n)} }
-
-func (c *conversations) get(i int) string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.last[i]
-}
-
-func (c *conversations) set(i int, id string) {
-	if id == "" {
-		return
-	}
-	c.mu.Lock()
-	c.last[i] = id
-	c.mu.Unlock()
-}
-
 // perfPlan is the load of a scenario: through the gateway, or straight at the
 // fake upstream.
-func (s *perfStack) perfPlan(sc perfScenario, throughGateway bool, chats *conversations) gatewaybench.Plan {
+func (s *perfStack) perfPlan(sc perfScenario, throughGateway bool) gatewaybench.Plan {
 	base, keys := s.upstreamURL(0), s.keys
 	if throughGateway {
 		base = s.frontURL
@@ -189,19 +163,12 @@ func (s *perfStack) perfPlan(sc perfScenario, throughGateway bool, chats *conver
 			if throughGateway {
 				spec.APIKey = keys[consumer]
 			}
-			if sc.sticky {
-				spec.PreviousResponseID = chats.get(consumer)
-			}
 			return spec.Build(base)
 		},
 		Complete: func(tail []byte) bool { return gatewaybench.Complete(sc.format, sc.stream, tail) },
 	}
 	if sc.qps > 0 {
 		plan.Concurrency = sc.cap
-	}
-	if sc.sticky {
-		plan.CaptureLimit = 8 << 10
-		plan.Captured = func(seq int64, _ int, body []byte) { chats.set(int(seq)%len(keys), gatewaybench.ResponseID(body)) }
 	}
 	return plan
 }
@@ -410,7 +377,6 @@ func (s *perfStack) run(plan gatewaybench.Plan, client *http.Client) perfRun {
 	out.Dials, out.Accepted, out.Lookups = s.dials.Load()-dialsBefore, s.server.Accepted()-acceptedBefore, s.resolver.lookups.Load()-lookupsBefore
 	out.Upstream = gatewaybench.UpstreamStats{
 		Requests: upstreamAfter.Requests - upstreamBefore.Requests, Streams: upstreamAfter.Streams - upstreamBefore.Streams,
-		StickyChecked: upstreamAfter.StickyChecked - upstreamBefore.StickyChecked, StickyMisses: upstreamAfter.StickyMisses - upstreamBefore.StickyMisses,
 	}
 	out.Summary = summarize(out.Result)
 	out.LockHold = summarizeHold(gatewaybench.HoldsSince(s.counter.Holds(), holdsBefore))
@@ -444,24 +410,20 @@ func (s *perfStack) scenario(sc perfScenario, repeat int) scenarioReport {
 	t := s.t
 	t.Logf("scenario %s #%d: %s", sc.name, repeat, describe(sc))
 	s.upstream.SetProfile(sc.profile)
-	directChats, gatewayChats := newConversations(len(s.keys)), newConversations(len(s.keys))
 	report := scenarioReport{Scenario: sc, Name: sc.name, Repeat: repeat}
 
-	report.Direct = s.run(s.perfPlan(sc, false, directChats), s.direct)
+	report.Direct = s.run(s.perfPlan(sc, false), s.direct)
 	t.Logf("  direct : %s (load average %s)", report.Direct.Result, report.Direct.LoadAverage)
 
 	requestsBefore, backgroundBefore := s.counter.Counts()
-	report.Gateway = s.run(s.perfPlan(sc, true, gatewayChats), s.gateway)
+	report.Gateway = s.run(s.perfPlan(sc, true), s.gateway)
 	t.Logf("  gateway: %s (load average %s)", report.Gateway.Result, report.Gateway.LoadAverage)
-	if sc.sticky && report.Gateway.Result.Failed() != 0 {
-		t.Errorf("response continuation failed; sticky performance results are invalid: %v", report.Gateway.Result.Failures)
-	}
 	requestsAfter, backgroundAfter := s.counter.Counts()
 	whole := gatewaybench.Since(requestsAfter, requestsBefore)
 	report.Background = gatewaybench.Since(backgroundAfter, backgroundBefore)
 	report.QueriesWhole = float64(gatewaybench.Total(whole)) / float64(max(report.Gateway.Result.Started, 1))
 
-	s.auditQueries(sc, gatewayChats, &report)
+	s.auditQueries(sc, &report)
 	s.upstream.SetProfile(sc.profile)
 	return report
 }
@@ -477,7 +439,7 @@ func describe(sc perfScenario) string {
 // auditQueries counts the statements a request sends. It uses short answers of
 // the scenario's shape, so that a stream of five seconds does not make the
 // audit take half an hour; the statements do not depend on the answer's length.
-func (s *perfStack) auditQueries(sc perfScenario, chats *conversations, report *scenarioReport) {
+func (s *perfStack) auditQueries(sc perfScenario, report *scenarioReport) {
 	short := sc
 	short.qps, short.workers = 0, 4
 	short.profile.TTFT, short.profile.Interval, short.profile.Tokens = 5*time.Millisecond, 0, min(sc.profile.Tokens, 50)
@@ -485,11 +447,11 @@ func (s *perfStack) auditQueries(sc perfScenario, chats *conversations, report *
 
 	// Warm the caches the engine keeps (key spend, key touch) so that the audit
 	// shows a request in steady state.
-	warm := s.perfPlan(short, true, chats)
+	warm := s.perfPlan(short, true)
 	warm.Warmup, warm.Duration, warm.MaxRequests = 0, 0, int64(2*len(s.keys))
 	gatewaybench.Run(context.Background(), s.gateway, warm)
 
-	plan := s.perfPlan(short, true, chats)
+	plan := s.perfPlan(short, true)
 	plan.Warmup, plan.Duration, plan.MaxRequests = 0, 0, *perfAudit
 	before, _ := s.counter.Counts()
 	var result gatewaybench.Result
@@ -546,7 +508,7 @@ func sustained(sc perfScenario, qps float64, r gatewaybench.Result) (bool, strin
 func (s *perfStack) sweep(sc perfScenario, rates []float64) (steps []sweepStep, best float64) {
 	s.upstream.SetProfile(sc.profile)
 	try := func(qps float64) bool {
-		plan := s.perfPlan(sc, true, newConversations(len(s.keys)))
+		plan := s.perfPlan(sc, true)
 		plan.QPS, plan.Concurrency, plan.Duration, plan.Timeout = qps, sc.cap, *perfSweepStep, 30*time.Second
 		plan.Warmup = max(sc.warmup(), 3*time.Second)
 		run := s.run(plan, s.gateway)
@@ -590,7 +552,7 @@ func (s *perfStack) sweep(sc perfScenario, rates []float64) (steps []sweepStep, 
 func (s *perfStack) profiled(sc perfScenario, dir string) {
 	t := s.t
 	s.upstream.SetProfile(sc.profile)
-	plan := s.perfPlan(sc, true, newConversations(len(s.keys)))
+	plan := s.perfPlan(sc, true)
 	plan.Warmup, plan.Duration = max(sc.warmup(), 3*time.Second), *perfProfile
 
 	runtime.MemProfileRate = 4096
@@ -647,7 +609,7 @@ func TestGatewayPerfBaseline(t *testing.T) {
 	var reports []scenarioReport
 	named := namedScenarios()
 	var chosen []perfScenario
-	for _, key := range []string{"nonstream", "stream", "concurrent", "saturate", "budget", "sticky"} {
+	for _, key := range []string{"nonstream", "stream", "concurrent", "saturate", "budget"} {
 		if selected[key] {
 			chosen = append(chosen, named[key])
 		}
@@ -744,7 +706,7 @@ func (s *perfStack) smoke() {
 func (s *perfStack) prime() {
 	s.upstream.SetProfile(gatewaybench.Profile{TTFT: 2 * time.Millisecond, Tokens: 8, InputTokens: 20})
 	sc := perfScenario{name: "prime", format: channel.FormatOpenAIChat, workers: 4}
-	plan := s.perfPlan(sc, true, nil)
+	plan := s.perfPlan(sc, true)
 	plan.Warmup, plan.Duration, plan.MaxRequests = 0, 0, 2000
 	result := gatewaybench.Run(context.Background(), s.gateway, plan)
 	if result.Failed() > 0 {
@@ -960,12 +922,6 @@ func writeScenarioTables(w *strings.Builder, reports []scenarioReport) {
 			fmt.Fprintf(w, "| %s | %.2f | %.3f | %.3f | %.3f |\n", name, step.Count, step.RoundTripMS, step.ClientGapMS, step.RoundTripMS+step.ClientGapMS)
 		}
 		fmt.Fprint(w, "\n")
-	}
-	for _, r := range reports {
-		if r.Scenario.sticky && r.Repeat == 1 {
-			u := r.Gateway.Upstream
-			fmt.Fprintf(w, "Sticky routing check (%s): the upstream judged %d follow-up requests, %d reached a channel other than the one that answered first.\n\n", r.Name, u.StickyChecked, u.StickyMisses)
-		}
 	}
 }
 

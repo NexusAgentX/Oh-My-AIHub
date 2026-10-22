@@ -61,9 +61,9 @@ func (a *app) registerGatewayRoutes(r *router) {
 		if endpoint.Feature != "F7" || existing[endpoint.ID] {
 			continue
 		}
-		// Only stateless inference is proxied now; resource, cache and token
-		// counting paths are retired and answer unsupported_endpoint.
-		if endpoint.Replay != "inference" || endpoint.Retired {
+		// Only stateless inference is proxied now: the endpoint table keeps no
+		// resource, cache or token counting entrance to register.
+		if endpoint.Replay != "inference" {
 			continue
 		}
 		path := strings.NewReplacer("{completion_id}", "{completionID}", "{response_id}", "{responseID}", "{conversation_id}", "{conversationID}", "{item_id}", "{itemID}", "{cache_id}", "{cacheID}").Replace(endpoint.Path)

@@ -419,23 +419,14 @@ func TestRankPutsDemotedChannelsLastInEveryModeButKeepsThem(t *testing.T) {
 	}
 }
 
-func TestRankKeepsADemotedChannelThatIsTheOnlyOneAndLetsTheStickyOneLead(t *testing.T) {
+func TestRankKeepsADemotedChannelThatIsTheOnlyOne(t *testing.T) {
 	only := []Candidate{candidate("a", "x", 1)}
 	if got := ids(Rank(RankInput{Mode: routing.ModeCheapest, Candidates: only, Demoted: map[string]Anomaly{"a": {}}})); got != "a" {
 		t.Fatalf("order = %s: a demoted channel is not excluded", got)
 	}
-	// A Responses turn continues where the previous one ran, healthy or not.
-	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 2), candidate("c", "x", 3)}
-	in := RankInput{Mode: routing.ModeCheapest, Candidates: candidates, Demoted: map[string]Anomaly{"c": {}}, Sticky: "c"}
-	if got := ids(Rank(in)); got != "cab" {
-		t.Fatalf("sticky order = %s, want cab", got)
-	}
-	in.Sticky = "b"
-	if got := ids(Rank(in)); got != "bac" {
-		t.Fatalf("order = %s, want bac", got)
-	}
 	// An excluded or unavailable channel stays out whether it is demoted or not.
-	in = RankInput{Mode: routing.ModeCheapest, Candidates: candidates, Demoted: map[string]Anomaly{"a": {}}, Excluded: []string{"b"}}
+	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 2), candidate("c", "x", 3)}
+	in := RankInput{Mode: routing.ModeCheapest, Candidates: candidates, Demoted: map[string]Anomaly{"a": {}}, Excluded: []string{"b"}}
 	if got := ids(Rank(in)); got != "ca" {
 		t.Fatalf("order = %s, want ca", got)
 	}

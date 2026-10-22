@@ -106,11 +106,6 @@ func (p *plan) answer(v variant) *answer {
 type UpstreamStats struct {
 	Requests int64
 	Streams  int64
-	// StickyChecked counts requests that carried a previous_response_id the
-	// upstream could judge, StickyMisses those whose ID came from another host:
-	// the gateway failed to send a follow-up to the channel that answered first.
-	StickyChecked int64
-	StickyMisses  int64
 }
 
 // Upstream is a fake model API for all four formats. It answers by path:
@@ -121,8 +116,6 @@ type Upstream struct {
 	sequence atomic.Int64
 	requests atomic.Int64
 	streams  atomic.Int64
-	checked  atomic.Int64
-	misses   atomic.Int64
 }
 
 // NewUpstream returns an upstream that behaves as profile says.
@@ -139,7 +132,7 @@ func (u *Upstream) SetProfile(profile Profile) {
 
 // Stats returns the counters of the upstream.
 func (u *Upstream) Stats() UpstreamStats {
-	return UpstreamStats{Requests: u.requests.Load(), Streams: u.streams.Load(), StickyChecked: u.checked.Load(), StickyMisses: u.misses.Load()}
+	return UpstreamStats{Requests: u.requests.Load(), Streams: u.streams.Load()}
 }
 
 // route tells the format of a path; geminiStream is true for the streaming
@@ -162,9 +155,8 @@ func route(path string) (format channel.Format, geminiStream, ok bool) {
 
 // requestFacts is what a fake upstream reads of a request body.
 type requestFacts struct {
-	Stream           bool   `json:"stream"`
-	PreviousResponse string `json:"previous_response_id"`
-	StreamOptions    *struct {
+	Stream        bool `json:"stream"`
+	StreamOptions *struct {
 		IncludeUsage bool `json:"include_usage"`
 	} `json:"stream_options"`
 }
@@ -187,14 +179,7 @@ func (u *Upstream) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	id := ""
 	if format == channel.FormatOpenAIResponses {
-		host := hostToken(r.Host)
-		id = "resp_" + host + "_" + strconv.FormatInt(u.sequence.Add(1), 10)
-		if facts.PreviousResponse != "" {
-			u.checked.Add(1)
-			if !strings.HasPrefix(facts.PreviousResponse, "resp_"+host+"_") {
-				u.misses.Add(1)
-			}
-		}
+		id = "resp_" + strconv.FormatInt(u.sequence.Add(1), 10)
 	}
 	if stream {
 		u.streams.Add(1)
@@ -202,15 +187,6 @@ func (u *Upstream) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	serveBody(w, r, current.profile, a, id)
-}
-
-// hostToken is the first label of the request's host name.
-func hostToken(host string) string {
-	if name, _, found := strings.Cut(host, ":"); found {
-		host = name
-	}
-	label, _, _ := strings.Cut(host, ".")
-	return label
 }
 
 func withID(frame []byte, id string) []byte {

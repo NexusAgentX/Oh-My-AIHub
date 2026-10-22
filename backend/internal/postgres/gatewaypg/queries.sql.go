@@ -585,24 +585,6 @@ func (q *Queries) ReserveGeoLookup(ctx context.Context, arg ReserveGeoLookupPara
 	return queries, err
 }
 
-const responseChannel = `-- name: ResponseChannel :one
-SELECT final_channel_id FROM calls
-WHERE upstream_response_id = $1 AND account_id = $2 AND final_channel_id IS NOT NULL
-ORDER BY created_at DESC LIMIT 1
-`
-
-type ResponseChannelParams struct {
-	UpstreamResponseID *string
-	AccountID          string
-}
-
-func (q *Queries) ResponseChannel(ctx context.Context, arg ResponseChannelParams) (*string, error) {
-	row := q.db.QueryRow(ctx, responseChannel, arg.UpstreamResponseID, arg.AccountID)
-	var final_channel_id *string
-	err := row.Scan(&final_channel_id)
-	return final_channel_id, err
-}
-
 const saveGeoCache = `-- name: SaveGeoCache :exec
 INSERT INTO geoip_cache (ip, location, expires_at) VALUES ($1, $2, $3)
 ON CONFLICT (ip) DO UPDATE SET location = EXCLUDED.location, expires_at = EXCLUDED.expires_at, updated_at = now()

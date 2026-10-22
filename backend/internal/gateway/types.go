@@ -241,7 +241,6 @@ type Store interface {
 	// grouped as AttemptHistoryRow says, for the statistics window to start
 	// from (Engine.LoadStats). It is read once at startup.
 	AttemptHistory(ctx context.Context, since time.Time) ([]AttemptHistoryRow, error)
-	ResponseChannel(ctx context.Context, accountID, responseID string) (string, error)
 	InsertCall(ctx context.Context, call CallInsert) (string, error)
 	FinishCall(ctx context.Context, finish CallFinish) (FinishResult, error)
 	// SweepStaleCalls marks calls still in progress since before the cut-off

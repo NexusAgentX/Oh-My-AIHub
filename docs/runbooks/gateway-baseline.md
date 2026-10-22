@@ -72,7 +72,7 @@ go -C backend test -tags perfbaseline -run TestGatewayPerfBaseline -count=1 -tim
 
 | 参数 | 默认 | 说明 |
 | --- | --- | --- |
-| `-perf.scenarios` | 全部 | `nonstream`、`stream`、`concurrent`、`saturate`、`budget`、`formats`、`responses`、`sweep-nonstream`、`sweep-stream`，逗号分隔；`responses` 是 `formats` 中 Responses 流式/非流式的子集，默认全矩阵已通过 `formats` 覆盖。工具仍定义 `sticky`，但它靠 `previous_response_id` 续接，在当前无状态边界下必然失败，本轮一律显式传入需要运行的场景列表以排除它 |
+| `-perf.scenarios` | 全部 | `nonstream`、`stream`、`concurrent`、`saturate`、`budget`、`formats`、`responses`、`sweep-nonstream`、`sweep-stream`，逗号分隔；`responses` 是 `formats` 中 Responses 流式/非流式的子集，默认全矩阵已通过 `formats` 覆盖 |
 | `-perf.duration` / `-perf.warmup` | 30s / 3s | 每次运行的测量窗口与预热（流式场景的预热至少是一条流时长的 1.5 倍） |
 | `-perf.repeat` | 1 | 每个场景重复次数，报告给出中位数与范围。机器上有别的负载时建议 3 |
 | `-perf.out` | 空 | 目录，写入 `report.md`、`results.json` 和 pprof 文件；设置后还会对 `nonstream` 与 `stream` 场景各做一次带 pprof 的运行（`-perf.profile`，默认 20s） |
@@ -139,7 +139,7 @@ gh run watch    # 选择刚触发的运行；默认参数一个作业要数小�
 | 输入 | 默认 | 说明 |
 | --- | --- | --- |
 | `base_ref` / `head_ref` | `main` / `main` | A 侧与 B 侧：分支、tag 或提交（短 SHA 可用）。工作流先把它们解析成提交，所有并行作业测同一对提交 |
-| `scenarios` | `nonstream,nonstream@200,stream,concurrent,budget,sticky,sweep-nonstream,sweep-stream` | 语法同 `-perf.scenarios`；`<场景>@<速率>` 表示以 `-perf.qps=<速率>` 单独运行（`nonstream@200` 是 200 次/秒的非流式），场景限 `nonstream`、`stream`、`budget`。默认值仍带 `sticky`，运行前必须显式替换为不含它的列表 |
+| `scenarios` | `nonstream,nonstream@200,stream,concurrent,budget,sweep-nonstream,sweep-stream` | 语法同 `-perf.scenarios`；`<场景>@<速率>` 表示以 `-perf.qps=<速率>` 单独运行（`nonstream@200` 是 200 次/秒的非流式），场景限 `nonstream`、`stream`、`budget` |
 | `repeat` | 3 | 轮数：每轮把每个场景在两侧各测一次 |
 | `jobs` | 1 | 并行作业数，每个作业在自己的机器上完整跑一遍；用来量同一对提交在不同机器上的波动，不用来加速 |
 | `tool_args` | 空 | 传给基线工具的额外参数，只接受 `-perf.<名称>=<值>`，如 `-perf.duration=10s -perf.sweepstep=5s` |

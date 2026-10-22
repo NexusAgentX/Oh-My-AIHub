@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"math"
-	"slices"
 	"sort"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/routing"
@@ -24,8 +23,6 @@ type RankInput struct {
 	// the others, in any mode, but not excluded.
 	Demoted    map[string]Anomaly
 	ConsumerID string
-	// Sticky is the channel that served the previous Responses turn, if any.
-	Sticky string
 	// Available reports whether a candidate can take a request now
 	// (cooldown, concurrency, RPM).
 	Available func(Candidate) bool
@@ -155,13 +152,6 @@ func Rank(in RankInput) []Candidate {
 		pool = demote(pool, in.Demoted)
 	}
 
-	if in.Sticky != "" {
-		if index := slices.IndexFunc(pool, func(c Candidate) bool { return c.ChannelID == in.Sticky }); index > 0 {
-			sticky := pool[index]
-			copy(pool[1:index+1], pool[:index])
-			pool[0] = sticky
-		}
-	}
 	return pool
 }
 
