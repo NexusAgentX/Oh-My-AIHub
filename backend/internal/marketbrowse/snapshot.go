@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
@@ -156,24 +155,6 @@ func EvidenceFacts(protocol string, evidence map[string]bool, capacity map[strin
 	}
 	return f
 }
-func projectionFacts(protocol string, projections ...detection.Projection) Facts {
-	evidence := map[string]bool{}
-	capacity := map[string]int64{}
-	for _, p := range projections {
-		if !p.Valid {
-			continue
-		}
-		for _, c := range p.Capabilities {
-			if c.State == "pass" {
-				evidence[c.Layer+"/"+c.ID] = true
-			}
-		}
-		for _, c := range p.Capacity {
-			capacity[c.ScenarioID+"/"+c.Kind] = c.VerifiedLower
-		}
-	}
-	return EvidenceFacts(protocol, evidence, capacity)
-}
 
 // Build uses the same approved immutable candidates as inference. Report
 // projection happened during publication, so browsing does not hash detector
@@ -232,7 +213,7 @@ func Build(state *groupchannel.State, prices *typical.PriceSnapshot, fx int64) (
 				if !validProtocol(protocol, format) {
 					continue
 				}
-				facts := projectionFacts(protocol, state.Reports[m.ID])
+				facts := Facts{Supported: map[string]bool{}}
 				o := Offering{Protocol: protocol, ModelID: m.ModelID, GroupModelID: m.ID, GroupID: m.GroupID, SupplierID: g.SupplierID, ModelType: m.ModelType, Visible: true, Enabled: true, Format: format, Facts: facts}
 				for _, row := range byOffering[m.ID] {
 					if !slices.Contains(row.Formats, format) {

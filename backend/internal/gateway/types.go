@@ -119,14 +119,9 @@ func (c Candidate) ValidOffering(modelID string) bool {
 // first-token median is read off a histogram (see StatsBook) and is within 4.6%
 // of the exact median.
 type ChannelStats struct {
-	Attempts           int64
-	Successes          int64
-	TTFTP50MS          *float64
-	FirstOutputP50MS   *float64
-	FirstOutputSamples int64
-	OutputTPSP50       *float64
-	OutputSpeedSamples int64
-	ExcludedSamples    int64
+	Attempts  int64
+	Successes int64
+	TTFTP50MS *float64
 }
 
 func (s ChannelStats) SuccessRate() float64 {

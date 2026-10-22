@@ -117,19 +117,11 @@ func Rank(in RankInput) []Candidate {
 		return stats.SuccessRate()
 	}
 	latency := func(candidate Candidate) float64 {
-		if stats, found := in.Stats[candidate.ChannelID]; found && stats.FirstOutputP50MS != nil && stats.FirstOutputSamples >= minSamples {
-			return *stats.FirstOutputP50MS
+		if stats, found := in.Stats[candidate.ChannelID]; found && stats.TTFTP50MS != nil && stats.Attempts >= minSamples {
+			return *stats.TTFTP50MS
 		}
 		return math.Inf(1)
 	}
-	speed := func(candidate Candidate) float64 {
-		stats := in.Stats[candidate.ChannelID]
-		if stats.OutputTPSP50 != nil && stats.OutputSpeedSamples >= minSamples {
-			return *stats.OutputTPSP50
-		}
-		return math.Inf(-1)
-	}
-
 	position := func(candidate Candidate) int { return positions[candidate.ChannelID] }
 	sort.SliceStable(pool, func(i, j int) bool {
 		a, b := pool[i], pool[j]
@@ -143,10 +135,6 @@ func Rank(in RankInput) []Candidate {
 		case routing.ModeFastest:
 			if latency(a) != latency(b) {
 				return latency(a) < latency(b)
-			}
-		case routing.ModeSpeed:
-			if speed(a) != speed(b) {
-				return speed(a) > speed(b)
 			}
 		default:
 			if order := compareCandidatePrice(a, b, in.ConsumerID, pricesComparable); order != 0 {

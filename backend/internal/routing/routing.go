@@ -21,12 +21,11 @@ const (
 	ModeCheapest Mode = "cheapest"
 	ModeReliable Mode = "reliable"
 	ModeFastest  Mode = "fastest"
-	ModeSpeed    Mode = "speed"
 	ModeManual   Mode = "manual"
 )
 
 func (m Mode) Valid() bool {
-	return m == ModeCheapest || m == ModeReliable || m == ModeFastest || m == ModeSpeed || m == ModeManual
+	return m == ModeCheapest || m == ModeReliable || m == ModeFastest || m == ModeManual
 }
 
 type Source string

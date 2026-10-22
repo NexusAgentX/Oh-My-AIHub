@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/contribution"
@@ -65,19 +66,39 @@ func (a *app) listContributions(w http.ResponseWriter, r *http.Request) {
 func (a *app) reviewContributions(w http.ResponseWriter, r *http.Request) {
 	a.contributionList(w, r, true)
 }
+func contributionCursor(r *http.Request) (*contribution.Cursor, bool) {
+	raw := r.URL.Query().Get("cursor")
+	if raw == "" {
+		return nil, true
+	}
+	decoded, ok := decodeTextCursor(raw)
+	if !ok {
+		return nil, false
+	}
+	at, id, ok := strings.Cut(decoded, "|")
+	if !ok || !uuidPattern.MatchString(id) {
+		return nil, false
+	}
+	stamp, err := time.Parse(time.RFC3339Nano, at)
+	if err != nil {
+		return nil, false
+	}
+	return &contribution.Cursor{At: stamp, ID: id}, true
+}
+func nextContributionCursor(at time.Time, id string) *string {
+	v := encodeTextCursor(at.UTC().Format(time.RFC3339Nano) + "|" + id)
+	return &v
+}
+
 func (a *app) contributionList(w http.ResponseWriter, r *http.Request, queue bool) {
 	if !a.contributionReady(w) {
 		return
 	}
 	limit, ok := pageLimit(r)
-	after, valid := detectionCursor(r)
+	cursor, valid := contributionCursor(r)
 	if !ok || !valid {
 		writeBadCursor(w)
 		return
-	}
-	var cursor *contribution.Cursor
-	if after != nil {
-		cursor = &contribution.Cursor{At: after.At, ID: after.ID}
 	}
 	items, err := a.contributions.List(r.Context(), contributionActor(r), queue, cursor, limit+1)
 	if err != nil {
@@ -94,7 +115,7 @@ func (a *app) contributionList(w http.ResponseWriter, r *http.Request, queue boo
 	var next *string
 	if more {
 		v := items[len(items)-1]
-		next = nextDetectionCursor(v.CreatedAt, v.ID)
+		next = nextContributionCursor(v.CreatedAt, v.ID)
 	}
 	writeJSON(w, 200, pageJSON[contribution.Summary]{Items: items, NextCursor: next})
 }

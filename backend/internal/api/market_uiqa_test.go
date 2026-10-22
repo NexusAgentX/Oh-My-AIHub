@@ -17,16 +17,12 @@ import (
 
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/apikey"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/money"
 )
 
-// Explicit loopback-only fixture. All directory/report data is synthetic;
-// report projections remain stale and cannot authorize upstream capability.
+// Explicit loopback-only fixture. All directory data is synthetic.
 func TestMarketUIHarness(t *testing.T) {
 	if os.Getenv("AIHUB_MARKET_UI_QA") != "1" {
 		t.Skip("explicit synthetic browser QA only")
@@ -38,10 +34,8 @@ func TestMarketUIHarness(t *testing.T) {
 		_, err := runtime.Wrap(groupBaseLoader{}).LoadCandidates(ctx)
 		return err
 	}
-	var engine *gateway.Engine
 	p := newPlatform(t, func(d *Dependencies) {
 		d.CookieSecure = false
-		engine = d.Gateway
 		d.GroupChannels = &groupchannel.Service{Runtime: runtime, Repository: repo}
 		d.Keys = apikey.NewService(newFakeKeyStore(), d.Gateway.Keyring, func(context.Context) ([]string, error) {
 			return []string{"fixture/model:2026", "fixture/image:2026", "fixture/unknown:2026"}, nil
@@ -90,21 +84,11 @@ func TestMarketUIHarness(t *testing.T) {
 	qid := "f0000000-0000-4000-8000-000000000080"
 	d.Models = append(d.Models, market.GroupModel{ID: "f0000000-0000-4000-8000-000000000081", GroupID: d.Groups[0].ID, ModelID: "fixture/unknown:2026", UpstreamModel: "fixture/unknown:2026", ModelType: "text", Enabled: true, Revision: 1, QuoteID: &qid})
 	d.Quotes = append(d.Quotes, market.Quote{ID: qid, GroupModelID: d.Models[3].ID, Version: 1, Currency: "CNY", BillingUnit: "per_million_tokens"})
-	reportID := "f0000000-0000-4000-8000-000000000082"
-	requirement := "openai-responses.base"
-	scenario := requirement + "/s01"
-	assertion := scenario + "/a01"
-	search := gatewaycontract.SearchSettings{Version: "fixture-v1", Method: "binary", Low: 1, High: 8192, HardMaximum: 8192, Precision: 128, PrecisionMode: "absolute", Rounds: 6}
-	repo.data.Reports = []detection.Job{{ReportID: &reportID, State: "finished", Complete: false, UpdatedAt: now, Target: detection.Target{GroupID: d.Groups[0].ID, Binding: market.EvidenceBinding{TargetKind: "group_model", TargetID: d.Models[0].ID}}, Parameters: detection.Parameters{Context: search, MaxOutput: search}, Plan: detection.Plan{ManifestVersion: "synthetic-ui", RegistryVersion: "synthetic-ui", Items: []detection.Planned{{ID: scenario, Layer: "upstream_protocol", Requirements: []string{requirement}, AssertionLabels: map[string]string{assertion: "accepted_native_message_shapes"}}}}, Results: []detection.Result{{ScenarioID: scenario, Layer: "upstream_protocol", State: "unsupported", Reason: "unsupported", Source: "synthetic_ui", Assertions: []detection.Assertion{{ID: assertion, State: "unsupported", Reason: "unsupported"}}}}}}
 	if err := runtime.Install(ctx, d); err != nil {
 		t.Fatal(err)
 	}
-	engine.Store = browseMetricHistory{rows: []gateway.ModelAttemptHistoryRow{{ChannelID: repo.data.Channels[0].ID, ModelID: "fixture/model:2026", Protocol: "openai-responses", Format: channel.FormatOpenAIResponses, Stream: true, Bucket: now.Unix() / 300, Counted: 40, Successes: 38, LatencyBin: 54, SpeedBin: 89}}}
-	if err := engine.LoadStats(ctx); err != nil {
-		t.Fatal(err)
-	}
 	// Exercise the actual handler and contract before exposing the fixture.
-	for _, path := range []string{"/api/market/models", "/api/market/models/fixture%2Fmodel:2026", "/api/market/suppliers", "/api/market/groups/" + d.Groups[0].ID, "/api/market/reports/" + reportID, "/api/market/channels"} {
+	for _, path := range []string{"/api/market/models", "/api/market/models/fixture%2Fmodel:2026", "/api/market/suppliers", "/api/market/groups/" + d.Groups[0].ID, "/api/market/channels"} {
 		admin.expect(t, 200, "GET", path, nil)
 	}
 	var mode atomic.Value
@@ -162,7 +146,7 @@ func TestMarketUIHarness(t *testing.T) {
 			stop.Do(func() { close(stopped) })
 		}
 	}()
-	fmt.Printf("UI_QA_READY market api=http://127.0.0.1:18491 group=%s report=%s model=fixture/model:2026\n", d.Groups[0].ID, reportID)
+	fmt.Printf("UI_QA_READY market api=http://127.0.0.1:18491 group=%s model=fixture/model:2026\n", d.Groups[0].ID)
 	<-stopped
 	shutdown, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()

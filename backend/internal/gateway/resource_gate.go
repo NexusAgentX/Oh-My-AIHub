@@ -38,18 +38,6 @@ func candidateBinding(c Candidate) gatewaycontract.Binding {
 func resourceMatch(c Candidate, r *resourcestate.Record) bool {
 	return r == nil || candidateBinding(c) == r.Binding && c.CredentialScope == r.CredentialScope
 }
-func supportsAll(c Candidate, required []CapabilityRequirement) bool {
-	for _, r := range required {
-		if !r.supportedBy(c.Evidence) {
-			return false
-		}
-	}
-	return true
-}
-
-func keyProbeMatchesEndpoint(c Candidate, format channel.Format, path string) bool {
-	return true
-}
 func (e *Engine) prepareResources(ctx context.Context, call *callState, body []byte, path string) error {
 	if e.Resources == nil {
 		return nil

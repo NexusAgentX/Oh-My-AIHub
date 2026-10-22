@@ -99,7 +99,7 @@ func TestGroupChannelChoicesLateProbesAndBusinessCascade(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	records, _, err := groupchannel.Build(d, data, nil)
+	records, _, err := groupchannel.Build(d, data)
 	if err != nil || len(records) != 1 || records[0].Candidate.MultiplierNano != 0 || records[0].Candidate.Quotes == nil {
 		t.Fatal("group candidate/zero discount lost", err)
 	}

@@ -60,17 +60,6 @@ func TestServeCompressedResponsesKeepsOpaqueBytes(t *testing.T) {
 	if w.Code != 200 || seen != 1 || len(store.finished) != 1 {
 		t.Fatalf("status=%d upstream=%d finishes=%d body=%s", w.Code, seen, len(store.finished), w.Body.String())
 	}
-	// Removing support evidence must stop the compressed request locally,
-	// rather than trying an unknown supplier or inventing compatibility.
-	store.candidate.Evidence = map[string]bool{"upstream_protocol/codex-special.RL14/native_zstd_request": true}
-	r = httptest.NewRequest("POST", "/v1/responses", bytes.NewReader(wire))
-	r.Header.Set("Authorization", "Bearer "+apikey.Prefix+"synthetic")
-	r.Header.Set("Content-Encoding", "zstd")
-	w = httptest.NewRecorder()
-	e.Serve(w, r, channel.FormatOpenAIResponses, "", false)
-	if w.Code != 503 || seen != 1 || len(store.finished) != 2 || store.finished[1].Bill != nil {
-		t.Fatalf("missing evidence called or billed an upstream: status=%d requests=%d", w.Code, seen)
-	}
 }
 
 func TestZstdRequirementIsEndpointSpecific(t *testing.T) {

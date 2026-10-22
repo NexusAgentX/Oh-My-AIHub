@@ -270,16 +270,6 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 		fail(503, "candidate_source_unavailable", "候选读取失败")
 		return
 	}
-	// Count/list/context operations require their own endpoint capability,
-	// not execution of every inference feature described in their input.
-	requestedCapabilities := nativeRequirements{protocol: ep.Protocol, capabilities: endpointRequirement(ep.ID)}
-	filtered := make([]CandidateRecord, 0, len(records))
-	for _, record := range records {
-		if missingRequestCapability(record.Candidate, requestedCapabilities, r.Header) == "" {
-			filtered = append(filtered, record)
-		}
-	}
-	records = filtered
 	selection := AuxiliarySelection{ModelID: model, Format: protocolFormat(ep.Protocol), AllowedModels: key.AllowedModels, Preference: pref, Required: append(endpointRequirement(ep.ID), referenceRequirements(explicitRefs)...)}
 	if encoding != "" {
 		selection.Required = append(selection.Required, nativeZstdRequirement(r.URL.Path))
@@ -362,10 +352,10 @@ func (e *Engine) ServeAuxiliary(w http.ResponseWriter, r *http.Request, ep gatew
 			candidates[i].RateNano = ledger.ModelRate(p.PriceCurrency, defaults.USDCNYRateNano)
 		}
 		e.applyTypicalPrices(candidates, model, defaults.USDCNYRateNano)
-		// Auxiliary entry points have no generation cadence of their own. Use
-		// only the verified model context in the matching protocol, never a
-		// channel-wide speed or a made-up model.
-		stats, demoted := e.statsView().forProtocol(model, protocolFormat(ep.Protocol), ep.Protocol, "", false)
+		// Auxiliary entry points share the channel-wide health statistics; the
+		// per-model 4xx anomaly rule still applies to the requested model.
+		view := e.statsView()
+		stats, demoted := view.channels, view.anomalies[model]
 		candidates = Rank(RankInput{Mode: pref.Mode, Order: pref.Order, Excluded: pref.Excluded, Candidates: candidates, Stats: stats, Demoted: demoted, ConsumerID: key.OwnerID})
 	}
 	if len(candidates) == 0 {

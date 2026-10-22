@@ -11,7 +11,7 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/market"
 )
 
-// 模型页的渠道行把成功率、首字延迟、冷却剩余写成 null 或字符串；
+// 模型页的渠道行把冷却剩余写成 null 或字符串；
 // 这些分支由处理器内联拼装，门禁只校验形状，这里钉住各状态下的取值。
 func TestModelPageReportsEachChannelsState(t *testing.T) {
 	const idPrefix = "00000000-0000-4000-8000-00000000"
@@ -43,12 +43,11 @@ func TestModelPageReportsEachChannelsState(t *testing.T) {
 	page := admin.expect(t, http.StatusOK, http.MethodGet, "/api/market/models/m1", nil)
 	type row struct {
 		state    string
-		metrics  int
 		cooldown any
 	}
 	want := map[string]row{
 		"无统计":   {state: "available"},
-		"无首字延迟": {state: "available"}, // Legacy aggregate cannot populate the new model scope.
+		"无首字延迟": {state: "available"},
 		"有首字延迟": {state: "available"},
 		"冷却中":   {state: "cooldown"},
 		"并发已满":  {state: "limited"},
@@ -56,8 +55,11 @@ func TestModelPageReportsEachChannelsState(t *testing.T) {
 	got := map[string]row{}
 	for _, entry := range page["routing_channels"].([]any) {
 		channelRow := entry.(map[string]any)
+		if _, present := channelRow["routing_metrics"]; present {
+			t.Fatalf("routing metrics are no longer part of the contract: %v", channelRow)
+		}
 		got[channelRow["name"].(string)] = row{
-			state: channelRow["state"].(string), metrics: len(channelRow["routing_metrics"].([]any)),
+			state:    channelRow["state"].(string),
 			cooldown: channelRow["cooldown_remaining_seconds"],
 		}
 	}

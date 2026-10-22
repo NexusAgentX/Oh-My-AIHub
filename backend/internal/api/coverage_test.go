@@ -46,7 +46,6 @@ var coverageExceptions = map[string]string{
 	"POST /v1/responses/compact":                               "原生 default 透传响应无本站 schema；TestGatewayF7EveryNativeEndpointUsesRealEntryAndScope（合成 HTTP 上游）逐项验证成功入口、归属及计费，PostgreSQL 集成另验持久索引",
 	"POST /v1/responses/input_tokens":                          "原生 default 透传响应无本站 schema；TestGatewayF7EveryNativeEndpointUsesRealEntryAndScope（合成 HTTP 上游）逐项验证成功入口、归属及计费，PostgreSQL 集成另验持久索引",
 	"POST /v1beta/cachedContents":                              "原生 default 透传响应无本站 schema；TestGatewayF7EveryNativeEndpointUsesRealEntryAndScope（合成 HTTP 上游）逐项验证成功入口、归属及计费，PostgreSQL 集成另验持久索引",
-	"POST /api/detection/mcp":                                  "原生 JSON-RPC 合成回调而非应用 JSON REST 响应；detection 的真实 HTTP 回归校验临时令牌、初始化/列表/工具结果/撤销，api 校验无 Origin、Cookie 与平台 Key 不能取得探针",
 	"POST /v1/chat/completions":                                gatewayPassthrough,
 	"POST /v1/responses":                                       gatewayPassthrough,
 	"GET /v1/responses/{responseID}":                           gatewayPassthrough,

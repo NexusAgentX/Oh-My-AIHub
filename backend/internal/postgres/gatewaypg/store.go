@@ -137,27 +137,6 @@ func (s *Store) AttemptHistory(ctx context.Context, since time.Time) ([]gateway.
 	return history, nil
 }
 
-func (s *Store) ModelAttemptHistory(ctx context.Context, since time.Time, limit int32) ([]gateway.ModelAttemptHistoryRow, error) {
-	if limit < 1 || limit > 8193 {
-		return nil, errors.New("invalid model metric warmup limit")
-	}
-	rows, err := s.q.ModelAttemptHistory(ctx, ModelAttemptHistoryParams{Since: since, RowLimit: limit})
-	if err != nil {
-		return nil, err
-	}
-	history := make([]gateway.ModelAttemptHistoryRow, 0, len(rows))
-	for _, row := range rows {
-		history = append(history, gateway.ModelAttemptHistoryRow{
-			Protocol:  row.Protocol,
-			ChannelID: row.ChannelID, ModelID: row.ModelID, Format: channel.Format(row.Format), Stream: row.Stream, Tier: row.Tier,
-			Bucket: row.Bucket, LatencyBin: int(row.LatencyBin), SpeedBin: int(row.SpeedBin), HistoryTruncated: row.HistoryTruncated,
-			Counted: row.Counted, Successes: row.Successes, Excluded: row.Excluded, ClientErrors: row.ClientErrors,
-			BeforeEditAttempts: row.BeforeEditAttempts, BeforeEditClientErrors: row.BeforeEditClientErrors,
-		})
-	}
-	return history, nil
-}
-
 func (s *Store) ResponseChannel(ctx context.Context, accountID, responseID string) (string, error) {
 	id, err := s.q.ResponseChannel(ctx, ResponseChannelParams{UpstreamResponseID: &responseID, AccountID: accountID})
 	if err != nil {

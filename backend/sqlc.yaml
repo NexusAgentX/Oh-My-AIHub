@@ -197,13 +197,6 @@ sql:
         out: internal/postgres/marketpg
         emit_json_tags: true
   - <<: *domain
-    queries: internal/postgres/detectionpg/queries.sql
-    gen:
-      go:
-        <<: *gen
-        package: detectionpg
-        out: internal/postgres/detectionpg
-  - <<: *domain
     queries: internal/postgres/contributionpg/queries.sql
     gen:
       go:

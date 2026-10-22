@@ -57,14 +57,6 @@ UPDATE channels SET status=$2,suspended_reason=sqlc.narg(reason),updated_at=now(
 UPDATE market_channels SET probe_epoch=probe_epoch+1,revision=revision+1 WHERE channel_id=$1 AND revision=$2;
 
 -- Only immutable reports that were approved with a publication are eligible.
--- name: ApprovedReports :many
-SELECT DISTINCT ON (b.target_id) r.metadata,b.credential_scope
-FROM detection_reports r JOIN market_report_bindings b ON b.id=r.id
-WHERE EXISTS(SELECT 1 FROM market_capability_evidence e WHERE e.report_id=r.id)
- AND ((b.target_kind='group' AND EXISTS(SELECT 1 FROM market_groups g WHERE g.id=b.target_id AND g.deleted_at IS NULL))
- OR (b.target_kind='group_model' AND EXISTS(SELECT 1 FROM market_group_models m JOIN market_groups g ON g.id=m.group_id WHERE m.id=b.target_id AND m.deleted_at IS NULL AND g.deleted_at IS NULL)))
-ORDER BY b.target_id,b.created_at DESC,b.id DESC;
-
 -- name: LockGroup :one
 SELECT capability_digest,enabled,deleted_at FROM market_groups WHERE id=$1 FOR SHARE;
 

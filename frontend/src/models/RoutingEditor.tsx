@@ -5,7 +5,6 @@ import type { ModelRoutingChannel, RoutingMode } from '../api/types'
 import { FormatTags, routingModeLabels } from '../calls'
 import { formatMultiplier } from '../money/format'
 import { formatTypicalPrice } from '../typical/format'
-import { RoutingMetrics } from './RoutingMetrics'
 import { Badge, Disclosure, Icon, Segmented, TextField } from '../ui'
 import {
   advancedChanged,
@@ -148,7 +147,6 @@ export function RoutingEditor({
                     </dd>
                   </div>
                 </dl>
-                <RoutingMetrics rows={channel.routing_metrics} />
               </li>
             )
           })}

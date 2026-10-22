@@ -8,7 +8,6 @@ import (
 	"net/netip"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -21,7 +20,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/channel"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/contribution"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/database"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/forum"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gatewaycontract"
@@ -35,7 +33,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/observe"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/contributionpg"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/detectionpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/groupchannelpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/marketpg"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/postgres/resourcepg"
@@ -302,69 +299,9 @@ func main() {
 		}
 	}()
 
-	// Detector state/queries use two private connections; saturation cannot
-	// consume gateway/settlement pool slots. Missing protocol suites remain in
-	// the full plan; implemented scenarios can execute without authorizing an
-	// incomplete creation report.
-	detectorStartup, cancelDetectorStartup := context.WithTimeout(context.Background(), keyringCheckTimeout)
-	defer cancelDetectorStartup()
-	detectorPool, err := database.OpenLimited(detectorStartup, databaseURL, 2)
-	if err != nil {
-		fatal(logger, "opening detection database pool failed", err)
-	}
-	defer detectorPool.Close()
-	detectorMarket := marketpg.NewStore(detectorPool)
-	if err = detectorMarket.VerifyProtectedRoots(detectorStartup, credentialKeyring); err != nil {
-		fatal(logger, "protected market roots cannot be opened", err)
-	}
-	credentialRoot, err := detectorMarket.ProtectedRoot(detectorStartup, credentialKeyring, "credential-scope-root-v1")
-	cancelDetectorStartup()
-	if err != nil {
-		fatal(logger, "opening detection credential root failed", err)
-	}
-	manifest, err := gatewaycontract.Load()
-	if err != nil {
-		fatal(logger, "loading detection manifest failed", err)
-	}
-	registry, err := detection.NewRegistry(manifest)
-	if err != nil {
-		fatal(logger, "loading detection registry failed", err)
-	}
-	if err = registry.RegisterNative(); err != nil {
-		fatal(logger, "registering native detection suites failed", err)
-	}
-	if err = registry.RegisterCodexNative(); err != nil {
-		fatal(logger, "registering Codex native detection suites failed", err)
-	}
-	if err = registry.RegisterCodexGateway(); err != nil {
-		fatal(logger, "registering Codex gateway detection suites failed", err)
-	}
-	var mcpFixture *detection.MCPFixture
-	if origin := strings.TrimSpace(os.Getenv("AIHUB_DETECTION_PUBLIC_ORIGIN")); origin != "" {
-		mcpFixture, err = detection.NewMCPFixture(origin)
-		if err != nil {
-			fatal(logger, "invalid detection callback origin", err)
-		}
-	}
-	if err = registry.RegisterMCP(mcpFixture); err != nil {
-		fatal(logger, "registering MCP detection failed", err)
-	}
-	sdkBinary := strings.TrimSpace(os.Getenv("AIHUB_DETECTION_SDK_BINARY"))
-	if sdkBinary == "" {
-		executable, executableErr := os.Executable()
-		if executableErr != nil {
-			fatal(logger, "locating SDK detection artifact failed", executableErr)
-		}
-		sdkBinary = filepath.Join(filepath.Dir(executable), "aihub-detection-sdk")
-	}
-	sdkStartup, cancelSDKStartup := context.WithTimeout(context.Background(), 15*time.Second)
-	err = registry.RegisterSDK(sdkStartup, sdkBinary)
-	cancelSDKStartup()
-	if err != nil {
-		fatal(logger, "validating SDK detection artifact failed", err)
-	}
-	// Review transactions and directory rebuilds use two separate connections;
-	// no long review transaction holds a gateway or detector pool slot.
+	// Market review transactions, directory rebuilds and the credential-scope
+	// root use two private connections; saturation cannot consume
+	// gateway/settlement pool slots.
 	reviewStartup, cancelReviewStartup := context.WithTimeout(context.Background(), keyringCheckTimeout)
 	reviewPool, err := database.OpenLimited(reviewStartup, databaseURL, 2)
 	if err != nil {
@@ -372,6 +309,13 @@ func main() {
 	}
 	defer reviewPool.Close()
 	reviewMarket := marketpg.NewStore(reviewPool)
+	if err = reviewMarket.VerifyProtectedRoots(reviewStartup, credentialKeyring); err != nil {
+		fatal(logger, "protected market roots cannot be opened", err)
+	}
+	credentialRoot, err := reviewMarket.ProtectedRoot(reviewStartup, credentialKeyring, "credential-scope-root-v1")
+	if err != nil {
+		fatal(logger, "opening market credential root failed", err)
+	}
 	reviewStore := contributionpg.NewStore(reviewPool)
 	if err = reviewStore.SyncPublications(reviewStartup); err != nil {
 		fatal(logger, "waiting for market publication recovery fence failed", err)
@@ -385,7 +329,6 @@ func main() {
 		}
 		return market.CredentialScope(groupCredentialRoot, r.GroupID, []byte(secret))
 	}
-	groupRuntime.Planner = registry
 	marketRuntime := contribution.NewRuntime(reviewMarket, groupRuntime.Install)
 	groupRuntime.Ready = func() error { _, err := marketRuntime.Current(); return err }
 	if err = marketRuntime.Refresh(reviewStartup); err != nil {
@@ -396,20 +339,6 @@ func main() {
 		fatal(logger, "recovering committed market publications failed", err)
 	}
 	cancelReviewStartup()
-	detectorStore := detectionpg.NewStore(detectorPool)
-	detectorSettings := settings.NewService(settingspg.NewStore(detectorPool))
-	detector, err := detection.New(backgroundContext, detection.Config{Registry: registry, Store: detectorStore, Settings: detectorStore, Resolver: detectionpg.DirectoryResolver{Market: detectorMarket}, Outbound: outboundPolicy, PrepareEgress: func(ctx context.Context) (channel.Outbound, error) {
-		value, err := detectorSettings.Get(ctx)
-		if err != nil {
-			return nil, err
-		}
-		return outboundPolicy.WithExtraBlockedHosts(value.ExtraBlockedHosts)
-	}, Limits: detection.DefaultLimits(), CredentialRoot: credentialRoot})
-	clear(credentialRoot)
-	if err != nil {
-		fatal(logger, "starting detection service failed", err)
-	}
-	defer detector.Close()
 	groupService := &groupchannel.Service{Repository: groupStore, Runtime: groupRuntime, Keyring: credentialKeyring}
 	groupProber := groupchannel.NewProber(backgroundContext, groupchannel.ProbeConfig{Runtime: groupRuntime, Repository: groupStore, Keyring: credentialKeyring, Logger: logger, Edited: engine.ChannelEdited, Outbound: func(ctx context.Context) (channel.Outbound, error) {
 		value, err := settingsService.Get(ctx)
@@ -447,9 +376,8 @@ func main() {
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: api.NewHandler(api.Dependencies{
-			Typical: typicalCosts, GroupChannels: groupService, DetectionMCP: mcpFixture,
+			Typical: typicalCosts, GroupChannels: groupService,
 			Contributions:     contributions,
-			Detection:         detector,
 			Identity:          identityService,
 			Forum:             forumService,
 			Ledger:            ledger.NewService(store.Ledger),

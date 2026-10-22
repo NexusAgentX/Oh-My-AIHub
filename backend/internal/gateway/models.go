@@ -314,9 +314,8 @@ func (e *Engine) nativeModelWitnesses(ctx context.Context, formats []channel.For
 		if err != nil {
 			return nil, err
 		}
-		path := map[channel.Format]string{channel.FormatOpenAIChat: "/v1/chat/completions", channel.FormatOpenAIResponses: "/v1/responses", channel.FormatAnthropic: "/v1/messages", channel.FormatGemini: "/v1beta/models", channel.FormatOpenAIImages: "/v1/images/generations"}[format]
 		for _, row := range rows {
-			if !slices.Contains(row.Formats, format) || !row.Candidate.ValidOffering(row.ModelID) || !keyProbeMatchesEndpoint(row.Candidate, format, path) {
+			if !slices.Contains(row.Formats, format) || !row.Candidate.ValidOffering(row.ModelID) {
 				continue
 			}
 			out[row.ModelID] = append(out[row.ModelID], nativeModelWitness{format, row.Candidate})

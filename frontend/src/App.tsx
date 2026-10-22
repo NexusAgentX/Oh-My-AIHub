@@ -96,12 +96,8 @@ export const appRoutes = createRoutesFromElements(
           <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketSuppliersPage})} path="/suppliers" />
           <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketSupplierDetailPage})} path="/suppliers/:id" />
           <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketGroupPage})} path="/groups/:id" />
-          <Route lazy={async()=>({Component:(await import('./market/Pages')).MarketReportPage})} path="/reports/:id" />
           <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelsPage})} path="/channels" />
  <Route lazy={async()=>({Component:(await import("./contributions/Status")).MyContributionsPage})} path="/contributions"/>
- <Route lazy={async()=>({Component:(await import('./detection/Pages')).DetectionPage})} path="/detection" />
- <Route lazy={async()=>({Component:(await import('./detection/Pages')).DetectionDetailPage})} path="/detection/:taskID" />
- <Route lazy={async()=>({Component:(await import('./detection/Pages')).SavedDetectionReportPage})} path="/detection/reports/:reportID" />
           <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelEditorPage})} path="/channels/new" />
           <Route lazy={async()=>({Component:(await import('./group-channels/Pages')).GroupChannelEditorPage})} path="/channels/:id" />
           <Route element={<PointsPage />} path="/points" />

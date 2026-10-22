@@ -53,29 +53,13 @@ func TestRankReliableUsesMedianForThinSamples(t *testing.T) {
 	}
 }
 
-func TestRankFastestUsesEffectiveOutputAndLeavesUnknownBehindMeasuredLatency(t *testing.T) {
+func TestRankFastestUsesFirstTokenAndLeavesUnmeasuredBehind(t *testing.T) {
 	fast, slow := 200.0, 900.0
 	candidates := []Candidate{candidate("a", "x", 1), candidate("b", "x", 1), candidate("c", "x", 1)}
-	stats := map[string]ChannelStats{"a": {Attempts: 30, Successes: 30, TTFTP50MS: &fast, FirstOutputP50MS: &slow, FirstOutputSamples: 30}, "b": {Attempts: 30, Successes: 30, TTFTP50MS: &slow, FirstOutputP50MS: &fast, FirstOutputSamples: 30}}
+	stats := map[string]ChannelStats{"a": {Attempts: 30, Successes: 30, TTFTP50MS: &slow}, "b": {Attempts: 30, Successes: 30, TTFTP50MS: &fast}, "c": {Attempts: 3, Successes: 3, TTFTP50MS: &fast}}
 	got := ids(Rank(RankInput{Mode: routing.ModeFastest, Candidates: candidates, Stats: stats, ConsumerID: "me"}))
 	if got != "bac" {
-		t.Fatalf("first byte or unknown metric displaced effective output: %s", got)
-	}
-}
-
-func TestRankSpeedIsIndependentOfLatencyAndDoesNotUseThinSamples(t *testing.T) {
-	fast, slow, high, low := 200.0, 900.0, 160.0, 40.0
-	candidates := []Candidate{candidate("a", "provider", 1), candidate("b", "provider", 1), candidate("c", "provider", 1)}
-	stats := map[string]ChannelStats{
-		"a": {FirstOutputP50MS: &fast, FirstOutputSamples: 30, OutputTPSP50: &low, OutputSpeedSamples: 30},
-		"b": {FirstOutputP50MS: &slow, FirstOutputSamples: 30, OutputTPSP50: &high, OutputSpeedSamples: 30},
-		"c": {OutputTPSP50: &high, OutputSpeedSamples: 1},
-	}
-	if got := ids(Rank(RankInput{Mode: routing.ModeSpeed, Candidates: candidates, Stats: stats})); got != "bac" {
-		t.Fatal("speed borrowed latency/thin sample", got)
-	}
-	if got := ids(Rank(RankInput{Mode: routing.ModeFastest, Candidates: candidates, Stats: stats})); got != "abc" {
-		t.Fatal("latency borrowed output speed", got)
+		t.Fatalf("first-token order or thin sample displaced: %s", got)
 	}
 }
 

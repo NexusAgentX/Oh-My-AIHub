@@ -10,7 +10,6 @@ import (
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/audit"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/c2c"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/contribution"
-	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/detection"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/forum"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/gateway"
 	"github.com/NexusAgentX/Oh-My-AIHub/backend/internal/groupchannel"
@@ -30,9 +29,7 @@ const (
 type Dependencies struct {
 	Typical       *typical.Service
 	GroupChannels *groupchannel.Service
-	DetectionMCP  *detection.MCPFixture
 	Contributions *contribution.Service
-	Detection     *detection.Service
 	Forum         *forum.Service
 	Identity      *identity.Service
 	Ledger        *ledger.Service
@@ -55,9 +52,7 @@ type Dependencies struct {
 type app struct {
 	typical           *typical.Service
 	groupChannels     *groupchannel.Service
-	detectionMCP      *detection.MCPFixture
 	contributions     *contribution.Service
-	detection         *detection.Service
 	forum             *forum.Service
 	identity          *identity.Service
 	ledger            *ledger.Service
@@ -90,9 +85,7 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application := &app{
 		typical:           dependencies.Typical,
 		groupChannels:     dependencies.GroupChannels,
-		detectionMCP:      dependencies.DetectionMCP,
 		contributions:     dependencies.Contributions,
-		detection:         dependencies.Detection,
 		forum:             dependencies.Forum,
 		identity:          dependencies.Identity,
 		ledger:            dependencies.Ledger,
@@ -126,7 +119,6 @@ func buildHandler(dependencies Dependencies) (http.Handler, []route) {
 	application.registerC2CRoutes(routes)
 	application.registerObserveRoutes(routes)
 	application.registerForumRoutes(routes)
-	application.registerDetectionRoutes(routes)
 	application.registerContributionRoutes(routes)
 	application.registerGroupChannelRoutes(routes)
 	application.registerTypicalRoutes(routes)
