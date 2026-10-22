@@ -61,4 +61,3 @@ func TestServeCompressedResponsesKeepsOpaqueBytes(t *testing.T) {
 		t.Fatalf("status=%d upstream=%d finishes=%d body=%s", w.Code, seen, len(store.finished), w.Body.String())
 	}
 }
-
