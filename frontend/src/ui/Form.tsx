@@ -194,7 +194,7 @@ export function SearchInput({
   return (
     <span className={['search-form', className].filter(Boolean).join(' ')}>
       <Icon name="search" />
-      <input {...props} aria-label={label} className="input" type="search" />
+      <input {...props} aria-label={label} className="input" placeholder={props.placeholder ?? label} type="search" />
     </span>
   )
 }
