@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/url"
 	"strings"
@@ -47,18 +48,39 @@ func (e *Engine) priceUsage(call *callState, model catalog.Model, candidate Cand
 	return priced, raw, err
 }
 
+var quoteStatementKey = []byte("group_quote")
+
 // WithQuoteStatement keeps the historical envelope with versioned provenance.
+// The frozen quote is one more top-level member: an existing member is
+// replaced, otherwise it is appended before the closing brace. Both paths use
+// the request scanner and one copy, so settling a call never decodes and
+// re-encodes the whole price snapshot. The map round trip this replaces cost
+// about 60 allocations per call on the settlement path.
 func WithQuoteStatement(raw []byte, statement quotepricing.Statement) ([]byte, error) {
-	var saved map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &saved); err != nil {
-		return nil, err
-	}
 	encoded, err := json.Marshal(statement)
 	if err != nil {
 		return nil, err
 	}
-	saved["group_quote"] = encoded
-	return json.Marshal(saved)
+	valueStart, valueEnd, found := 0, 0, false
+	bounds, err := walkObject(raw, 0, func(key []byte, _ int, start, end int) {
+		if found || !bytes.EqualFold(key, quoteStatementKey) {
+			return
+		}
+		valueStart, valueEnd, found = start, end, true
+	})
+	if err != nil {
+		return nil, err
+	}
+	if found {
+		return applySplices(raw, []splice{{start: valueStart, end: valueEnd, value: encoded}}), nil
+	}
+	insertion := make([]byte, 0, len(encoded)+len(`"group_quote":`)+1)
+	if bounds.lastEnd != bounds.open+1 {
+		insertion = append(insertion, ',')
+	}
+	insertion = append(insertion, `"group_quote":`...)
+	insertion = append(insertion, encoded...)
+	return applySplices(raw, []splice{{start: bounds.lastEnd, end: bounds.lastEnd, value: insertion}}), nil
 }
 
 func endpointGeo(base string) string {
