@@ -3,6 +3,7 @@
   display: flex;
   gap: var(--space-2);
   overflow-x: auto;
+  scroll-snap-type: x proximity;
   padding: 2px 4px 6px 2px; /* 给选中项的投影留位置，避免被滚动容器裁掉 */
   scrollbar-width: none;
 }
@@ -15,6 +16,7 @@
   gap: 6px;
   padding: 0 var(--space-4);
   border: var(--sticker-border);
+  scroll-snap-align: start;
   border-color: transparent;
   border-radius: var(--radius-pill);
   color: var(--muted);
@@ -30,6 +32,11 @@
 .tab-count { padding: 0 7px; border-radius: var(--radius-pill); color: var(--muted); background: var(--selected); font-size: var(--text-xs); }
 .tab-active .tab-count { color: var(--ink); background: var(--canvas); }
 .tab-panel { padding-top: var(--space-3); }
+
+/* 窄屏收窄胶囊内边距，四个常用标签一行放得下；更长的标签仍可横向滚动。 */
+@media (max-width: 480px) {
+  .tab { padding-inline: var(--space-3); }
+}
 
 /* 分段选择：墨线胶囊，选中项填芥末 */
 .segmented {
