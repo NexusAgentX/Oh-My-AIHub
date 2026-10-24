@@ -3,8 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import type { components } from '../api/schema.gen'
 import { FormatTags } from '../calls'
 import { MarkdownContent } from '../markdown/MarkdownContent'
-import { SharingNav } from '../sharing/components'
-import { Badge, Button, ButtonLink, Card, EmptyState, Icon, PageHeader, QueryBoundary, SearchInput, TextField, Toolbar } from '../ui'
+import { Badge, ButtonLink, Card, EmptyState, Icon, PageHeader, Pagination, QueryBoundary, SearchInput, TextField, Toolbar } from '../ui'
 import { useMarketChannel, useMarketHall } from './queries'
 import './Hall.css'
 
@@ -28,9 +27,9 @@ function HallChannelCard({channel}:{channel:Channel}){
 export function MarketHallPage(){
   const [params,setParams]=useSearchParams(),query=useMarketHall(params)
   const update=(key:string,value:string)=>setParams(current=>{const next=new URLSearchParams(current);if(value)next.set(key,value);else next.delete(key);next.delete('cursor');return next},{replace:true})
-  return <><PageHeader title="渠道大厅" actions={<ButtonLink to="/channels/new">共享渠道</ButtonLink>}/><SharingNav/>
-    <div className="hall-toolbar"><Toolbar><SearchInput label="搜索渠道" value={params.get('channel_q')??''} onChange={e=>update('channel_q',e.target.value)}/><TextField label="模型 ID（精确）" value={params.get('model_id')??''} onChange={e=>update('model_id',e.target.value)}/></Toolbar></div>
-    <QueryBoundary query={query} errorFallback="渠道大厅加载失败">{data=><><p className="muted-copy">共 {data.total} 个渠道</p>{data.items.length?<div className="sharing-grid">{data.items.map(c=><HallChannelCard key={c.id} channel={c}/>)}</div>:<EmptyState title="暂无符合条件的渠道"/>}<div className="form-actions"><Button variant="quiet" disabled={!params.get('cursor')} onClick={()=>update('cursor','')}>回到第一页</Button><Button variant="secondary" disabled={!data.next_cursor} onClick={()=>setParams(current=>{const n=new URLSearchParams(current);n.set('cursor',data.next_cursor??'');return n})}>下一页</Button></div></>}</QueryBoundary>
+  return <><PageHeader title="渠道大厅" actions={<ButtonLink to="/channels/new">共享渠道</ButtonLink>}/>
+    <Toolbar><SearchInput label="搜索渠道" value={params.get('channel_q')??''} onChange={e=>update('channel_q',e.target.value)}/><TextField hideLabel label="模型 ID（精确）" placeholder="模型 ID（精确）" value={params.get('model_id')??''} onChange={e=>update('model_id',e.target.value)}/></Toolbar>
+    <QueryBoundary query={query} errorFallback="渠道大厅加载失败">{data=><><p className="muted-copy">共 {data.total} 个渠道</p>{data.items.length?<div className="sharing-grid">{data.items.map(c=><HallChannelCard key={c.id} channel={c}/>)}</div>:<EmptyState title="暂无符合条件的渠道"/>}<Pagination hasPrevious={Boolean(params.get('cursor'))} onPrevious={()=>update('cursor','')} hasNext={Boolean(data.next_cursor)} onNext={()=>setParams(current=>{const n=new URLSearchParams(current);n.set('cursor',data.next_cursor??'');return n})}/></>}</QueryBoundary>
   </>
 }
 export function MarketHallChannelPage(){

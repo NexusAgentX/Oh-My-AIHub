@@ -15,7 +15,13 @@ html:has(.test-site-notice) { --test-site-offset: var(--control-height); }
   font-size: var(--text-sm);
   font-weight: 700;
 }
-.app-shell { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: 100vh; min-height: 100dvh; }
+/* 外壳高度扣掉测试站提示条，否则短页面也会多出一条可滚动的空白 */
+.app-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  min-height: calc(100vh - var(--test-site-offset, 0px));
+  min-height: calc(100dvh - var(--test-site-offset, 0px));
+}
 
 .skip-link {
   position: absolute;
@@ -228,7 +234,16 @@ html:has(.test-site-notice) { --test-site-offset: var(--control-height); }
   font-size: var(--text-sm);
 }
 
-.page-content { width: min(100%, var(--content-max)); margin: 0 auto; padding: 28px 28px 48px; }
+.page-content {
+  display: flex;
+  width: min(100%, var(--content-max));
+  /* 列表短时也把内容撑满可视区，底部分页停在页面底部 */
+  min-height: calc(100vh - var(--topbar-height) - var(--test-site-offset, 0px));
+  min-height: calc(100dvh - var(--topbar-height) - var(--test-site-offset, 0px));
+  flex-direction: column;
+  margin: 0 auto;
+  padding: 28px 28px 48px;
+}
 .page-content:focus { outline: none; }
 .page-content > * + *:not(dialog) { margin-top: var(--space-4); } /* Dialog/Drawer 是脱离文档流的浮层，不参与内容间距 */
 .page-content > .page-heading + * { margin-top: 0; }
@@ -278,6 +293,8 @@ html:has(.test-site-notice) { --test-site-offset: var(--control-height); }
   .wallet-chip { margin-left: auto; }
   .session-alert { margin: var(--space-3) var(--space-4) 0; }
   .page-content {
+    min-height: calc(100vh - 56px - var(--test-site-offset, 0px));
+    min-height: calc(100dvh - 56px - var(--test-site-offset, 0px));
     padding: var(--space-4) max(var(--space-4), env(safe-area-inset-right)) calc(var(--bottom-bar-height) + env(safe-area-inset-bottom) + 32px) max(var(--space-4), env(safe-area-inset-left));
   }
 

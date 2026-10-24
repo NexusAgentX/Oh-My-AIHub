@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import {
-  Button,
   Card,
   EmptyState,
   PageHeader,
+  Pagination,
   QueryBoundary,
 } from '../ui'
 import { useContributions, type Kind } from './queries'
@@ -35,65 +35,56 @@ export function MyContributionsPage() {
           query={query}
           isEmpty={(d) => d.items.length === 0}
           empty={
-            <EmptyState
-              title="还没有贡献"
-              description="到供应商、分组或模型页发起修改，草稿会出现在这里。"
-            />
+            <Card>
+              <EmptyState
+                title="还没有贡献"
+                description="到供应商、分组或模型页发起修改，草稿会出现在这里。"
+              />
+            </Card>
           }
         >
           {(data) => (
-            <>
-              <div className="contribution-list">
-                {data.items.map((v) => {
-                  const editable = ['draft', 'rejected', 'withdrawn'].includes(
-                    v.state,
-                  )
-                  return (
-                    <article key={v.id}>
-                      <div>
-                        <strong>{v.title}</strong>
+            <div className="contribution-list">
+              {data.items.map((v) => {
+                const editable = ['draft', 'rejected', 'withdrawn'].includes(
+                  v.state,
+                )
+                return (
+                  <article key={v.id}>
+                    <div>
+                      <strong>{v.title}</strong>
+                      <p className="muted-copy">
+                        {kinds[v.kind as Kind] ?? v.kind} ·{' '}
+                        {stamp(v.updated_at)}
+                      </p>
+                      {v.review_reason && (
                         <p className="muted-copy">
-                          {kinds[v.kind as Kind] ?? v.kind} ·{' '}
-                          {stamp(v.updated_at)}
+                          驳回理由：{v.review_reason}
                         </p>
-                        {v.review_reason && (
-                          <p className="muted-copy">
-                            驳回理由：{v.review_reason}
-                          </p>
-                        )}
-                      </div>
-                      <StateBadge value={v.state} />
-                      <ContributionDialog
-                        draftID={v.id}
-                        label={editable ? '继续编辑' : '查看'}
-                        title={v.title}
-                      />
-                    </article>
-                  )
-                })}
-              </div>
-              <div className="form-actions">
-                <Button
-                  type="button"
-                  variant="quiet"
-                  disabled={!cursor}
-                  onClick={() => setCursor('')}
-                >
-                  回到最新
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={!data.next_cursor}
-                  onClick={() => setCursor(data.next_cursor ?? '')}
-                >
-                  下一页
-                </Button>
-              </div>
-            </>
+                      )}
+                    </div>
+                    <StateBadge value={v.state} />
+                    <ContributionDialog
+                      draftID={v.id}
+                      label={editable ? '继续编辑' : '查看'}
+                      title={v.title}
+                    />
+                  </article>
+                )
+              })}
+            </div>
           )}
         </QueryBoundary>
       </Card>
+      {query.data && query.data.items.length > 0 && (
+        <Pagination
+          firstLabel="回到最新"
+          hasPrevious={Boolean(cursor)}
+          onPrevious={() => setCursor('')}
+          hasNext={Boolean(query.data.next_cursor)}
+          onNext={() => setCursor(query.data.next_cursor ?? '')}
+        />
+      )}
     </>
   )
 }

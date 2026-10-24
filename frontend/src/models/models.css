@@ -95,8 +95,9 @@
 }
 
 .model-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
-/* 结果数与“仅看有在线渠道”同一行：开关决定显示多少个，放在数字旁边 */
-.model-filter-summary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2) var(--space-3); margin: var(--space-3) 0; color: var(--muted); font-size: var(--text-sm); }
-.model-filter-summary-end { display: flex; align-items: center; gap: var(--space-3); margin-left: auto; color: var(--body); }
 @media (max-width: 960px) { .model-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 480px) { .model-filters { grid-template-columns: minmax(0, 1fr); } }
+
+/* 只影响结果数量的开关跟在筛选控件行尾，不单独占一行 */
+.model-filter-toolbar .toolbar-end { gap: var(--space-3); }
+@media (max-width: 767px) { .model-filter-toolbar .toolbar-end { justify-content: space-between; } }

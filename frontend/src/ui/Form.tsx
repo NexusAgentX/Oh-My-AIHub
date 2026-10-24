@@ -13,6 +13,8 @@ import { SuggestInput, type Suggestion } from './Suggest'
 
 type FieldMeta = {
   label: string
+  /** 只给读屏与自动填充：选项文案已说明用途时，不再在控件上方显示 label */
+  hideLabel?: boolean
   /** 校验错误：显示为红色并设置 aria-invalid */
   error?: string
   /** 辅助说明，错误出现时被替换 */
@@ -23,6 +25,7 @@ type FieldMeta = {
 function FieldFrame({
   id,
   label,
+  hideLabel,
   error,
   hint,
   className,
@@ -31,7 +34,7 @@ function FieldFrame({
   const message = error || hint
   return (
     <label className={['field', className].filter(Boolean).join(' ')} htmlFor={id}>
-      <span className="field-label">{label}</span>
+      <span className={hideLabel ? 'visually-hidden' : 'field-label'}>{label}</span>
       {children}
       {message && (
         <span
@@ -51,6 +54,7 @@ function describedBy(id: string, meta: FieldMeta) {
 
 export function TextField({
   label,
+  hideLabel,
   error,
   hint,
   id,
@@ -71,7 +75,7 @@ export function TextField({
     id: fieldID,
   }
   return (
-    <FieldFrame className={className} error={error} hint={hint} id={fieldID} label={label}>
+    <FieldFrame className={className} error={error} hideLabel={hideLabel} hint={hint} id={fieldID} label={label}>
       {suggestions ? (
         <SuggestInput {...shared} suggestions={suggestions} />
       ) : (
@@ -125,6 +129,7 @@ export function PasswordField({
 
 export function SelectField({
   label,
+  hideLabel,
   error,
   hint,
   id,
@@ -135,7 +140,7 @@ export function SelectField({
   const generatedID = useId()
   const fieldID = id ?? generatedID
   return (
-    <FieldFrame className={className} error={error} hint={hint} id={fieldID} label={label}>
+    <FieldFrame className={className} error={error} hideLabel={hideLabel} hint={hint} id={fieldID} label={label}>
       <select
         {...props}
         aria-describedby={describedBy(fieldID, { label, error, hint })}
@@ -151,6 +156,7 @@ export function SelectField({
 
 export function TextareaField({
   label,
+  hideLabel,
   error,
   hint,
   id,
@@ -160,7 +166,7 @@ export function TextareaField({
   const generatedID = useId()
   const fieldID = id ?? generatedID
   return (
-    <FieldFrame className={className} error={error} hint={hint} id={fieldID} label={label}>
+    <FieldFrame className={className} error={error} hideLabel={hideLabel} hint={hint} id={fieldID} label={label}>
       <textarea
         {...props}
         aria-describedby={describedBy(fieldID, { label, error, hint })}

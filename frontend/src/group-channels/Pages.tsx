@@ -1,7 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { errorMessage } from '../api/query'
-import { SharingNav } from '../sharing/components'
 import { Badge, Button, ButtonLink, Card, Checkbox, ConfirmDialog, EmptyState, FormSection, Icon, IconButton, InlineError, Notice, PageHeader, PasswordField, QueryBoundary, SelectField, TextareaField, TextField, Tabs, SuccessMessage } from '../ui'
 import { useGroupAction, useGroupEvents, useGroupChannel, useGroupChannels, useGroupSources, useSaveGroupChannel, type Choice, type GroupChannel, type GroupSource, type Overrides } from './queries'
 import { ChannelStatsPanel, ChannelHealth } from '../channels/ChannelStatsPanel'
@@ -24,7 +23,6 @@ export function GroupChannelsPage({ admin = false }: { admin?: boolean }) {
   const channels = useGroupChannels(admin)
   return <>
     <PageHeader title={admin ? '渠道治理' : '我的渠道'} actions={!admin && <ButtonLink to="/channels/new" variant="primary" icon={<Icon name="plus" />}>添加渠道</ButtonLink>} />
-    {!admin && <SharingNav />}
     <QueryBoundary query={channels} errorFallback="渠道加载失败" isEmpty={(data) => data.items.length === 0} empty={<EmptyState title="还没有分组渠道" action={!admin && <ButtonLink to="/channels/new">添加渠道</ButtonLink>} />}>
       {(data) => <div className="channel-grid">{data.items.map((channel) => <Card key={channel.id} className="group-channel-card">
         <div className="group-channel-heading"><Link to={`${admin ? '/admin/channels' : '/channels'}/${channel.id}`}>{channel.name}</Link><Badge tone={channel.status === 'suspended' ? 'danger' : channel.available ? 'success' : 'warning'}>{channel.status === 'suspended' ? '已下架' : channel.status === 'unlisted' ? '未上架' : channel.available ? '可用' : '待处理'}</Badge></div>

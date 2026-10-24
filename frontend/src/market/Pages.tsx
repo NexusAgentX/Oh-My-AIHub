@@ -12,7 +12,7 @@ import { SupplierIcon } from '../sharing/components'
 import { EstimateCard } from '../typical/Page'
 import { useTypicalCosts } from '../typical/queries'
 import { formatTypicalPrice } from '../typical/format'
-import { Badge, Button, Card, Disclosure, EmptyState, InlineError, Notice, PageHeader, QueryBoundary, SearchInput, SelectField, SuccessMessage, Switch, Toolbar } from '../ui'
+import { Badge, Button, Card, Disclosure, EmptyState, InlineError, Notice, PageHeader, Pagination, QueryBoundary, SearchInput, SelectField, SuccessMessage, Switch, Toolbar } from '../ui'
 import { useMarketGroup, useMarketModel, useMarketModels, useMarketSuppliers,useSetMarketRouting } from './queries'
 import './market.css'
 
@@ -52,24 +52,23 @@ export function MarketModelGrid({ groupID, supplierID }: { groupID?: string; sup
   }, { replace: true })
   const search = new URLSearchParams(effective); search.delete('cursor'); search.delete('limit')
   return <>
-    <div className="model-filter-toolbar"><Toolbar>
+    <div className="model-filter-toolbar"><Toolbar end={<><Switch label="仅看有在线渠道" checked={params.get('only_online') === 'true'} onChange={v => update('only_online', String(v))} /><Button variant="quiet" onClick={() => setParams({})} disabled={!params.size}>清空筛选</Button></>}>
       <SearchInput label="搜索模型 ID" value={params.get('q') ?? ''} onChange={e => update('q', e.target.value)} />
-      <SelectField label="模型类型" value={params.get('model_type') ?? ''} onChange={e => update('model_type', e.target.value)}><option value="">全部</option><option value="text">文本推理</option><option value="image">图片生成</option></SelectField>
-      <SelectField label="协议入口" value={params.get('protocol') ?? ''} onChange={e => update('protocol', e.target.value)}><option value="">全部</option>{Object.entries(protocols).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</SelectField>
-      <SelectField label="排序" value={params.get('sort') ?? 'id'} onChange={e => update('sort', e.target.value)}><option value="id">模型 ID</option><option value="price">典型费用</option></SelectField>
+      <SelectField hideLabel label="模型类型" value={params.get('model_type') ?? ''} onChange={e => update('model_type', e.target.value)}><option value="">全部模型</option><option value="text">文本推理</option><option value="image">图片生成</option></SelectField>
+      <SelectField hideLabel label="协议入口" value={params.get('protocol') ?? ''} onChange={e => update('protocol', e.target.value)}><option value="">全部协议</option>{Object.entries(protocols).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</SelectField>
+      <SelectField hideLabel label="排序" value={params.get('sort') ?? 'id'} onChange={e => update('sort', e.target.value)}><option value="id">模型 ID</option><option value="price">典型费用</option></SelectField>
     </Toolbar></div>
     <Disclosure title="供应商与分组筛选">
       <div className="model-filters">
-        {!supplierID && <SelectField label="供应商" value={params.get('supplier_id') ?? ''} onChange={e => update('supplier_id', e.target.value)}><option value="">全部</option>{suppliers.data?.items.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</SelectField>}
-        {!groupID && <SelectField label="分组" value={params.get('group_id') ?? ''} onChange={e => update('group_id', e.target.value)}><option value="">全部</option>{suppliers.data?.groups.filter(g => !effective.get('supplier_id') || g.supplier_id === effective.get('supplier_id')).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</SelectField>}
+        {!supplierID && <SelectField hideLabel label="供应商" value={params.get('supplier_id') ?? ''} onChange={e => update('supplier_id', e.target.value)}><option value="">全部供应商</option>{suppliers.data?.items.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</SelectField>}
+        {!groupID && <SelectField hideLabel label="分组" value={params.get('group_id') ?? ''} onChange={e => update('group_id', e.target.value)}><option value="">全部分组</option>{suppliers.data?.groups.filter(g => !effective.get('supplier_id') || g.supplier_id === effective.get('supplier_id')).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</SelectField>}
       </div>
     </Disclosure>
-    <div className="model-filter-summary"><Switch label="仅看有在线渠道" checked={params.get('only_online') === 'true'} onChange={v => update('only_online', String(v))} /><Button variant="quiet" onClick={() => setParams({})} disabled={!params.size}>清空筛选</Button></div>
     <QueryBoundary query={query} errorFallback="模型目录加载失败">{data => <>
-      <p className="muted-copy" role="status">共 {data.total} 个模型 · 费用来自符合筛选的候选</p>
+      <p className="visually-hidden" role="status">共 {data.total} 个模型</p>
       {data.price_sort_fallback && <Notice tone="info">报价的计量单位不同，当前按模型 ID 排序。</Notice>}
       {data.items.length ? <div className="model-grid">{data.items.map(model => <ModelCard key={model.id} model={model} search={search.toString()} />)}</div> : <EmptyState title="没有符合条件的模型" />}
-      <div className="form-actions"><Button variant="quiet" disabled={!params.get('cursor')} onClick={() => update('cursor', '')}>回到第一页</Button><Button variant="secondary" disabled={!data.next_cursor} onClick={() => setParams(current => { const next = new URLSearchParams(current); next.set('cursor', data.next_cursor ?? ''); return next })}>下一页</Button></div>
+      <Pagination hasPrevious={Boolean(params.get('cursor'))} onPrevious={() => update('cursor', '')} hasNext={Boolean(data.next_cursor)} onNext={() => setParams(current => { const next = new URLSearchParams(current); next.set('cursor', data.next_cursor ?? ''); return next })} />
     </>}</QueryBoundary>
   </>
 }
@@ -133,7 +132,7 @@ function QuoteDetails({ offer }: { offer: Schema['MarketBrowseOffer'] }) {
 
 export function MarketSuppliersPage() {
   const query = useMarketSuppliers(), [params, setParams] = useSearchParams()
-  return <><PageHeader title="供应商" actions={<ContributionDialog create={{ kind: 'supplier', starter: true }} label="贡献供应商" title="新增供应商" variant="primary" />} /><Toolbar><SearchInput label="搜索供应商" value={params.get('q') ?? ''} onChange={e => setParams(p => { const n = new URLSearchParams(p); n.set('q', e.target.value); return n })} /><SelectField label="供应商分类" value={params.get('kind') ?? ''} onChange={e => setParams(p => { const n = new URLSearchParams(p); n.set('kind', e.target.value); return n })}><option value="">全部</option>{Object.entries(kinds).map(([k, label]) => <option value={k} key={k}>{label}</option>)}</SelectField></Toolbar>
+  return <><PageHeader title="供应商" actions={<ContributionDialog create={{ kind: 'supplier', starter: true }} label="贡献供应商" title="新增供应商" variant="primary" />} /><Toolbar><SearchInput label="搜索供应商" value={params.get('q') ?? ''} onChange={e => setParams(p => { const n = new URLSearchParams(p); n.set('q', e.target.value); return n })} /><SelectField hideLabel label="供应商分类" value={params.get('kind') ?? ''} onChange={e => setParams(p => { const n = new URLSearchParams(p); n.set('kind', e.target.value); return n })}><option value="">全部供应商</option>{Object.entries(kinds).map(([k, label]) => <option value={k} key={k}>{label}</option>)}</SelectField></Toolbar>
     <QueryBoundary query={query} errorFallback="供应商加载失败">{data => {
       const rows = data.items.filter(s => (!params.get('kind') || s.kind === params.get('kind')) && `${s.name} ${s.summary}`.toLowerCase().includes((params.get('q') ?? '').toLowerCase()))
       return rows.length ? <div className="sharing-grid">{rows.map(s => <Card key={s.id}><div className="sharing-title"><SupplierIcon supplier={s} /><h2><Link to={`/suppliers/${s.id}`}>{s.name}</Link></h2><Badge>{kinds[s.kind]}</Badge></div><p>{s.summary}</p><p className="muted-copy">{s.groups.length} 个分组</p></Card>)}</div> : <EmptyState title="暂无符合条件的供应商" />
