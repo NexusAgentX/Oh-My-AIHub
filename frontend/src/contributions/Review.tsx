@@ -10,6 +10,7 @@ import {
   InlineError,
   Notice,
   PageHeader,
+  Pagination,
   QueryBoundary,
   SelectField,
   TextField,
@@ -49,46 +50,35 @@ export function ContributionQueuePage() {
           empty={<EmptyState title="暂无待审核贡献" description="成员提交后会出现在这里。" />}
         >
           {(data) => (
-            <>
-              <div className="contribution-list">
-                {data.items.map((v) => (
-                  <article key={v.id}>
-                    <div>
-                      <strong>{v.title}</strong>
-                      <p className="muted-copy">
-                        {kinds[v.kind as Kind] ?? v.kind} ·{' '}
-                        {stamp(v.updated_at)}
-                      </p>
-                    </div>
-                    <StateBadge value={v.state} />
-                    <ButtonLink size="sm" to={`/admin/contributions/${v.id}`}>
-                      审核
-                    </ButtonLink>
-                  </article>
-                ))}
-              </div>
-              <div className="form-actions">
-                <Button
-                  type="button"
-                  variant="quiet"
-                  disabled={!cursor}
-                  onClick={() => setCursor('')}
-                >
-                  回到最新
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={!data.next_cursor}
-                  onClick={() => setCursor(data.next_cursor ?? '')}
-                >
-                  下一页
-                </Button>
-              </div>
-            </>
+            <div className="contribution-list">
+              {data.items.map((v) => (
+                <article key={v.id}>
+                  <div>
+                    <strong>{v.title}</strong>
+                    <p className="muted-copy">
+                      {kinds[v.kind as Kind] ?? v.kind} ·{' '}
+                      {stamp(v.updated_at)}
+                    </p>
+                  </div>
+                  <StateBadge value={v.state} />
+                  <ButtonLink size="sm" to={`/admin/contributions/${v.id}`}>
+                    审核
+                  </ButtonLink>
+                </article>
+              ))}
+            </div>
           )}
         </QueryBoundary>
       </Card>
+      {query.data && query.data.items.length > 0 && (
+        <Pagination
+          firstLabel="回到最新"
+          hasPrevious={Boolean(cursor)}
+          onPrevious={() => setCursor('')}
+          hasNext={Boolean(query.data.next_cursor)}
+          onNext={() => setCursor(query.data.next_cursor ?? '')}
+        />
+      )}
     </>
   )
 }
