@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ApiKey } from '../api/types'
-import { advancedChangedCount, budgetProgress, createRequest, emptyKeyForm, formFromKey, keyBadges, updateRequest, validateKeyForm } from './keyForm'
+import { advancedChangedCount, budgetProgress, createRequest, editRequest, emptyKeyForm, formFromKey, keyBadges, updateRequest, validateKeyForm } from './keyForm'
 
 const key: ApiKey = {
   id: 'k',
@@ -38,6 +38,12 @@ describe('API key form', () => {
     const original = formFromKey(key)
     expect(updateRequest(original, original)).toEqual({})
     expect(updateRequest(original, { ...original, name: '新名字', budgetDaily: '' })).toEqual({ name: '新名字', budget_daily: null })
+  })
+
+  it('keeps the enable/disable action out of the form patch', () => {
+    const original = formFromKey(key)
+    expect(editRequest(original, { ...original, enabled: false })).toEqual({})
+    expect(editRequest(original, { ...original, name: '新名字', enabled: false })).toEqual({ name: '新名字' })
   })
 
   it('validates budgets, model scope and aliases', () => {
