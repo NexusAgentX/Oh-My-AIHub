@@ -2,8 +2,8 @@
 .welcome {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  min-height: 100vh;
-  min-height: 100dvh;
+  min-height: calc(100vh - var(--test-site-offset, 0px));
+  min-height: calc(100dvh - var(--test-site-offset, 0px));
 }
 
 .welcome-header,

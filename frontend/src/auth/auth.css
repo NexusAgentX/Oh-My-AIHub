@@ -1,8 +1,9 @@
 /* 身份页面：登录、初始化、首次改密与账户设置 */
+/* 扣掉测试站提示条，否则一屏高的身份页会多出一条滚动空白 */
 .identity-page {
   display: grid;
-  min-height: 100vh;
-  min-height: 100dvh;
+  min-height: calc(100vh - var(--test-site-offset, 0px));
+  min-height: calc(100dvh - var(--test-site-offset, 0px));
   padding: var(--space-8) var(--space-5);
   place-items: center;
 }
@@ -39,7 +40,13 @@
 
 @media (max-width: 560px) {
   .identity-page { padding: 0; background: var(--canvas); }
-  .identity-card { min-height: 100vh; min-height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
+  .identity-card {
+    min-height: calc(100vh - var(--test-site-offset, 0px));
+    min-height: calc(100dvh - var(--test-site-offset, 0px));
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
 }
 
 .account-grid .success-message { margin-bottom: var(--space-4); }
