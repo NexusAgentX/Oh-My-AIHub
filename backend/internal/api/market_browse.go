@@ -53,7 +53,9 @@ func (a *app) marketSnapshot(w http.ResponseWriter, r *http.Request) (*marketbro
 }
 func marketQuery(r *http.Request) (marketbrowse.Query, int, error) {
 	v := r.URL.Query()
-	q := marketbrowse.Query{ModelID: v.Get("model_id"), SupplierID: v.Get("supplier_id"), GroupID: v.Get("group_id"), Search: v.Get("q"), ModelType: v.Get("model_type"), Format: channel.Format(v.Get("format")), Protocol: v.Get("protocol"), Sort: v.Get("sort")}
+	// supplier_id and group_id repeat: supplier scopes mean all of their
+	// groups, group scopes add individual groups, and both are unioned.
+	q := marketbrowse.Query{ModelID: v.Get("model_id"), SupplierIDs: v["supplier_id"], GroupIDs: v["group_id"], Search: v.Get("q"), ModelType: v.Get("model_type"), Format: channel.Format(v.Get("format")), Protocol: v.Get("protocol"), Sort: v.Get("sort")}
 	if value := v.Get("only_online"); value != "" {
 		b, err := strconv.ParseBool(value)
 		if err != nil {

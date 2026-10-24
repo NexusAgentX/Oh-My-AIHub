@@ -23,12 +23,10 @@ describe('approved group market presentation',()=>{
     expect(html).toContain('匹配候选的典型费用')
     expect(html).toContain('全部模型')
     expect(html).toContain('全部协议')
-    expect(html).toContain('全部供应商')
-    expect(html).toContain('全部分组')
+    expect(html).toContain('供应商与分组筛选：全部供应商')
+    expect(html).not.toContain('全部分组')
     expect(html).toContain('仅看有在线渠道')
     expect(html).toContain('aria-label="分页"')
-    // 供应商/分组与其余筛选项同一行，不再占一个可折叠分区
-    expect(html).not.toContain('供应商与分组筛选')
     // 结果数只留给读屏；筛选项不再在控件上方重复 label
     expect(html).toContain('visually-hidden')
     expect(html).not.toMatch(/field-label[^>]*>(模型类型|协议入口|排序|供应商|分组)</)

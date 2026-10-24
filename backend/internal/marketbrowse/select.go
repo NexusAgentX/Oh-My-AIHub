@@ -50,15 +50,18 @@ type Offering struct {
 	Channels                                              []Channel
 }
 type Query struct {
-	ModelID    string         `json:"model_id"`
-	SupplierID string         `json:"supplier_id"`
-	GroupID    string         `json:"group_id"`
-	Protocol   string         `json:"protocol"`
-	Search     string         `json:"search"`
-	ModelType  string         `json:"model_type"`
-	Format     channel.Format `json:"format"`
-	OnlyOnline bool           `json:"only_online"`
-	Sort       string         `json:"sort"`
+	ModelID string `json:"model_id"`
+	// SupplierIDs select every group of those suppliers; GroupIDs add the
+	// remaining explicitly selected groups. Both lists are a union, so a
+	// caller can mix "whole supplier" and "specific group" scopes.
+	SupplierIDs []string       `json:"supplier_ids"`
+	GroupIDs    []string       `json:"group_ids"`
+	Protocol    string         `json:"protocol"`
+	Search      string         `json:"search"`
+	ModelType   string         `json:"model_type"`
+	Format      channel.Format `json:"format"`
+	OnlyOnline  bool           `json:"only_online"`
+	Sort        string         `json:"sort"`
 }
 type Scope struct {
 	// Version must cover the approved offering/candidate/price snapshot
@@ -97,9 +100,29 @@ type Page struct {
 }
 type cursor struct{ Scope, After string }
 
+const maxFilterScopes = 200
+
+func normalizeIDs(ids []string) []string {
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if id = strings.TrimSpace(id); id != "" {
+			out = append(out, id)
+		}
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
 func (q Query) validate() bool {
-	if q.ModelID != "" && !gatewaycontract.ValidModelID(q.ModelID) || len(q.SupplierID) > 128 || len(q.GroupID) > 128 {
+	if q.ModelID != "" && !gatewaycontract.ValidModelID(q.ModelID) || len(q.SupplierIDs) > maxFilterScopes || len(q.GroupIDs) > maxFilterScopes {
 		return false
+	}
+	for _, ids := range [][]string{q.SupplierIDs, q.GroupIDs} {
+		for _, id := range ids {
+			if len(id) > 128 {
+				return false
+			}
+		}
 	}
 	if q.Protocol != "" && !slices.Contains([]string{"openai-chat-completions", "openai-responses", "native-messages", "native-generate-content", "openai-images"}, q.Protocol) {
 		return false
@@ -144,8 +167,10 @@ func priceLess(a, b *Price) bool {
 }
 
 // Select filters permissions, governance and protocol on each witness before
-// grouping, counting, sorting or pagination. No union of unrelated groups,
-// protocols or channels can create a matching witness.
+// grouping, counting, sorting or pagination. Supplier scopes expand to all of
+// their groups and explicit group scopes are added as a union; matching
+// witnesses always come from a selected supplier or group, and no unrelated
+// protocols or channels are combined into one witness.
 func Select(offers []Offering, scope Scope, q Query, after string, limit int) (Page, error) {
 	if limit < 1 || limit > 100 {
 		return Page{Items: []Model{}}, ErrFilter
@@ -161,6 +186,8 @@ func FilterAll(offers []Offering, scope Scope, q Query) (Page, error) {
 }
 func selectPage(offers []Offering, scope Scope, q Query, after string, limit int) (Page, error) {
 	page := Page{Items: []Model{}}
+	q.SupplierIDs = normalizeIDs(q.SupplierIDs)
+	q.GroupIDs = normalizeIDs(q.GroupIDs)
 	if scope.Version == "" || scope.ActorID == "" || !q.validate() || limit < 1 {
 		return page, ErrFilter
 	}
@@ -196,7 +223,10 @@ func selectPage(offers []Offering, scope Scope, q Query, after string, limit int
 	}
 	models := map[string]*aggregate{}
 	for _, offer := range offers {
-		if q.ModelID != "" && q.ModelID != offer.ModelID || q.SupplierID != "" && q.SupplierID != offer.SupplierID || q.GroupID != "" && q.GroupID != offer.GroupID {
+		if q.ModelID != "" && q.ModelID != offer.ModelID {
+			continue
+		}
+		if len(q.SupplierIDs)+len(q.GroupIDs) > 0 && !slices.Contains(q.SupplierIDs, offer.SupplierID) && !slices.Contains(q.GroupIDs, offer.GroupID) {
 			continue
 		}
 		if !offer.Visible || !offer.Enabled || !validProtocol(offer.Protocol, offer.Format) || offer.GroupModelID == "" || offer.GroupID == "" || offer.SupplierID == "" || offer.ModelType != "text" && offer.ModelType != "image" || !gatewaycontract.ValidModelID(offer.ModelID) || len(allowed) > 0 && !slices.Contains(allowed, offer.ModelID) || q.ModelType != "" && offer.ModelType != q.ModelType || q.Format != "" && offer.Format != q.Format || q.Protocol != "" && offer.Protocol != q.Protocol || q.Search != "" && !strings.Contains(strings.ToLower(offer.ModelID), strings.ToLower(q.Search)) {

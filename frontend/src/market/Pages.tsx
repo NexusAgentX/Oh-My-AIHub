@@ -14,6 +14,8 @@ import { useTypicalCosts } from '../typical/queries'
 import { formatTypicalPrice } from '../typical/format'
 import { Badge, Button, Card, Disclosure, EmptyState, InlineError, Notice, PageHeader, Pagination, QueryBoundary, SearchInput, SelectField, SuccessMessage, Switch, Toolbar } from '../ui'
 import { useMarketGroup, useMarketModel, useMarketModels, useMarketSuppliers,useSetMarketRouting } from './queries'
+import { ParentFilter } from './ParentFilter'
+import { readParentSelection, writeParentSelection } from './parentSelection'
 import './market.css'
 
 type Schema = components['schemas']
@@ -38,27 +40,47 @@ function ModelCard({ model, search }: { model: Model; search: string }) {
 
 export function MarketModelGrid({ groupID, supplierID }: { groupID?: string; supplierID?: string }) {
   const [params, setParams] = useSearchParams()
-  const effective = new URLSearchParams(params)
-  if (groupID) effective.set('group_id', groupID)
-  if (supplierID) effective.set('supplier_id', supplierID)
-  const query = useMarketModels(effective)
   const suppliers = useMarketSuppliers()
+  const scopedGroups = supplierID ? (suppliers.data?.groups.filter(group => group.supplier_id === supplierID) ?? []) : []
+  const effective = new URLSearchParams(params)
+  if (groupID) {
+    // 详情页已经锁定分组：忽略 URL 上的父级筛选，避免并集把范围放大。
+    effective.delete('supplier_id')
+    effective.delete('group_id')
+    effective.set('group_id', groupID)
+  } else if (supplierID) {
+    // 供应商详情：选了分组就只发分组（分组已隐含供应商），否则发供应商全范围。
+    effective.delete('supplier_id')
+    effective.delete('group_id')
+    const chosen = scopedGroups.find(group => params.getAll('group_id').includes(group.id))
+    if (chosen) effective.set('group_id', chosen.id)
+    else effective.set('supplier_id', supplierID)
+  }
+  const query = useMarketModels(effective)
   const update = (key: string, value: string) => setParams(current => {
     const next = new URLSearchParams(current)
     if (value) next.set(key, value); else next.delete(key)
     next.delete('cursor')
-    if (key === 'supplier_id') next.delete('group_id')
     return next
   }, { replace: true })
+  const updateGroup = (value: string) => setParams(current => {
+    const next = new URLSearchParams(current)
+    next.delete('group_id')
+    if (value) next.set('group_id', value)
+    next.delete('cursor')
+    return next
+  }, { replace: true })
+  const selectedGroup = scopedGroups.find(group => params.getAll('group_id').includes(group.id))?.id ?? ''
   const search = new URLSearchParams(effective); search.delete('cursor'); search.delete('limit')
+  const parentFilter = !supplierID && !groupID
   return <>
-    <div className="model-filter-toolbar"><Toolbar end={<><Switch label="仅看有在线渠道" checked={params.get('only_online') === 'true'} onChange={v => update('only_online', String(v))} /><Button variant="quiet" onClick={() => setParams({})} disabled={!params.size}>清空筛选</Button></>}>
+    <div className="model-filter-toolbar"><Toolbar end={<Switch label="仅看有在线渠道" checked={params.get('only_online') === 'true'} onChange={v => update('only_online', String(v))} />}>
       <SearchInput label="搜索模型 ID" value={params.get('q') ?? ''} onChange={e => update('q', e.target.value)} />
       <SelectField hideLabel label="模型类型" value={params.get('model_type') ?? ''} onChange={e => update('model_type', e.target.value)}><option value="">全部模型</option><option value="text">文本推理</option><option value="image">图片生成</option></SelectField>
       <SelectField hideLabel label="协议入口" value={params.get('protocol') ?? ''} onChange={e => update('protocol', e.target.value)}><option value="">全部协议</option>{Object.entries(protocols).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</SelectField>
       <SelectField hideLabel label="排序" value={params.get('sort') ?? 'id'} onChange={e => update('sort', e.target.value)}><option value="id">模型 ID</option><option value="price">典型费用</option></SelectField>
-      {!supplierID && <SelectField hideLabel label="供应商" value={params.get('supplier_id') ?? ''} onChange={e => update('supplier_id', e.target.value)}><option value="">全部供应商</option>{suppliers.data?.items.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</SelectField>}
-      {!groupID && <SelectField hideLabel label="分组" value={params.get('group_id') ?? ''} onChange={e => update('group_id', e.target.value)}><option value="">全部分组</option>{suppliers.data?.groups.filter(g => !effective.get('supplier_id') || g.supplier_id === effective.get('supplier_id')).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</SelectField>}
+      {parentFilter && <ParentFilter groups={suppliers.data?.groups ?? []} loading={suppliers.isPending} onChange={next => setParams(writeParentSelection(params, next), { replace: true })} selection={readParentSelection(params)} suppliers={suppliers.data?.items ?? []} />}
+      {supplierID && !groupID && <SelectField hideLabel label="分组" value={selectedGroup} onChange={e => updateGroup(e.target.value)}><option value="">全部分组</option>{scopedGroups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</SelectField>}
     </Toolbar></div>
     <QueryBoundary query={query} errorFallback="模型目录加载失败">{data => <>
       <p className="visually-hidden" role="status">共 {data.total} 个模型</p>
