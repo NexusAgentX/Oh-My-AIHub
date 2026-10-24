@@ -79,7 +79,7 @@ h2 { margin-bottom: 0; font-family: var(--font-display); font-size: var(--text-m
 .multiplier-text { display: inline-grid; gap: 1px; }
 .multiplier-text > small { color: var(--muted); font-size: var(--text-xs); font-weight: 400; white-space: nowrap; }
 
-.route-loading { display: grid; min-height: 100vh; min-height: 100dvh; place-items: center; }
+.route-loading { display: grid; min-height: calc(100vh - var(--test-site-offset, 0px)); min-height: calc(100dvh - var(--test-site-offset, 0px)); place-items: center; }
 
 @media (max-width: 767px) {
   h1 { font-size: var(--text-xl); }
