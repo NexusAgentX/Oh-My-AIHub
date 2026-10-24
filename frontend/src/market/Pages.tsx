@@ -57,13 +57,9 @@ export function MarketModelGrid({ groupID, supplierID }: { groupID?: string; sup
       <SelectField hideLabel label="模型类型" value={params.get('model_type') ?? ''} onChange={e => update('model_type', e.target.value)}><option value="">全部模型</option><option value="text">文本推理</option><option value="image">图片生成</option></SelectField>
       <SelectField hideLabel label="协议入口" value={params.get('protocol') ?? ''} onChange={e => update('protocol', e.target.value)}><option value="">全部协议</option>{Object.entries(protocols).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</SelectField>
       <SelectField hideLabel label="排序" value={params.get('sort') ?? 'id'} onChange={e => update('sort', e.target.value)}><option value="id">模型 ID</option><option value="price">典型费用</option></SelectField>
+      {!supplierID && <SelectField hideLabel label="供应商" value={params.get('supplier_id') ?? ''} onChange={e => update('supplier_id', e.target.value)}><option value="">全部供应商</option>{suppliers.data?.items.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</SelectField>}
+      {!groupID && <SelectField hideLabel label="分组" value={params.get('group_id') ?? ''} onChange={e => update('group_id', e.target.value)}><option value="">全部分组</option>{suppliers.data?.groups.filter(g => !effective.get('supplier_id') || g.supplier_id === effective.get('supplier_id')).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</SelectField>}
     </Toolbar></div>
-    <Disclosure title="供应商与分组筛选">
-      <div className="model-filters">
-        {!supplierID && <SelectField hideLabel label="供应商" value={params.get('supplier_id') ?? ''} onChange={e => update('supplier_id', e.target.value)}><option value="">全部供应商</option>{suppliers.data?.items.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</SelectField>}
-        {!groupID && <SelectField hideLabel label="分组" value={params.get('group_id') ?? ''} onChange={e => update('group_id', e.target.value)}><option value="">全部分组</option>{suppliers.data?.groups.filter(g => !effective.get('supplier_id') || g.supplier_id === effective.get('supplier_id')).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</SelectField>}
-      </div>
-    </Disclosure>
     <QueryBoundary query={query} errorFallback="模型目录加载失败">{data => <>
       <p className="visually-hidden" role="status">共 {data.total} 个模型</p>
       {data.price_sort_fallback && <Notice tone="info">报价的计量单位不同，当前按模型 ID 排序。</Notice>}

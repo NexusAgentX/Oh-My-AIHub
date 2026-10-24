@@ -94,10 +94,11 @@
   .routing-handle { width: 44px; height: 44px; }
 }
 
-.model-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
-@media (max-width: 960px) { .model-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 480px) { .model-filters { grid-template-columns: minmax(0, 1fr); } }
-
 /* 只影响结果数量的开关跟在筛选控件行尾，不单独占一行 */
-.model-filter-toolbar .toolbar-end { gap: var(--space-3); }
-@media (max-width: 767px) { .model-filter-toolbar .toolbar-end { justify-content: space-between; } }
+.model-filter-toolbar .toolbar { align-items: flex-start; flex-wrap: nowrap; }
+.model-filter-toolbar .toolbar-main { min-width: 0; flex: 1 1 auto; }
+.model-filter-toolbar .toolbar-end { flex: 0 0 auto; margin-top: 4px; gap: var(--space-3); }
+@media (max-width: 767px) {
+  .model-filter-toolbar .toolbar { align-items: stretch; }
+  .model-filter-toolbar .toolbar-end { justify-content: space-between; margin-top: 0; }
+}
