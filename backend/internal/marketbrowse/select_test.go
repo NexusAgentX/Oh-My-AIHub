@@ -3,6 +3,7 @@ package marketbrowse
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -110,6 +111,51 @@ func TestRetiredCodexProtocolIsNotAFilter(t *testing.T) {
 	for _, q := range []Query{{Protocol: "codex-special"}, {Format: channel.Format("codex-special")}} {
 		if _, err := Select([]Offering{offer("model-a", "a")}, scope(), q, "", 20); !errors.Is(err, ErrFilter) {
 			t.Fatalf("%+v: retired protocol accepted", q)
+		}
+	}
+}
+
+func TestSupplierAndGroupScopesUnionWithoutOrderDependence(t *testing.T) {
+	rows := []Offering{offer("model-a", "a"), offer("model-b", "b"), offer("model-c", "c")}
+	rows[1].SupplierID = "supplier-2"
+	rows[2].SupplierID = "supplier-2"
+	q := query()
+	q.SupplierIDs = []string{"supplier"}
+	q.GroupIDs = []string{"b"}
+	page, err := Select(rows, scope(), q, "", 20)
+	if err != nil || page.Total != 2 || page.Items[0].ID != "model-a" || page.Items[1].ID != "model-b" {
+		t.Fatal("supplier scope and explicit group were not unioned", page, err)
+	}
+	q.GroupIDs = []string{"c", "b", "b"}
+	page, err = Select(rows, scope(), q, "", 20)
+	if err != nil || page.Total != 3 {
+		t.Fatal("repeated group scopes did not union and deduplicate", page, err)
+	}
+
+	first := query()
+	first.GroupIDs = []string{"a", "b"}
+	second := query()
+	second.GroupIDs = []string{"b", "a", "a"}
+	one, err := Select(rows, scope(), first, "", 1)
+	if err != nil || one.NextCursor == nil {
+		t.Fatal("fixture did not paginate", one, err)
+	}
+	expected, err := Select(rows, scope(), first, *one.NextCursor, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resumed, err := Select(rows, scope(), second, *one.NextCursor, 1)
+	if err != nil || resumed.Total != 2 || len(resumed.Items) != 1 || resumed.Items[0].ID != expected.Items[0].ID {
+		t.Fatal("scope order changed the cursor binding", resumed, expected, err)
+	}
+
+	tooMany := Query{SupplierIDs: make([]string, maxFilterScopes+1)}
+	for i := range tooMany.SupplierIDs {
+		tooMany.SupplierIDs[i] = fmt.Sprintf("supplier-%d", i)
+	}
+	for _, bad := range []Query{{GroupIDs: []string{strings.Repeat("x", 129)}}, tooMany} {
+		if _, err := Select(rows, scope(), bad, "", 20); !errors.Is(err, ErrFilter) {
+			t.Fatalf("%+v: oversized scope accepted", bad)
 		}
 	}
 }

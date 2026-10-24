@@ -103,15 +103,27 @@ paths:
           {
             "in": "query",
             "name": "supplier_id",
+            "description": "供应商 ID；重复表示这些供应商的全部分组",
+            "style": "form",
+            "explode": true,
             "schema": {
-              "type": "string"
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           {
             "in": "query",
             "name": "group_id",
+            "description": "分组 ID；重复表示这些分组；与 supplier_id 取并集",
+            "style": "form",
+            "explode": true,
             "schema": {
-              "type": "string"
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           {
@@ -377,15 +389,27 @@ paths:
           {
             "in": "query",
             "name": "supplier_id",
+            "description": "供应商 ID；重复表示这些供应商的全部分组",
+            "style": "form",
+            "explode": true,
             "schema": {
-              "type": "string"
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           {
             "in": "query",
             "name": "group_id",
+            "description": "分组 ID；重复表示这些分组；与 supplier_id 取并集",
+            "style": "form",
+            "explode": true,
             "schema": {
-              "type": "string"
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           {
@@ -553,15 +577,27 @@ paths:
           {
             "in": "query",
             "name": "supplier_id",
+            "description": "供应商 ID；重复表示这些供应商的全部分组",
+            "style": "form",
+            "explode": true,
             "schema": {
-              "type": "string"
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           {
             "in": "query",
             "name": "group_id",
+            "description": "分组 ID；重复表示这些分组；与 supplier_id 取并集",
+            "style": "form",
+            "explode": true,
             "schema": {
-              "type": "string"
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           {

@@ -80,6 +80,14 @@ func TestMarketBrowseUsesApprovedIDsScopesCursorAndPublicationBarrier(t *testing
 	if filtered["total"] != float64(1) {
 		t.Fatal("plain protocol filter changed the approved page", filtered)
 	}
+	repeated := member.expect(t, 200, "GET", "/api/market/models?group_id=group&group_id=missing", nil)
+	if repeated["total"] != float64(2) {
+		t.Fatal("repeated group scopes did not filter as a union", repeated)
+	}
+	union := member.expect(t, 200, "GET", "/api/market/models?supplier_id=supplier&group_id=missing", nil)
+	if union["total"] != float64(2) {
+		t.Fatal("supplier scope did not expand to its groups", union)
+	}
 	member.expect(t, 422, "GET", "/api/market/models?sort=unknown_sort", nil)
 	detail := member.expect(t, 200, "GET", "/api/market/models/same%2Fmodel:v1", nil)
 	if detail["model"].(map[string]any)["id"] != "same/model:v1" {

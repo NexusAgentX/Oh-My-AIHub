@@ -4467,8 +4467,10 @@ export interface operations {
         parameters: {
             query?: {
                 model_id?: string;
-                supplier_id?: string;
-                group_id?: string;
+                /** @description 供应商 ID；重复表示这些供应商的全部分组 */
+                supplier_id?: string[];
+                /** @description 分组 ID；重复表示这些分组；与 supplier_id 取并集 */
+                group_id?: string[];
                 q?: string;
                 model_type?: string;
                 format?: string;
@@ -4630,8 +4632,10 @@ export interface operations {
         parameters: {
             query?: {
                 model_id?: string;
-                supplier_id?: string;
-                group_id?: string;
+                /** @description 供应商 ID；重复表示这些供应商的全部分组 */
+                supplier_id?: string[];
+                /** @description 分组 ID；重复表示这些分组；与 supplier_id 取并集 */
+                group_id?: string[];
                 q?: string;
                 model_type?: string;
                 format?: string;
@@ -4716,8 +4720,10 @@ export interface operations {
         parameters: {
             query?: {
                 model_id?: string;
-                supplier_id?: string;
-                group_id?: string;
+                /** @description 供应商 ID；重复表示这些供应商的全部分组 */
+                supplier_id?: string[];
+                /** @description 分组 ID；重复表示这些分组；与 supplier_id 取并集 */
+                group_id?: string[];
                 q?: string;
                 model_type?: string;
                 format?: string;
