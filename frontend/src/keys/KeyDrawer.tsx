@@ -21,9 +21,9 @@ import {
 import {
   advancedChangedCount,
   createRequest,
+  editRequest,
   emptyKeyForm,
   formFromKey,
-  updateRequest,
   validateKeyForm,
   type KeyForm,
 } from './keyForm'
@@ -227,9 +227,20 @@ function KeyEditForm({ detail, initialSecret, onDeleted }: { detail: ApiKeyDetai
   const [message, setMessage] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const update = useUpdateKey(detail.key.id)
+  const toggle = useUpdateKey(detail.key.id)
   const remove = useDeleteKey()
-  const patch = updateRequest(original, form)
+  // 启用状态由独立按钮即时切换，不进入表单保存，避免陈旧状态被一起提交
+  const patch = editRequest(original, form)
   const dirty = Object.keys(patch).length > 0
+  const enabled = detail.key.status === 'enabled'
+  const toggleStatus = () => {
+    setError('')
+    setMessage('')
+    toggle.mutate(
+      { status: enabled ? 'disabled' : 'enabled' },
+      { onError: (caught) => setError(errorMessage(caught, '切换状态失败，请重试')) },
+    )
+  }
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -248,22 +259,27 @@ function KeyEditForm({ detail, initialSecret, onDeleted }: { detail: ApiKeyDetai
       {initialSecret && <SuccessMessage>Key 已创建</SuccessMessage>}
       <KeySecret initial={initialSecret} keyId={detail.key.id} prefix={detail.key.prefix} />
       <TextField label="名称" maxLength={64} onChange={(event) => setForm({ ...form, name: event.target.value })} value={form.name} />
-      <Switch checked={form.enabled} label={form.enabled ? '已启用' : '已停用'} onChange={(enabled) => setForm({ ...form, enabled })} />
-      <Disclosure changed={advancedChangedCount(form, detail.routing.length)} title="高级设置">
-        <KeyAdvancedFields form={form} onChange={setForm} />
-        <fieldset className="form-section">
-          <legend>路由</legend>
-          <KeyRoutingSection keyId={detail.key.id} routing={detail.routing} />
-        </fieldset>
-      </Disclosure>
+      <KeyAdvancedFields form={form} onChange={setForm} />
+      <fieldset className="form-section">
+        <legend>路由</legend>
+        <KeyRoutingSection keyId={detail.key.id} routing={detail.routing} />
+      </fieldset>
       <InlineError>{error}</InlineError>
       <SuccessMessage>{dirty ? '' : message}</SuccessMessage>
       <div className="form-actions key-form-actions">
-        <span role="status">{dirty ? '有未保存修改' : '已保存'}</span>
+        <Button
+          disabled={update.isPending}
+          loading={toggle.isPending}
+          onClick={toggleStatus}
+          type="button"
+          variant="secondary"
+        >
+          {enabled ? '停用' : '启用'}
+        </Button>
         <Button icon={<Icon name="trash" />} onClick={() => setConfirmDelete(true)} type="button" variant="danger">
           删除
         </Button>
-        <Button disabled={!dirty} loading={update.isPending}>
+        <Button disabled={!dirty || toggle.isPending} loading={update.isPending}>
           保存
         </Button>
       </div>

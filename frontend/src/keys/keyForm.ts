@@ -113,6 +113,13 @@ export function updateRequest(original: KeyForm, form: KeyForm): ApiKeyUpdateReq
   return patch as ApiKeyUpdateRequest
 }
 
+/** 编辑抽屉的保存：启用状态由独立按钮即时切换，表单不提交 status。 */
+export function editRequest(original: KeyForm, form: KeyForm): ApiKeyUpdateRequest {
+  const patch = updateRequest(original, form)
+  delete patch.status
+  return patch
+}
+
 export type BudgetProgress = { label: string; percent: number; warn: boolean }
 
 /** 最紧的一项预算：已花 / 预算。没有预算返回 null。≥80% 时提示。 */
